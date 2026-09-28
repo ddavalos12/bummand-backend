@@ -22,22 +22,22 @@ export class Becario {
   universidad: string;
 
   @Column({ type: 'varchar', length: 150, nullable: true })
-  institucion: string;
+  institucion: string | null;
 
   @Column({ name: 'iglesia_id', nullable: true })
-  iglesiaId: number;
+  iglesiaId: number | null;
 
   @Column({ name: 'lugar_practica_id', nullable: true })
-  lugarPracticaId: number;
+  lugarPracticaId: number | null;
 
   @Column({ name: 'fecha_ingreso', type: 'date' })
   fechaIngreso: Date;
 
   @Column({ name: 'supervisor_id', nullable: true })
-  supervisorId: number;
+  supervisorId: number | null;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
-  unidad: string;
+  unidad: string | null;
 
   @OneToOne(() => Usuario, (usuario) => usuario.becario, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'usuario_id' })
@@ -45,15 +45,15 @@ export class Becario {
 
   @ManyToOne(() => Usuario, (usuario) => usuario.becariosSupervisados, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'supervisor_id' })
-  supervisor: Usuario;
+  supervisor: Usuario | null;
 
   @ManyToOne(() => Iglesia, (iglesia) => iglesia.becarios)
   @JoinColumn({ name: 'iglesia_id' })
-  iglesia: Iglesia;
+  iglesia: Iglesia | null;
 
   @ManyToOne(() => LugarPractica, (lugarPractica) => lugarPractica.becarios)
   @JoinColumn({ name: 'lugar_practica_id' })
-  lugarPractica: LugarPractica;
+  lugarPractica: LugarPractica | null;
 
   @OneToMany(() => RegistroAsistencia, (registro) => registro.becario)
   registrosAsistencia: RegistroAsistencia[];
