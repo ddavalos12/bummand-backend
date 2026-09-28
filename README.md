@@ -11,12 +11,12 @@ El proyecto sigue una arquitectura modular y en estricto español:
 
 ## Comandos
 
-- `npm run compilar`: Compila el proyecto con Nest CLI.
-- `npm run compilar:formax`: Compilación rápida con webpack.
-- `npm run start:dev`: Inicia en modo desarrollo con auto-recarga.
-- `npm run start:prod`: Inicia en modo producción.
-- `npm run format`: Formatea el código.
-- `npm run lint`: Revisa el código.
+- `npm run compilar`: Compila el proyecto con Nest CLI (utilizando webpack por defecto para optimizar y facilitar el despliegue).
+- `npm run iniciar:desarrollo`: Inicia en modo desarrollo con auto-recarga.
+- `npm run iniciar:produccion`: Inicia en modo producción.
+- `npm run formatear`: Formatea el código con Prettier.
+- `npm run revisar`: Revisa el código con ESLint.
+- `npm run pruebas`: Ejecuta las pruebas unitarias.
 
 ## Configuración de Base de Datos
 
