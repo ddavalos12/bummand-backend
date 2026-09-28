@@ -22,6 +22,7 @@ import { RegistroAsistencia } from './modulos/asistencia/entidades/registro-asis
 import { PasajesModulo } from './modulos/pasajes/pasajes.modulo';
 import { SolicitudPasajes } from './modulos/pasajes/entidades/solicitud-pasaje.entidad';
 import { Recorrido } from './modulos/pasajes/entidades/recorrido.entidad';
+import { PdfModulo } from './modulos/pdf/pdf.modulo';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { Recorrido } from './modulos/pasajes/entidades/recorrido.entidad';
     AutenticacionModulo,
     AsistenciaModulo,
     PasajesModulo,
+    PdfModulo,
   ],
   controllers: [AppControlador],
   providers: [AppServicio],
