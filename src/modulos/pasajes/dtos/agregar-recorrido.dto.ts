@@ -2,8 +2,9 @@ import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min
 import { Tramo } from '../entidades/recorrido.entidad';
 
 export class AgregarRecorridoDto {
+  @IsOptional()
   @IsNumber()
-  becarioId: number; // TODO: remover cuando se integre JWT y @UsuarioActual()
+  becarioId?: number; // Inyectado por el guardia
 
   @IsString()
   @IsNotEmpty()

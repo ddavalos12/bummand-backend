@@ -12,7 +12,7 @@ export class CrearUsuarioDto {
 
   @IsString()
   @MinLength(6)
-  contrasenaHash: string;
+  contrasena: string;
 
   @IsEnum(Rol)
   rol: Rol;

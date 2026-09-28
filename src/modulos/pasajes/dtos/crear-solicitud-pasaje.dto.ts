@@ -1,9 +1,9 @@
-import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString, IsOptional } from 'class-validator';
 
 export class CrearSolicitudPasajeDto {
+  @IsOptional()
   @IsNumber()
-  @IsNotEmpty()
-  becarioId: number;
+  becarioId?: number; // Inyectado por el guardia
 
   @IsString()
   @IsNotEmpty()

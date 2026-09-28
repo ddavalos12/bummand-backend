@@ -2,8 +2,9 @@ import { IsBoolean, IsEnum, IsNumber, IsOptional } from 'class-validator';
 import { TipoAsistencia } from '../entidades/registro-asistencia.entidad';
 
 export class CoordenadasDto {
+  @IsOptional()
   @IsNumber()
-  becarioId: number; // TODO: remover cuando se integre JWT y @UsuarioActual()
+  becarioId?: number; // Inyectado por el guardia
 
   @IsNumber()
   latitud: number;

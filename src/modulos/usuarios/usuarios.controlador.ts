@@ -1,24 +1,45 @@
-import { Controller, Get, Post, Body, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, UseGuards, Query, ParseIntPipe, BadRequestException } from '@nestjs/common';
 import { UsuariosServicio } from './usuarios.servicio';
 import { CrearUsuarioDto } from './dtos/crear-usuario.dto';
-import { Usuario } from './entidades/usuario.entidad';
+import { Usuario, Rol, EstadoUsuario } from './entidades/usuario.entidad';
+import { JwtGuardia } from '../autenticacion/jwt.guardia';
+import { RolesGuardia } from '../autenticacion/roles.guardia';
+import { Roles } from '../autenticacion/roles.decorador';
+import { UsuarioActual } from '../autenticacion/usuario-actual.decorador';
 
 @Controller('usuarios')
+@UseGuards(JwtGuardia, RolesGuardia)
 export class UsuariosControlador {
   constructor(private readonly usuariosServicio: UsuariosServicio) {}
 
   @Post()
+  @Roles(Rol.ADMINISTRADOR)
   crear(@Body() crearUsuarioDto: CrearUsuarioDto): Promise<Usuario> {
     return this.usuariosServicio.crear(crearUsuarioDto);
   }
 
   @Get()
-  obtenerTodos(): Promise<Usuario[]> {
-    return this.usuariosServicio.obtenerTodos();
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  listar(@Query('rol') rol?: string): Promise<Usuario[]> {
+    if (rol && !Object.values(Rol).includes(rol as Rol)) {
+      throw new BadRequestException('Rol inválido');
+    }
+    return this.usuariosServicio.listar(rol as Rol);
   }
 
-  @Get(':id')
-  obtenerPorId(@Param('id', ParseIntPipe) id: number): Promise<Usuario> {
-    return this.usuariosServicio.obtenerPorId(id);
+  @Put(':id/estado')
+  @Roles(Rol.ADMINISTRADOR)
+  cambiarEstado(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('estado') estado: EstadoUsuario,
+    @UsuarioActual() usuarioAutenticado: Usuario
+  ): Promise<Usuario> {
+    if (!Object.values(EstadoUsuario).includes(estado)) {
+      throw new BadRequestException('Estado debe ser activo o inactivo');
+    }
+    if (id === usuarioAutenticado.id && estado === EstadoUsuario.INACTIVO) {
+      throw new BadRequestException('No puedes desactivar tu propia cuenta');
+    }
+    return this.usuariosServicio.cambiarEstado(id, estado);
   }
 }

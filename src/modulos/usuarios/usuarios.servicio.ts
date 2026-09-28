@@ -1,8 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Usuario } from './entidades/usuario.entidad';
+import { Usuario, Rol, EstadoUsuario } from './entidades/usuario.entidad';
 import { CrearUsuarioDto } from './dtos/crear-usuario.dto';
+
+// TODO: importar bcrypt y cambiar simulación.
+function hashPasswordSimulado(pass: string) { return pass; }
 
 @Injectable()
 export class UsuariosServicio {
@@ -11,20 +14,54 @@ export class UsuariosServicio {
     private readonly usuarioRepositorio: Repository<Usuario>,
   ) {}
 
-  async crear(crearUsuarioDto: CrearUsuarioDto): Promise<Usuario> {
-    const nuevoUsuario = this.usuarioRepositorio.create(crearUsuarioDto);
+  async crear(dto: CrearUsuarioDto): Promise<Usuario> {
+    if (dto.rol === Rol.BECARIO) {
+      throw new ConflictException('Los becarios deben crearse desde el módulo de becarios.');
+    }
+
+    const existente = await this.usuarioRepositorio.findOne({ where: { correo: dto.correo } });
+    if (existente) {
+      throw new ConflictException('Ya existe un usuario con este correo.');
+    }
+
+    const nuevoUsuario = this.usuarioRepositorio.create({
+      ...dto,
+      contrasenaHash: hashPasswordSimulado(dto.contrasena),
+    });
+
     return this.usuarioRepositorio.save(nuevoUsuario);
+  }
+
+  async listar(rolFiltro?: Rol): Promise<Usuario[]> {
+    const whereCondition = rolFiltro ? { rol: rolFiltro } : {};
+    return this.usuarioRepositorio.find({
+      where: whereCondition,
+      select: {
+        id: true,
+        nombre: true,
+        correo: true,
+        rol: true,
+        estado: true,
+        createdAt: true
+      },
+      order: { id: 'ASC' },
+    });
+  }
+
+  async cambiarEstado(id: number, estado: EstadoUsuario): Promise<Usuario> {
+    const usuario = await this.usuarioRepositorio.findOne({ where: { id } });
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+    usuario.estado = estado;
+    return this.usuarioRepositorio.save(usuario);
   }
 
   async obtenerTodos(): Promise<Usuario[]> {
     return this.usuarioRepositorio.find();
   }
 
-  async obtenerPorId(id: number): Promise<Usuario> {
-    const usuario = await this.usuarioRepositorio.findOneBy({ id });
-    if (!usuario) {
-      throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
-    }
-    return usuario;
+  async obtenerPorId(id: number): Promise<Usuario | null> {
+    return this.usuarioRepositorio.findOne({ where: { id } });
   }
 }
