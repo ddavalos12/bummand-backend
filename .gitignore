@@ -1,0 +1,37 @@
+# Node y Dependencias
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+
+# Compilación de NestJS
+dist/
+.nest/
+
+# Variables de Entorno
+.env
+.env.test
+.env.production
+.env.local
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs y OS
+*.log
+.DS_Store
+
+# Agentes AI (Reglas locales)
+.agents/
+
+# LaTeX y Auxiliares
+*.tex
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+!*.pdf
