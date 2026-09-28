@@ -7,9 +7,7 @@ import { CrearBecarioDto } from './dtos/crear-becario.dto';
 import { ActualizarBecarioDto } from './dtos/actualizar-becario.dto';
 import { Iglesia } from '../iglesias/entidades/iglesia.entidad';
 import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.entidad';
-
-// TODO: importar bcrypt y cambiar simulación.
-function hashPasswordSimulado(pass: string) { return pass; }
+import { hashearContrasena } from '../../utilidades/hash.utilidad';
 
 @Injectable()
 export class BecariosServicio {
@@ -46,7 +44,7 @@ export class BecariosServicio {
     const nuevoUsuario = this.usuarioRepositorio.create({
       nombre: dto.nombre,
       correo: dto.correo,
-      contrasenaHash: hashPasswordSimulado(dto.contrasena),
+      contrasenaHash: await hashearContrasena(dto.contrasena),
       rol: Rol.BECARIO,
       estado: EstadoUsuario.ACTIVO,
     });

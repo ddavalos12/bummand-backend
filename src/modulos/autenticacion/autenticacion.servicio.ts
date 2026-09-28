@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsuariosServicio } from '../usuarios/usuarios.servicio';
 import { InicioSesionDto } from './dtos/inicio-sesion.dto';
+import { compararContrasena } from '../../utilidades/hash.utilidad';
 
 @Injectable()
 export class AutenticacionServicio {
@@ -13,8 +14,8 @@ export class AutenticacionServicio {
   async iniciarSesion(dto: InicioSesionDto) {
     const usuarios = await this.usuariosServicio.obtenerTodos();
     const usuario = usuarios.find(u => u.correo === dto.correo);
-    // TODO: Usar bcrypt para verificar la contraseña. Ahora simulamos comparación directa.
-    if (!usuario || usuario.contrasenaHash !== dto.contrasena) {
+    
+    if (!usuario || !(await compararContrasena(dto.contrasena, usuario.contrasenaHash))) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
