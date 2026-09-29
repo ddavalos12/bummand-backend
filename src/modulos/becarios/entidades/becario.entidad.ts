@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToOne, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Usuario } from '../../usuarios/entidades/usuario.entidad';
 import { Iglesia } from '../../iglesias/entidades/iglesia.entidad';
-import { LugarPractica } from '../../lugares-practica/entidades/lugar-practica.entidad';
+import { lugar_practica } from '../../lugares-practica/entidades/lugar-practica.entidad';
 import { RegistroAsistencia } from '../../asistencia/entidades/registro-asistencia.entidad';
 
 @Entity('becarios')
@@ -10,7 +10,7 @@ export class Becario {
   id: number;
 
   @Column({ name: 'usuario_id', unique: true })
-  usuarioId: number;
+  usuario_id: number;
 
   @Column({ type: 'varchar', length: 20, unique: true, nullable: true })
   ci: string;
@@ -25,16 +25,16 @@ export class Becario {
   institucion: string | null;
 
   @Column({ name: 'iglesia_id', nullable: true })
-  iglesiaId: number | null;
+  iglesia_id: number | null;
 
   @Column({ name: 'lugar_practica_id', nullable: true })
-  lugarPracticaId: number | null;
+  lugar_practica_id: number | null;
 
   @Column({ name: 'fecha_ingreso', type: 'date' })
-  fechaIngreso: Date;
+  fecha_ingreso: Date;
 
   @Column({ name: 'supervisor_id', nullable: true })
-  supervisorId: number | null;
+  supervisor_id: number | null;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   unidad: string | null;
@@ -43,7 +43,7 @@ export class Becario {
   @JoinColumn({ name: 'usuario_id' })
   usuario: Usuario;
 
-  @ManyToOne(() => Usuario, (usuario) => usuario.becariosSupervisados, { onDelete: 'SET NULL' })
+  @ManyToOne(() => Usuario, (usuario) => usuario.becarios_supervisados, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'supervisor_id' })
   supervisor: Usuario | null;
 
@@ -51,10 +51,11 @@ export class Becario {
   @JoinColumn({ name: 'iglesia_id' })
   iglesia: Iglesia | null;
 
-  @ManyToOne(() => LugarPractica, (lugarPractica) => lugarPractica.becarios)
+  @ManyToOne(() => lugar_practica, (lugar_practica) => lugar_practica.becarios)
   @JoinColumn({ name: 'lugar_practica_id' })
-  lugarPractica: LugarPractica | null;
+  lugar_practica: lugar_practica | null;
 
   @OneToMany(() => RegistroAsistencia, (registro) => registro.becario)
-  registrosAsistencia: RegistroAsistencia[];
+  registros_asistencia: RegistroAsistencia[];
 }
+

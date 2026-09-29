@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { Becario } from '../../becarios/entidades/becario.entidad';
 
 @Entity('lugares_practica')
-export class LugarPractica {
+export class lugar_practica {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -21,6 +21,7 @@ export class LugarPractica {
   @Column({ name: 'radio_tolerancia_m', type: 'int' })
   radioToleranciaM: number;
 
-  @OneToMany(() => Becario, (becario) => becario.lugarPractica)
+  @OneToMany(() => Becario, (becario) => becario.lugar_practica)
   becarios: Becario[];
 }
+

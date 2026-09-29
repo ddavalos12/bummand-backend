@@ -48,5 +48,6 @@ export class Usuario {
   becario: Becario;
 
   @OneToMany(() => Becario, (becario) => becario.supervisor)
-  becariosSupervisados: Becario[];
+  becarios_supervisados: Becario[];
 }
+

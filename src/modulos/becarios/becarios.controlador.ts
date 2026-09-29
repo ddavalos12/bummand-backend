@@ -74,3 +74,4 @@ export class BecariosControlador {
     return this.becariosServicio.eliminar(id);
   }
 }
+

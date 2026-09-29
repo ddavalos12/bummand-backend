@@ -4,7 +4,7 @@ import { Tramo } from '../entidades/recorrido.entidad';
 export class AgregarRecorridoDto {
   @IsOptional()
   @IsNumber()
-  becarioId?: number; // Inyectado por el guardia
+  becario_id?: number; // Inyectado por el guardia
 
   @IsString()
   @IsNotEmpty()
@@ -49,3 +49,4 @@ export class AgregarRecorridoDto {
   @IsNumber()
   lngDestino?: number;
 }
+

@@ -14,13 +14,13 @@ export class PasajesControlador {
 
   @Post()
   crear(@Body() crearSolicitudPasajeDto: CrearSolicitudPasajeDto, @UsuarioActual() usuario: Usuario): Promise<SolicitudPasajes> {
-    crearSolicitudPasajeDto.becarioId = usuario.id;
+    crearSolicitudPasajeDto.becario_id = usuario.id;
     return this.pasajesServicio.crear(crearSolicitudPasajeDto);
   }
 
   @Post('recorridos')
   agregarRecorrido(@Body() agregarRecorridoDto: AgregarRecorridoDto, @UsuarioActual() usuario: Usuario) {
-    agregarRecorridoDto.becarioId = usuario.id;
+    agregarRecorridoDto.becario_id = usuario.id;
     return this.pasajesServicio.agregarRecorrido(agregarRecorridoDto);
   }
 
@@ -29,3 +29,5 @@ export class PasajesControlador {
     return this.pasajesServicio.obtenerTodas();
   }
 }
+
+

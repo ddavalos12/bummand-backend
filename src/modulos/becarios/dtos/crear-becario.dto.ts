@@ -32,15 +32,15 @@ export class CrearBecarioDto {
 
   @IsOptional()
   @IsNumber()
-  iglesiaId?: number;
+  iglesia_id?: number;
 
   @IsOptional()
   @IsNumber()
-  lugarPracticaId?: number;
+  lugar_practica_id?: number;
 
   @IsOptional()
   @IsNumber()
-  supervisorId?: number;
+  supervisor_id?: number;
 
   @IsOptional()
   @IsString()
@@ -49,5 +49,6 @@ export class CrearBecarioDto {
 
   @IsDateString()
   @IsNotEmpty()
-  fechaIngreso: string;
+  fecha_ingreso: string;
 }
+

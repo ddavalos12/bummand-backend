@@ -13,7 +13,7 @@ export class RegistroAsistencia {
   id: number;
 
   @Column({ name: 'becario_id' })
-  becarioId: number;
+  becario_id: number;
 
   @Column({ type: 'enum', enum: TipoAsistencia })
   tipo: TipoAsistencia;
@@ -25,7 +25,7 @@ export class RegistroAsistencia {
   horaIngreso: string;
 
   @Column({ name: 'hora_salida', type: 'time', nullable: true })
-  horaSalida: string;
+  hora_salida: string;
 
   @Column({ name: 'lat_ingreso', type: 'decimal', precision: 9, scale: 6, nullable: true })
   latIngreso: number;
@@ -51,7 +51,8 @@ export class RegistroAsistencia {
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @ManyToOne(() => Becario, (becario) => becario.registrosAsistencia, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Becario, (becario) => becario.registros_asistencia, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'becario_id' })
   becario: Becario;
 }
+

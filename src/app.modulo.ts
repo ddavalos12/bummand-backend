@@ -8,7 +8,7 @@ import { AppServicio } from './app.servicio';
 import { Usuario } from './modulos/usuarios/entidades/usuario.entidad';
 import { Becario } from './modulos/becarios/entidades/becario.entidad';
 import { Iglesia } from './modulos/iglesias/entidades/iglesia.entidad';
-import { LugarPractica } from './modulos/lugares-practica/entidades/lugar-practica.entidad';
+import { lugar_practica } from './modulos/lugares-practica/entidades/lugar-practica.entidad';
 
 // Módulos
 import { UsuariosModulo } from './modulos/usuarios/usuarios.modulo';
@@ -23,6 +23,8 @@ import { PasajesModulo } from './modulos/pasajes/pasajes.modulo';
 import { SolicitudPasajes } from './modulos/pasajes/entidades/solicitud-pasaje.entidad';
 import { Recorrido } from './modulos/pasajes/entidades/recorrido.entidad';
 import { PdfModulo } from './modulos/pdf/pdf.modulo';
+import { EvaluacionesModulo } from './modulos/evaluaciones/evaluaciones.modulo';
+import { Evaluacion } from './modulos/evaluaciones/entidades/evaluacion.entidad';
 
 @Module({
   imports: [
@@ -36,7 +38,7 @@ import { PdfModulo } from './modulos/pdf/pdf.modulo';
       username: process.env.DB_USERNAME,
       password: process.env.DB_CONTRASENA,
       database: process.env.DB_DATABASE,
-      entities: [Usuario, Becario, Iglesia, LugarPractica, RegistroAsistencia, SolicitudPasajes, Recorrido],
+      entities: [Usuario, Becario, Iglesia, lugar_practica, RegistroAsistencia, SolicitudPasajes, Recorrido, Evaluacion],
       synchronize: false, // ¡No sincronizar en producción ni sobrescribir BD legacy!
     }),
     UsuariosModulo,
@@ -47,8 +49,10 @@ import { PdfModulo } from './modulos/pdf/pdf.modulo';
     AsistenciaModulo,
     PasajesModulo,
     PdfModulo,
+    EvaluacionesModulo,
   ],
   controllers: [AppControlador],
   providers: [AppServicio],
 })
 export class AppModulo {}
+

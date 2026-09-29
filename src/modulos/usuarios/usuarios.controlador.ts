@@ -43,3 +43,4 @@ export class UsuariosControlador {
     return this.usuariosServicio.cambiarEstado(id, estado);
   }
 }
+

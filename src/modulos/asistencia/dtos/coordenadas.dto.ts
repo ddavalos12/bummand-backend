@@ -4,7 +4,7 @@ import { TipoAsistencia } from '../entidades/registro-asistencia.entidad';
 export class CoordenadasDto {
   @IsOptional()
   @IsNumber()
-  becarioId?: number; // Inyectado por el guardia
+  becario_id?: number; // Inyectado por el guardia
 
   @IsNumber()
   latitud: number;
@@ -24,3 +24,4 @@ export class CoordenadasDto {
   @IsBoolean()
   simulada?: boolean;
 }
+

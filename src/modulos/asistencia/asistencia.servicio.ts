@@ -19,31 +19,31 @@ export class AsistenciaServicio {
 
   async registrarIngreso(dto: CoordenadasDto): Promise<{ registro: RegistroAsistencia; mensaje: string }> {
     const becario = await this.becarioRepositorio.findOne({
-      where: { id: dto.becarioId },
-      relations: { lugarPractica: true },
+      where: { id: dto.becario_id },
+      relations: { lugar_practica: true },
     });
 
     if (!becario) throw new NotFoundException('Becario no encontrado');
-    if (!becario.lugarPractica) throw new ConflictException('Becario sin lugar de prácticas asignado');
+    if (!becario.lugar_practica) throw new ConflictException('Becario sin lugar de prácticas asignado');
 
     const tipo = dto.tipo || TipoAsistencia.PRACTICAS;
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
     const ingresoAbierto = await this.asistenciaRepositorio.findOne({
-      where: { becarioId: becario.id, fecha: hoy, tipo, horaSalida: null as any },
+      where: { becario_id: becario.id, fecha: hoy, tipo, hora_salida: null as any },
     });
 
     if (ingresoAbierto) {
       throw new ConflictException('Ya existe un ingreso abierto hoy. Registra la salida primero.');
     }
 
-    const distanciaM = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(becario.lugarPractica.latitud), Number(becario.lugarPractica.longitud));
+    const distanciaM = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(becario.lugar_practica.latitud), Number(becario.lugar_practica.longitud));
     const margen = Math.min(Math.max(dto.precision || 0, 0), MARGEN_GPS_MAXIMO_M);
-    const dentroDeRadio = dto.simulada !== true && distanciaM <= becario.lugarPractica.radioToleranciaM + margen;
+    const dentroDeRadio = dto.simulada !== true && distanciaM <= becario.lugar_practica.radioToleranciaM + margen;
 
     const registro = this.asistenciaRepositorio.create({
-      becarioId: becario.id,
+      becario_id: becario.id,
       tipo,
       fecha: hoy,
       horaIngreso: new Date().toTimeString().split(' ')[0], // HH:MM:SS
@@ -65,20 +65,20 @@ export class AsistenciaServicio {
     hoy.setHours(0, 0, 0, 0);
 
     const registroAbierto = await this.asistenciaRepositorio.findOne({
-      where: { becarioId: dto.becarioId, fecha: hoy, tipo, horaSalida: null as any },
+      where: { becario_id: dto.becario_id, fecha: hoy, tipo, hora_salida: null as any },
     });
 
     if (!registroAbierto) {
       throw new NotFoundException('No existe un ingreso abierto hoy.');
     }
 
-    registroAbierto.horaSalida = new Date().toTimeString().split(' ')[0];
+    registroAbierto.hora_salida = new Date().toTimeString().split(' ')[0];
     registroAbierto.latSalida = dto.latitud;
     registroAbierto.lngSalida = dto.longitud;
     
     // Cálculo básico de horas (requiere mejor Parse en el futuro)
     const [hI, mI] = registroAbierto.horaIngreso.split(':').map(Number);
-    const [hS, mS] = registroAbierto.horaSalida.split(':').map(Number);
+    const [hS, mS] = registroAbierto.hora_salida.split(':').map(Number);
     const horas = (hS + mS / 60) - (hI + mI / 60);
     registroAbierto.horasTrabajadas = parseFloat(horas.toFixed(2));
 
@@ -91,3 +91,4 @@ export class AsistenciaServicio {
     return this.asistenciaRepositorio.find();
   }
 }
+

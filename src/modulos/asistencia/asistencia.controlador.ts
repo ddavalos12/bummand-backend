@@ -13,13 +13,13 @@ export class AsistenciaControlador {
 
   @Post('ingreso')
   registrarIngreso(@Body() coordenadasDto: CoordenadasDto, @UsuarioActual() usuario: Usuario) {
-    coordenadasDto.becarioId = usuario.id; // Asumimos id=becarioId por ahora
+    coordenadasDto.becario_id = usuario.id; // Asumimos id=becario_id por ahora
     return this.asistenciaServicio.registrarIngreso(coordenadasDto);
   }
 
   @Post('salida')
   registrarSalida(@Body() coordenadasDto: CoordenadasDto, @UsuarioActual() usuario: Usuario) {
-    coordenadasDto.becarioId = usuario.id;
+    coordenadasDto.becario_id = usuario.id;
     return this.asistenciaServicio.registrarSalida(coordenadasDto);
   }
 
@@ -28,3 +28,5 @@ export class AsistenciaControlador {
     return this.asistenciaServicio.obtenerTodos();
   }
 }
+
+

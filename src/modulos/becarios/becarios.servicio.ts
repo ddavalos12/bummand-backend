@@ -6,7 +6,7 @@ import { Usuario, Rol, EstadoUsuario } from '../usuarios/entidades/usuario.entid
 import { CrearBecarioDto } from './dtos/crear-becario.dto';
 import { ActualizarBecarioDto } from './dtos/actualizar-becario.dto';
 import { Iglesia } from '../iglesias/entidades/iglesia.entidad';
-import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.entidad';
+import { lugar_practica } from '../lugares-practica/entidades/lugar-practica.entidad';
 import { hashearContrasena } from '../../utilidades/hash.utilidad';
 
 @Injectable()
@@ -18,8 +18,8 @@ export class BecariosServicio {
     private readonly usuarioRepositorio: Repository<Usuario>,
   ) {}
 
-  async validarSupervisor(supervisorId: number): Promise<void> {
-    const supervisor = await this.usuarioRepositorio.findOne({ where: { id: supervisorId } });
+  async validarSupervisor(supervisor_id: number): Promise<void> {
+    const supervisor = await this.usuarioRepositorio.findOne({ where: { id: supervisor_id } });
     if (!supervisor) {
       throw new BadRequestException('El supervisor indicado no existe');
     }
@@ -37,8 +37,8 @@ export class BecariosServicio {
       throw new ConflictException('Ya existe un usuario con ese correo');
     }
 
-    if (dto.supervisorId) {
-      await this.validarSupervisor(dto.supervisorId);
+    if (dto.supervisor_id) {
+      await this.validarSupervisor(dto.supervisor_id);
     }
 
     const nuevoUsuario = this.usuarioRepositorio.create({
@@ -56,10 +56,10 @@ export class BecariosServicio {
       universidad: dto.universidad,
       institucion: dto.institucion || null,
       unidad: dto.unidad || null,
-      fechaIngreso: new Date(dto.fechaIngreso),
-      iglesia: dto.iglesiaId ? ({ id: dto.iglesiaId } as Iglesia) : null,
-      lugarPractica: dto.lugarPracticaId ? ({ id: dto.lugarPracticaId } as LugarPractica) : null,
-      supervisor: dto.supervisorId ? ({ id: dto.supervisorId } as Usuario) : null,
+      fecha_ingreso: new Date(dto.fecha_ingreso),
+      iglesia: dto.iglesia_id ? ({ id: dto.iglesia_id } as Iglesia) : null,
+      lugar_practica: dto.lugar_practica_id ? ({ id: dto.lugar_practica_id } as lugar_practica) : null,
+      supervisor: dto.supervisor_id ? ({ id: dto.supervisor_id } as Usuario) : null,
       usuario: usuarioGuardado,
     });
 
@@ -70,7 +70,7 @@ export class BecariosServicio {
     const query = this.becarioRepositorio.createQueryBuilder('becario')
       .leftJoinAndSelect('becario.usuario', 'usuario')
       .leftJoinAndSelect('becario.supervisor', 'supervisor')
-      .leftJoinAndSelect('becario.lugarPractica', 'lugarPractica')
+      .leftJoinAndSelect('becario.lugar_practica', 'lugar_practica')
       .leftJoinAndSelect('becario.iglesia', 'iglesia')
       .orderBy('becario.id', 'ASC');
 
@@ -84,7 +84,7 @@ export class BecariosServicio {
   async obtener(id: number, usuario: Usuario): Promise<Becario> {
     const becario = await this.becarioRepositorio.findOne({
       where: { id },
-      relations: { usuario: true, supervisor: true, lugarPractica: true, iglesia: true },
+      relations: { usuario: true, supervisor: true, lugar_practica: true, iglesia: true },
     });
 
     if (!becario) throw new NotFoundException('Becario no encontrado');
@@ -96,10 +96,10 @@ export class BecariosServicio {
     return becario;
   }
 
-  async obtenerPorUsuario(usuarioId: number): Promise<Becario | null> {
+  async obtenerPorUsuario(usuario_id: number): Promise<Becario | null> {
     return this.becarioRepositorio.findOne({
-      where: { usuario: { id: usuarioId } },
-      relations: { usuario: true, supervisor: true, lugarPractica: true, iglesia: true },
+      where: { usuario: { id: usuario_id } },
+      relations: { usuario: true, supervisor: true, lugar_practica: true, iglesia: true },
     });
   }
 
@@ -107,8 +107,8 @@ export class BecariosServicio {
     const becario = await this.becarioRepositorio.findOne({ where: { id }, relations: { usuario: true } });
     if (!becario) throw new NotFoundException('Becario no encontrado');
 
-    if (dto.supervisorId) {
-      await this.validarSupervisor(dto.supervisorId);
+    if (dto.supervisor_id) {
+      await this.validarSupervisor(dto.supervisor_id);
     }
 
     // Actualizar usuario si hay nombre
@@ -123,14 +123,14 @@ export class BecariosServicio {
     if (dto.institucion !== undefined) becario.institucion = dto.institucion || null;
     if (dto.unidad !== undefined) becario.unidad = dto.unidad || null;
     
-    if (dto.iglesiaId !== undefined) {
-      becario.iglesia = dto.iglesiaId ? ({ id: dto.iglesiaId } as Iglesia) : null;
+    if (dto.iglesia_id !== undefined) {
+      becario.iglesia = dto.iglesia_id ? ({ id: dto.iglesia_id } as Iglesia) : null;
     }
-    if (dto.lugarPracticaId !== undefined) {
-      becario.lugarPractica = dto.lugarPracticaId ? ({ id: dto.lugarPracticaId } as LugarPractica) : null;
+    if (dto.lugar_practica_id !== undefined) {
+      becario.lugar_practica = dto.lugar_practica_id ? ({ id: dto.lugar_practica_id } as lugar_practica) : null;
     }
-    if (dto.supervisorId !== undefined) {
-      becario.supervisor = dto.supervisorId ? ({ id: dto.supervisorId } as Usuario) : null;
+    if (dto.supervisor_id !== undefined) {
+      becario.supervisor = dto.supervisor_id ? ({ id: dto.supervisor_id } as Usuario) : null;
     }
 
     return this.becarioRepositorio.save(becario);
@@ -148,3 +148,4 @@ export class BecariosServicio {
     return { mensaje: 'Becario desactivado correctamente' };
   }
 }
+

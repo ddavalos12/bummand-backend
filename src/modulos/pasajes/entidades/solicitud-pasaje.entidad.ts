@@ -16,7 +16,7 @@ export class SolicitudPasajes {
   id: number;
 
   @Column({ name: 'becario_id' })
-  becarioId: number;
+  becario_id: number;
 
   @Column({ type: 'varchar', length: 20 })
   periodo: string;
@@ -34,7 +34,7 @@ export class SolicitudPasajes {
   observaciones: string;
 
   @Column({ name: 'supervisor_id', nullable: true })
-  supervisorId: number;
+  supervisor_id: number;
 
   @Column({ name: 'fecha_envio', type: 'timestamp', nullable: true })
   fechaEnvio: Date;
@@ -56,3 +56,4 @@ export class SolicitudPasajes {
   @OneToMany(() => Recorrido, (recorrido) => recorrido.solicitud)
   recorridos: Recorrido[];
 }
+

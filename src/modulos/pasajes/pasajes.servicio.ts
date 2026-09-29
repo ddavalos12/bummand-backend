@@ -23,7 +23,7 @@ export class PasajesServicio {
   async agregarRecorrido(dto: AgregarRecorridoDto): Promise<Recorrido> {
     // 1. Obtener o crear solicitud mensual. (Aquí lo simplificamos a buscar la última)
     let solicitud = await this.solicitudRepositorio.findOne({
-      where: { becarioId: dto.becarioId, estado: EstadoSolicitud.BORRADOR },
+      where: { becario_id: dto.becario_id, estado: EstadoSolicitud.BORRADOR },
       order: { createdAt: 'DESC' }
     });
 
@@ -31,7 +31,7 @@ export class PasajesServicio {
       // Creamos una solicitud borrador automática si no existe para ese periodo.
       // Se asume que el periodo lo deducimos de la fecha (mock).
       solicitud = this.solicitudRepositorio.create({
-        becarioId: dto.becarioId,
+        becario_id: dto.becario_id,
         periodo: new Date(dto.fecha).toLocaleString('es-ES', { month: 'long', year: 'numeric' }),
       });
       solicitud = await this.solicitudRepositorio.save(solicitud);
@@ -67,3 +67,4 @@ export class PasajesServicio {
     return this.solicitudRepositorio.find({ relations: { recorridos: true } });
   }
 }
+
