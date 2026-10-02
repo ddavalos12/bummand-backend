@@ -28,10 +28,19 @@ export class AgregarRecorridoDto {
   @Max(50)
   tarifa: number;
 
+  @IsOptional()
   @IsString()
-  @MinLength(3)
   @MaxLength(255)
-  apoyoRealizado: string;
+  apoyo_realizado?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  apoyoRealizado?: string;
+
+  @IsOptional()
+  @IsNumber()
+  lat_origen?: number;
 
   @IsOptional()
   @IsNumber()
@@ -39,11 +48,23 @@ export class AgregarRecorridoDto {
 
   @IsOptional()
   @IsNumber()
+  lng_origen?: number;
+
+  @IsOptional()
+  @IsNumber()
   lngOrigen?: number;
 
   @IsOptional()
   @IsNumber()
+  lat_destino?: number;
+
+  @IsOptional()
+  @IsNumber()
   latDestino?: number;
+
+  @IsOptional()
+  @IsNumber()
+  lng_destino?: number;
 
   @IsOptional()
   @IsNumber()

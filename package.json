@@ -20,6 +20,7 @@
     "iniciar:produccion": "node dist/main",
     "revisar": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "pruebas": "jest",
+    "test": "jest",
     "pruebas:watch": "jest --watch",
     "pruebas:cov": "jest --coverage",
     "pruebas:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
@@ -88,6 +89,11 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@nestjs/typeorm$": "<rootDir>/../test/mocks/nestjs-typeorm.ts",
+      "^@nestjs/passport$": "<rootDir>/../test/mocks/nestjs-passport.ts",
+      "^puppeteer$": "<rootDir>/../test/mocks/puppeteer.ts"
+    }
   }
 }

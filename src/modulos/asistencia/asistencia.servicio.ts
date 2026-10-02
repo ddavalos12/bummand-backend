@@ -38,24 +38,24 @@ export class AsistenciaServicio {
       throw new ConflictException('Ya existe un ingreso abierto hoy. Registra la salida primero.');
     }
 
-    const distanciaM = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(becario.lugar_practica.latitud), Number(becario.lugar_practica.longitud));
+    const distancia_m = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(becario.lugar_practica.latitud), Number(becario.lugar_practica.longitud));
     const margen = Math.min(Math.max(dto.precision || 0, 0), MARGEN_GPS_MAXIMO_M);
-    const dentroDeRadio = dto.simulada !== true && distanciaM <= becario.lugar_practica.radioToleranciaM + margen;
+    const dentro_de_radio = dto.simulada !== true && distancia_m <= becario.lugar_practica.radio_tolerancia_m + margen;
 
     const registro = this.asistenciaRepositorio.create({
       becario_id: becario.id,
       tipo,
       fecha: hoy,
-      horaIngreso: new Date().toTimeString().split(' ')[0], // HH:MM:SS
-      latIngreso: dto.latitud,
-      lngIngreso: dto.longitud,
-      dentroDeRadio,
-      // dentroDeHorario: null // Faltaría verificar horario
+      hora_ingreso: new Date().toTimeString().split(' ')[0], // HH:MM:SS
+      lat_ingreso: dto.latitud,
+      lng_ingreso: dto.longitud,
+      dentro_de_radio,
+      // dentro_de_horario: null // Faltaría verificar horario
     });
 
     await this.asistenciaRepositorio.save(registro);
 
-    const mensaje = dentroDeRadio ? 'Ingreso registrado correctamente' : 'Ingreso registrado, pero fuera del radio';
+    const mensaje = dentro_de_radio ? 'Ingreso registrado correctamente' : 'Ingreso registrado, pero fuera del radio';
     return { registro, mensaje };
   }
 
@@ -64,27 +64,27 @@ export class AsistenciaServicio {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
-    const registroAbierto = await this.asistenciaRepositorio.findOne({
+    const registro_abierto = await this.asistenciaRepositorio.findOne({
       where: { becario_id: dto.becario_id, fecha: hoy, tipo, hora_salida: null as any },
     });
 
-    if (!registroAbierto) {
+    if (!registro_abierto) {
       throw new NotFoundException('No existe un ingreso abierto hoy.');
     }
 
-    registroAbierto.hora_salida = new Date().toTimeString().split(' ')[0];
-    registroAbierto.latSalida = dto.latitud;
-    registroAbierto.lngSalida = dto.longitud;
+    registro_abierto.hora_salida = new Date().toTimeString().split(' ')[0];
+    registro_abierto.lat_salida = dto.latitud;
+    registro_abierto.lng_salida = dto.longitud;
     
-    // Cálculo básico de horas (requiere mejor Parse en el futuro)
-    const [hI, mI] = registroAbierto.horaIngreso.split(':').map(Number);
-    const [hS, mS] = registroAbierto.hora_salida.split(':').map(Number);
-    const horas = (hS + mS / 60) - (hI + mI / 60);
-    registroAbierto.horasTrabajadas = parseFloat(horas.toFixed(2));
+    // Cálculo básico de horas
+    const [h_i, m_i] = registro_abierto.hora_ingreso.split(':').map(Number);
+    const [h_s, m_s] = registro_abierto.hora_salida.split(':').map(Number);
+    const horas = (h_s + m_s / 60) - (h_i + m_i / 60);
+    registro_abierto.horas_trabajadas = parseFloat(horas.toFixed(2));
 
-    await this.asistenciaRepositorio.save(registroAbierto);
+    await this.asistenciaRepositorio.save(registro_abierto);
 
-    return { registro: registroAbierto, mensaje: 'Salida registrada correctamente' };
+    return { registro: registro_abierto, mensaje: 'Salida registrada correctamente' };
   }
 
   async obtenerTodos(): Promise<RegistroAsistencia[]> {

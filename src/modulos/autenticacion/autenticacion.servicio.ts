@@ -15,7 +15,7 @@ export class AutenticacionServicio {
     const usuarios = await this.usuariosServicio.obtenerTodos();
     const usuario = usuarios.find(u => u.correo === dto.correo);
     
-    if (!usuario || !(await compararContrasena(dto.contrasena, usuario.contrasenaHash))) {
+    if (!usuario || !(await compararContrasena(dto.contrasena, usuario.contrasena_hash))) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 

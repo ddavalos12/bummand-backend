@@ -22,25 +22,25 @@ export class UsuariosServicio {
       throw new ConflictException('Ya existe un usuario con este correo.');
     }
 
-    const nuevoUsuario = this.usuarioRepositorio.create({
+    const nuevo_usuario = this.usuarioRepositorio.create({
       ...dto,
-      contrasenaHash: await hashearContrasena(dto.contrasena),
+      contrasena_hash: await hashearContrasena(dto.contrasena),
     });
 
-    return this.usuarioRepositorio.save(nuevoUsuario);
+    return this.usuarioRepositorio.save(nuevo_usuario);
   }
 
-  async listar(rolFiltro?: Rol): Promise<Usuario[]> {
-    const whereCondition = rolFiltro ? { rol: rolFiltro } : {};
+  async listar(rol_filtro?: Rol): Promise<Usuario[]> {
+    const condicion_where = rol_filtro ? { rol: rol_filtro } : {};
     return this.usuarioRepositorio.find({
-      where: whereCondition,
+      where: condicion_where,
       select: {
         id: true,
         nombre: true,
         correo: true,
         rol: true,
         estado: true,
-        createdAt: true
+        created_at: true,
       },
       order: { id: 'ASC' },
     });

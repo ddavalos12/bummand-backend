@@ -1,8 +1,12 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToOne, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Usuario } from '../../usuarios/entidades/usuario.entidad';
 import { Iglesia } from '../../iglesias/entidades/iglesia.entidad';
-import { lugar_practica } from '../../lugares-practica/entidades/lugar-practica.entidad';
+import { LugarPractica } from '../../lugares-practica/entidades/lugar-practica.entidad';
 import { RegistroAsistencia } from '../../asistencia/entidades/registro-asistencia.entidad';
+import { SolicitudPasajes } from '../../pasajes/entidades/solicitud-pasaje.entidad';
+import { Evaluacion } from '../../evaluaciones/entidades/evaluacion.entidad';
+import { AprobacionPracticas } from '../../practicas/entidades/aprobacion-practicas.entidad';
+import { ReporteGenerado } from '../../pdf/entidades/reporte-generado.entidad';
 
 @Entity('becarios')
 export class Becario {
@@ -51,11 +55,22 @@ export class Becario {
   @JoinColumn({ name: 'iglesia_id' })
   iglesia: Iglesia | null;
 
-  @ManyToOne(() => lugar_practica, (lugar_practica) => lugar_practica.becarios)
+  @ManyToOne(() => LugarPractica, (lugar_practica) => lugar_practica.becarios)
   @JoinColumn({ name: 'lugar_practica_id' })
-  lugar_practica: lugar_practica | null;
+  lugar_practica: LugarPractica | null;
 
   @OneToMany(() => RegistroAsistencia, (registro) => registro.becario)
   registros_asistencia: RegistroAsistencia[];
-}
 
+  @OneToMany(() => SolicitudPasajes, (solicitud) => solicitud.becario)
+  solicitudes_pasajes: SolicitudPasajes[];
+
+  @OneToMany(() => Evaluacion, (evaluacion) => evaluacion.becario)
+  evaluaciones: Evaluacion[];
+
+  @OneToMany(() => AprobacionPracticas, (aprobacion) => aprobacion.becario)
+  aprobaciones_practicas: AprobacionPracticas[];
+
+  @OneToMany(() => ReporteGenerado, (reporte) => reporte.becario)
+  reportes_generados: ReporteGenerado[];
+}

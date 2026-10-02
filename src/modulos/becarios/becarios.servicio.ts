@@ -6,7 +6,7 @@ import { Usuario, Rol, EstadoUsuario } from '../usuarios/entidades/usuario.entid
 import { CrearBecarioDto } from './dtos/crear-becario.dto';
 import { ActualizarBecarioDto } from './dtos/actualizar-becario.dto';
 import { Iglesia } from '../iglesias/entidades/iglesia.entidad';
-import { lugar_practica } from '../lugares-practica/entidades/lugar-practica.entidad';
+import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.entidad';
 import { hashearContrasena } from '../../utilidades/hash.utilidad';
 
 @Injectable()
@@ -44,7 +44,7 @@ export class BecariosServicio {
     const nuevoUsuario = this.usuarioRepositorio.create({
       nombre: dto.nombre,
       correo: dto.correo,
-      contrasenaHash: await hashearContrasena(dto.contrasena),
+      contrasena_hash: await hashearContrasena(dto.contrasena),
       rol: Rol.BECARIO,
       estado: EstadoUsuario.ACTIVO,
     });
@@ -58,7 +58,7 @@ export class BecariosServicio {
       unidad: dto.unidad || null,
       fecha_ingreso: new Date(dto.fecha_ingreso),
       iglesia: dto.iglesia_id ? ({ id: dto.iglesia_id } as Iglesia) : null,
-      lugar_practica: dto.lugar_practica_id ? ({ id: dto.lugar_practica_id } as lugar_practica) : null,
+      lugar_practica: dto.lugar_practica_id ? ({ id: dto.lugar_practica_id } as LugarPractica) : null,
       supervisor: dto.supervisor_id ? ({ id: dto.supervisor_id } as Usuario) : null,
       usuario: usuarioGuardado,
     });
@@ -127,7 +127,7 @@ export class BecariosServicio {
       becario.iglesia = dto.iglesia_id ? ({ id: dto.iglesia_id } as Iglesia) : null;
     }
     if (dto.lugar_practica_id !== undefined) {
-      becario.lugar_practica = dto.lugar_practica_id ? ({ id: dto.lugar_practica_id } as lugar_practica) : null;
+      becario.lugar_practica = dto.lugar_practica_id ? ({ id: dto.lugar_practica_id } as LugarPractica) : null;
     }
     if (dto.supervisor_id !== undefined) {
       becario.supervisor = dto.supervisor_id ? ({ id: dto.supervisor_id } as Usuario) : null;

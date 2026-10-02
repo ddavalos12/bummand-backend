@@ -4,27 +4,37 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppControlador } from './app.controlador';
 import { AppServicio } from './app.servicio';
 
-// Entidades
+// 15 Entidades Relacionales Oficiales (BUMAND)
 import { Usuario } from './modulos/usuarios/entidades/usuario.entidad';
-import { Becario } from './modulos/becarios/entidades/becario.entidad';
 import { Iglesia } from './modulos/iglesias/entidades/iglesia.entidad';
-import { lugar_practica } from './modulos/lugares-practica/entidades/lugar-practica.entidad';
+import { LugarPractica } from './modulos/lugares-practica/entidades/lugar-practica.entidad';
+import { Becario } from './modulos/becarios/entidades/becario.entidad';
+import { RegistroAsistencia } from './modulos/asistencia/entidades/registro-asistencia.entidad';
+import { SolicitudPasajes } from './modulos/pasajes/entidades/solicitud-pasaje.entidad';
+import { Recorrido } from './modulos/pasajes/entidades/recorrido.entidad';
+import { ModuloEvaluacion } from './modulos/evaluaciones/entidades/modulo-evaluacion.entidad';
+import { PeriodoEvaluacion } from './modulos/evaluaciones/entidades/periodo-evaluacion.entidad';
+import { Evaluador } from './modulos/evaluaciones/entidades/evaluador.entidad';
+import { Evaluacion } from './modulos/evaluaciones/entidades/evaluacion.entidad';
+import { EvaluacionPastor } from './modulos/evaluaciones/entidades/evaluacion-pastor.entidad';
+import { AprobacionPracticas } from './modulos/practicas/entidades/aprobacion-practicas.entidad';
+import { Notificacion } from './modulos/notificaciones/entidades/notificacion.entidad';
+import { ReporteGenerado } from './modulos/pdf/entidades/reporte-generado.entidad';
 
-// Módulos
+// Módulos Funcionales
 import { UsuariosModulo } from './modulos/usuarios/usuarios.modulo';
 import { BecariosModulo } from './modulos/becarios/becarios.modulo';
 import { IglesiasModulo } from './modulos/iglesias/iglesias.modulo';
 import { LugaresPracticaModulo } from './modulos/lugares-practica/lugares-practica.modulo';
 import { AutenticacionModulo } from './modulos/autenticacion/autenticacion.modulo';
-
 import { AsistenciaModulo } from './modulos/asistencia/asistencia.modulo';
-import { RegistroAsistencia } from './modulos/asistencia/entidades/registro-asistencia.entidad';
 import { PasajesModulo } from './modulos/pasajes/pasajes.modulo';
-import { SolicitudPasajes } from './modulos/pasajes/entidades/solicitud-pasaje.entidad';
-import { Recorrido } from './modulos/pasajes/entidades/recorrido.entidad';
 import { PdfModulo } from './modulos/pdf/pdf.modulo';
 import { EvaluacionesModulo } from './modulos/evaluaciones/evaluaciones.modulo';
-import { Evaluacion } from './modulos/evaluaciones/entidades/evaluacion.entidad';
+import { PracticasModulo } from './modulos/practicas/practicas.modulo';
+import { NotificacionesModulo } from './modulos/notificaciones/notificaciones.modulo';
+import { DashboardModulo } from './modulos/dashboard/dashboard.modulo';
+import { DatosModulo } from './datos/datos.modulo';
 
 @Module({
   imports: [
@@ -38,8 +48,24 @@ import { Evaluacion } from './modulos/evaluaciones/entidades/evaluacion.entidad'
       username: process.env.DB_USERNAME,
       password: process.env.DB_CONTRASENA,
       database: process.env.DB_DATABASE,
-      entities: [Usuario, Becario, Iglesia, lugar_practica, RegistroAsistencia, SolicitudPasajes, Recorrido, Evaluacion],
-      synchronize: false, // ¡No sincronizar en producción ni sobrescribir BD legacy!
+      entities: [
+        Usuario,
+        Iglesia,
+        LugarPractica,
+        Becario,
+        RegistroAsistencia,
+        SolicitudPasajes,
+        Recorrido,
+        ModuloEvaluacion,
+        PeriodoEvaluacion,
+        Evaluador,
+        Evaluacion,
+        EvaluacionPastor,
+        AprobacionPracticas,
+        Notificacion,
+        ReporteGenerado,
+      ],
+      synchronize: false, // Controlado estrictamente por migraciones SQL
     }),
     UsuariosModulo,
     BecariosModulo,
@@ -50,9 +76,12 @@ import { Evaluacion } from './modulos/evaluaciones/entidades/evaluacion.entidad'
     PasajesModulo,
     PdfModulo,
     EvaluacionesModulo,
+    PracticasModulo,
+    NotificacionesModulo,
+    DashboardModulo,
+    DatosModulo,
   ],
   controllers: [AppControlador],
   providers: [AppServicio],
 })
 export class AppModulo {}
-

@@ -2,7 +2,7 @@ import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseGuard
 import { LugaresPracticaServicio } from './lugares-practica.servicio';
 import { CrearLugarPracticaDto } from './dtos/crear-lugar-practica.dto';
 import { ActualizarLugarPracticaDto } from './dtos/actualizar-lugar-practica.dto';
-import { lugar_practica } from './entidades/lugar-practica.entidad';
+import { LugarPractica } from './entidades/lugar-practica.entidad';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
 import { Roles } from '../autenticacion/roles.decorador';
@@ -15,19 +15,19 @@ export class LugaresPracticaControlador {
 
   @Post()
   @Roles(Rol.ADMINISTRADOR)
-  crear(@Body() dto: CrearLugarPracticaDto): Promise<lugar_practica> {
+  crear(@Body() dto: CrearLugarPracticaDto): Promise<LugarPractica> {
     return this.servicio.crear(dto);
   }
 
   @Get()
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
-  listar(): Promise<lugar_practica[]> {
+  listar(): Promise<LugarPractica[]> {
     return this.servicio.listar();
   }
 
   @Get(':id')
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
-  obtener(@Param('id', ParseIntPipe) id: number): Promise<lugar_practica> {
+  obtener(@Param('id', ParseIntPipe) id: number): Promise<LugarPractica> {
     return this.servicio.obtener(id);
   }
 
@@ -36,7 +36,7 @@ export class LugaresPracticaControlador {
   actualizar(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ActualizarLugarPracticaDto,
-  ): Promise<lugar_practica> {
+  ): Promise<LugarPractica> {
     return this.servicio.actualizar(id, dto);
   }
 

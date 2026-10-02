@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { Becario } from '../../becarios/entidades/becario.entidad';
 
 @Entity('lugares_practica')
-export class lugar_practica {
+export class LugarPractica {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -19,9 +19,20 @@ export class lugar_practica {
   longitud: number;
 
   @Column({ name: 'radio_tolerancia_m', type: 'int' })
-  radioToleranciaM: number;
+  radio_tolerancia_m: number;
+
+  // Getter/setter para compatibilidad con código existente
+  get radioToleranciaM(): number {
+    return this.radio_tolerancia_m;
+  }
+  set radioToleranciaM(valor: number) {
+    this.radio_tolerancia_m = valor;
+  }
 
   @OneToMany(() => Becario, (becario) => becario.lugar_practica)
   becarios: Becario[];
 }
+
+// Export de compatibilidad transitoria
+export { LugarPractica as lugar_practica };
 

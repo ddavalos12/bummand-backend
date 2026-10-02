@@ -17,6 +17,11 @@ export class CrearLugarPracticaDto {
   @IsNumber()
   longitud: number;
 
+  @IsOptional()
   @IsNumber()
-  radioToleranciaM: number;
+  radio_tolerancia_m?: number;
+
+  @IsOptional()
+  @IsNumber()
+  radioToleranciaM?: number;
 }

@@ -3,7 +3,7 @@ import { AppControlador } from './app.controlador';
 import { AppServicio } from './app.servicio';
 
 describe('AppControlador', () => {
-  let AppControlador: AppControlador;
+  let app_controlador: AppControlador;
 
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
@@ -11,12 +11,12 @@ describe('AppControlador', () => {
       providers: [AppServicio],
     }).compile();
 
-    AppControlador = app.get<AppControlador>(AppControlador);
+    app_controlador = app.get<AppControlador>(AppControlador);
   });
 
   describe('root', () => {
     it('should return "Hello World!"', () => {
-      expect(AppControlador.getHello()).toBe('Hello World!');
+      expect(app_controlador.getHello()).toBe('Hello World!');
     });
   });
 });
