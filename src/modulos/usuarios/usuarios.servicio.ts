@@ -62,4 +62,12 @@ export class UsuariosServicio {
   async obtenerPorId(id: number): Promise<Usuario | null> {
     return this.usuarioRepositorio.findOne({ where: { id } });
   }
+
+  async obtenerPorCorreoConRelaciones(correo: string): Promise<Usuario | null> {
+    return this.usuarioRepositorio.findOne({
+      where: { correo },
+      relations: { becario: true },
+    });
+  }
 }
+
