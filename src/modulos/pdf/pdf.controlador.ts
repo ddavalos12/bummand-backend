@@ -1,9 +1,12 @@
 import { Controller, Get, Param, Res, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { PdfServicio } from './pdf.servicio';
 import { EvaluacionesServicio } from '../evaluaciones/evaluaciones.servicio';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 
+@ApiTags('PDF')
+@ApiBearerAuth('JWT-auth')
 @UseGuards(JwtGuardia)
 @Controller('pdf')
 export class PdfControlador {
@@ -13,6 +16,21 @@ export class PdfControlador {
   ) {}
 
   @Get('evaluacion/:id')
+  @ApiOperation({
+    summary: 'Generar y descargar informe de evaluación en PDF',
+    description: 'Renderiza mediante Puppeteer headless el informe institucional oficial (equivalente al formulario físico F-03) con firma de conformidad.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador de la evaluación', type: Number, example: 1 })
+  @ApiProduces('application/pdf')
+  @ApiResponse({
+    status: 200,
+    description: 'Archivo binario del informe PDF oficial descargado.',
+    schema: {
+      type: 'string',
+      format: 'binary',
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Evaluación no encontrada.' })
   async generarReporteEvaluacion(@Param('id', ParseIntPipe) id: number, @Res() respuesta: Response) {
     const evaluacion = await this.evaluaciones_servicio.obtenerPorId(id);
 

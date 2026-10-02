@@ -583,9 +583,35 @@ A continuación se resume la totalidad de las rutas de red expuestas por el serv
 
 ---
 
-## 8. Verificación de Compilación y Aseguramiento de Calidad
+## 8. Documentación Interactiva OpenAPI y Swagger (`/api/docs`)
+
+Para facilitar la interoperabilidad, consumo por clientes web y móviles, y auditoría en tiempo real, el backend integra la suite oficial **Swagger / OpenAPI 3.0** (`@nestjs/swagger` y `swagger-ui-express`):
+
+- **Ruta de Acceso:** La consola interactiva se sirve en `http://localhost:3000/api/docs` (o el puerto configurado en variables de entorno).
+- **Esquema de Seguridad Bearer:** Configurado con `addBearerAuth` bajo el identificador `JWT-auth`, permitiendo autenticar peticiones de prueba mediante tokens JWT institucionales válidos de forma persistente (`persistAuthorization: true`).
+- **Etiquetado Semántico por Dominio (`@ApiTags`):**
+  - `Sistema`: Verificación de salud y conectividad básica.
+  - `Autenticación`: Inicio de sesión y expedición de tokens.
+  - `Usuarios`: Gestión de cuentas institucionales y estados (`activo`/`inactivo`).
+  - `Becarios`: Expedientes académicos, carreras y asignaciones.
+  - `Iglesias`: Directorio de congregaciones cristianas.
+  - `Lugares de Práctica`: Sedes operativas, coordenadas geodésicas y radios de geocerca.
+  - `Asistencia`: Registros de entrada/salida satelitales con fórmula de Haversine.
+  - `Pasajes`: Declaración mensual de viáticos, liquidación del 80% en centavos y regla del día 24.
+  - `Evaluaciones`: Matriz 360°, ponderación matemática y formulario eclesiástico F-03.
+  - `Prácticas`: Convalidación y certificación de horas con firma manuscrita Canvas.
+  - `Notificaciones`: Bandeja de avisos reactivos y conteo de no leídas.
+  - `Dashboard`: Agregaciones analíticas, ejecución presupuestaria del 80% y rankings.
+  - `PDF`: Generación y descarga binaria de certificados oficiales vía Puppeteer.
+- **Decoración Exhaustiva de DTOs:** Cada campo de entrada y salida está anotado con `@ApiProperty` o `@ApiPropertyOptional`, detallando tipos, descripciones institucionales, restricciones de validación (`minLength`, `maxLength`, `minimum`, `maximum`) y valores de ejemplo representativos.
+- **Herencia en Modificaciones:** Los DTOs de actualización (`ActualizarBecarioDto`, `ActualizarIglesiaDto`, `ActualizarLugarPracticaDto`) emplean `PartialType` importado de `@nestjs/swagger`, heredando automáticamente la metainformación de campos y marcándolos opcionales en el esquema OpenAPI.
+
+---
+
+## 9. Verificación de Compilación y Aseguramiento de Calidad
 
 El backend de BUMAND cuenta con un flujo integral de pruebas automatizadas y compilación estructurada:
-- **Compilación Oficial:** `npm run compilar` ejecuta el empaquetado optimizado mediante Webpack 5 y Nest CLI, garantizando la resolución limpia de todas las dependencias y la verificación estricta de tipos de TypeScript sin emitir advertencias.
+- **Compilación Oficial:** `npm run compilar` ejecuta el empaquetado optimizado mediante Webpack 5 y Nest CLI, garantizando la resolución limpia de todas las dependencias, la generación de metadatos de Swagger y la verificación estricta de tipos de TypeScript sin emitir advertencias.
 - **Suite de Pruebas Unitarias:** `npm test` corre el motor Jest sobre 7 suites de pruebas (`dashboard.servicio.spec.ts`, `evaluaciones.controlador.spec.ts`, `pasajes.servicio.spec.ts`, `evaluaciones.servicio.spec.ts`, `pdf.controlador.spec.ts`, `dashboard.controlador.spec.ts`, `app.controlador.spec.ts`), con 16 pruebas aprobadas al 100%. Las pruebas validan de forma explícita el cálculo en centavos enteros del 80%, la regla restrictiva del día 24, la ponderación del sistema 360° y la generación de reportes.
 - **Mantenimiento y Formato:** Se dispone de los scripts estandarizados `npm run formatear` (Prettier), `npm run revisar` (ESLint) y modos de ejecución `npm run iniciar:desarrollo` y `npm run iniciar:produccion`.
+
