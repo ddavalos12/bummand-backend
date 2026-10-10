@@ -150,4 +150,20 @@ describe('PasajesServicio', () => {
       ).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('Catálogo geodésico de paradas frecuentes', () => {
+    it('debe retornar paradas oficiales de transporte urbano', async () => {
+      const paradas = await servicio.obtenerParadas();
+      expect(paradas.length).toBeGreaterThan(0);
+      expect(paradas.some((p) => p.nombre?.includes('Ceja'))).toBe(true);
+    });
+
+    it('debe permitir filtrar paradas por ciudad', async () => {
+      const paradas_el_alto = await servicio.obtenerParadas('El Alto');
+      expect(paradas_el_alto.every((p) => p.ciudad === 'El Alto')).toBe(true);
+
+      const paradas_la_paz = await servicio.obtenerParadas('La Paz');
+      expect(paradas_la_paz.every((p) => p.ciudad === 'La Paz')).toBe(true);
+    });
+  });
 });

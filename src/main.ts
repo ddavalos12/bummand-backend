@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModulo } from './app.modulo';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { FiltroExcepcionesGlobal } from './nucleo/errores';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModulo);
@@ -17,6 +18,8 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
     transform: true,
   }));
+
+  app.useGlobalFilters(new FiltroExcepcionesGlobal());
 
   // Configuración de Swagger para documentación interactiva de la API
   const configuracion = new DocumentBuilder()

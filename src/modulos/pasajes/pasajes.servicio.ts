@@ -1,10 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SolicitudPasajes, EstadoSolicitud } from './entidades/solicitud-pasaje.entidad';
 import { Recorrido } from './entidades/recorrido.entidad';
+import { TarifaTransporte } from './entidades/tarifa-transporte.entidad';
+import { ParadaTransporte, PARADAS_OFICIALES_DEFECTO } from './entidades/parada-transporte.entidad';
 import { CrearSolicitudPasajeDto } from './dtos/crear-solicitud-pasaje.dto';
 import { AgregarRecorridoDto } from './dtos/agregar-recorrido.dto';
+import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
 
 export interface CalculoReembolsoPasajes {
   monto_total: number;
@@ -20,7 +23,36 @@ export class PasajesServicio {
     private readonly solicitudRepositorio: Repository<SolicitudPasajes>,
     @InjectRepository(Recorrido)
     private readonly recorridoRepositorio: Repository<Recorrido>,
+    @Optional()
+    @InjectRepository(TarifaTransporte)
+    private readonly tarifaRepositorio?: Repository<TarifaTransporte>,
+    @Optional()
+    @InjectRepository(ParadaTransporte)
+    private readonly paradaRepositorio?: Repository<ParadaTransporte>,
+    @Optional()
+    private readonly tiempoRealGateway?: TiempoRealGateway,
   ) {}
+
+  async obtenerTarifasOficiales(): Promise<TarifaTransporte[]> {
+    if (this.tarifaRepositorio) {
+      const encontradas = await this.tarifaRepositorio.find({
+        where: { activo: true },
+        order: { costo_bs: 'ASC' },
+      });
+      if (encontradas && encontradas.length > 0) {
+        return encontradas;
+      }
+    }
+
+    return [
+      { id: 1, medio_transporte: 'Micro / Colectivo Urbano', descripcion: 'Ruta regular La Paz / El Alto', costo_bs: 2.00, tramo_tipo: 'urbano', activo: true, created_at: new Date() },
+      { id: 2, medio_transporte: 'Minibús Tramo Corto', descripcion: 'Parada intermedia o tramo corto', costo_bs: 2.00, tramo_tipo: 'urbano', activo: true, created_at: new Date() },
+      { id: 3, medio_transporte: 'Minibús Tramo Directo', descripcion: 'Ruta directa troncal urbana', costo_bs: 2.60, tramo_tipo: 'urbano', activo: true, created_at: new Date() },
+      { id: 4, medio_transporte: 'Mi Teleférico', descripcion: 'Línea de red por tramo', costo_bs: 3.00, tramo_tipo: 'interciudad', activo: true, created_at: new Date() },
+      { id: 5, medio_transporte: 'Minibús Interciudad / El Alto', descripcion: 'Tramo La Paz - El Alto o extralargo', costo_bs: 3.50, tramo_tipo: 'interciudad', activo: true, created_at: new Date() },
+      { id: 6, medio_transporte: 'Trufi Troncal', descripcion: 'Ruta fija troncal', costo_bs: 4.00, tramo_tipo: 'urbano', activo: true, created_at: new Date() },
+    ] as TarifaTransporte[];
+  }
 
   calcularReembolsoCentavos(tarifas: number[]): CalculoReembolsoPasajes {
     const total_centavos = tarifas.reduce((acumulado, tarifa) => {
@@ -45,7 +77,9 @@ export class PasajesServicio {
       monto_total: 0,
       monto_devolucion: 0,
     });
-    return this.solicitudRepositorio.save(nueva_solicitud);
+    const guardada = await this.solicitudRepositorio.save(nueva_solicitud);
+    this.tiempoRealGateway?.notificarPasajes({ accion: 'crear', solicitud: guardada });
+    return guardada;
   }
 
   async agregarRecorrido(dto: AgregarRecorridoDto): Promise<Recorrido> {
@@ -88,6 +122,8 @@ export class PasajesServicio {
     solicitud.monto_devolucion = calculo.monto_devolucion;
     await this.solicitudRepositorio.save(solicitud);
 
+    this.tiempoRealGateway?.notificarPasajes({ accion: 'recorrido_agregado', recorrido: nuevo_recorrido, solicitud });
+
     return nuevo_recorrido;
   }
 
@@ -122,7 +158,9 @@ export class PasajesServicio {
 
     solicitud.estado = EstadoSolicitud.PENDIENTE;
     solicitud.fecha_envio = fecha_referencia;
-    return this.solicitudRepositorio.save(solicitud);
+    const guardada = await this.solicitudRepositorio.save(solicitud);
+    this.tiempoRealGateway?.notificarPasajes({ accion: 'enviar', solicitud: guardada });
+    return guardada;
   }
 
   async obtenerTodas(): Promise<SolicitudPasajes[]> {
@@ -156,7 +194,9 @@ export class PasajesServicio {
     solicitud.estado = EstadoSolicitud.APROBADO;
     solicitud.supervisor_id = supervisor_id;
     solicitud.fecha_resolucion = new Date();
-    return this.solicitudRepositorio.save(solicitud);
+    const guardada = await this.solicitudRepositorio.save(solicitud);
+    this.tiempoRealGateway?.notificarPasajes({ accion: 'aprobar', solicitud: guardada });
+    return guardada;
   }
 
   async rechazarSolicitud(id: number, supervisor_id: number, observaciones: string): Promise<SolicitudPasajes> {
@@ -168,6 +208,49 @@ export class PasajesServicio {
     solicitud.supervisor_id = supervisor_id;
     solicitud.observaciones = observaciones;
     solicitud.fecha_resolucion = new Date();
-    return this.solicitudRepositorio.save(solicitud);
+    const guardada = await this.solicitudRepositorio.save(solicitud);
+    this.tiempoRealGateway?.notificarPasajes({ accion: 'rechazar', solicitud: guardada });
+    return guardada;
+  }
+
+  async obtenerParadas(ciudad?: string): Promise<ParadaTransporte[]> {
+    if (this.paradaRepositorio) {
+      const where: any = {};
+      if (ciudad) {
+        where.ciudad = ciudad;
+      }
+      const paradas_db = await this.paradaRepositorio.find({
+        where,
+        order: { ciudad: 'ASC', nombre: 'ASC' },
+      });
+      if (paradas_db && paradas_db.length > 0) {
+        return paradas_db;
+      }
+    }
+
+    // Fallback a catálogo en memoria si la BD aún no ha sido sembrada
+    if (ciudad) {
+      return (PARADAS_OFICIALES_DEFECTO as ParadaTransporte[]).filter(
+        (p) => p.ciudad?.toLowerCase() === ciudad.toLowerCase(),
+      );
+    }
+    return PARADAS_OFICIALES_DEFECTO as ParadaTransporte[];
+  }
+
+  async sembrarParadas(): Promise<ParadaTransporte[]> {
+    if (!this.paradaRepositorio) {
+      return PARADAS_OFICIALES_DEFECTO as ParadaTransporte[];
+    }
+
+    const sembradas: ParadaTransporte[] = [];
+    for (const p of PARADAS_OFICIALES_DEFECTO) {
+      let existente = await this.paradaRepositorio.findOne({ where: { nombre: p.nombre } });
+      if (!existente) {
+        existente = this.paradaRepositorio.create(p);
+        existente = await this.paradaRepositorio.save(existente);
+      }
+      sembradas.push(existente);
+    }
+    return sembradas;
   }
 }

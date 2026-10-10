@@ -8,6 +8,9 @@ import { Iglesia } from '../modulos/iglesias/entidades/iglesia.entidad';
 import { ModuloEvaluacion } from '../modulos/evaluaciones/entidades/modulo-evaluacion.entidad';
 import { PeriodoEvaluacion } from '../modulos/evaluaciones/entidades/periodo-evaluacion.entidad';
 import { Evaluador } from '../modulos/evaluaciones/entidades/evaluador.entidad';
+import { TarifaTransporte } from '../modulos/pasajes/entidades/tarifa-transporte.entidad';
+import { ParadaTransporte } from '../modulos/pasajes/entidades/parada-transporte.entidad';
+import { Evento } from '../modulos/eventos/entidades/evento.entidad';
 
 @Module({
   imports: [
@@ -19,6 +22,9 @@ import { Evaluador } from '../modulos/evaluaciones/entidades/evaluador.entidad';
       ModuloEvaluacion,
       PeriodoEvaluacion,
       Evaluador,
+      TarifaTransporte,
+      ParadaTransporte,
+      Evento,
     ]),
   ],
   providers: [SemillaServicio],

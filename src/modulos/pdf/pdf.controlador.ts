@@ -98,4 +98,32 @@ export class PdfControlador {
 
     respuesta.end(buffer);
   }
+
+  @Get('evento/:id')
+  @ApiOperation({
+    summary: 'Generar y descargar acta oficial de asistencia a evento en PDF',
+    description: 'Renderiza mediante Puppeteer el acta de control geodésico y nómina de asistentes a un evento convocado.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador del evento', type: Number, example: 1 })
+  @ApiProduces('application/pdf')
+  @ApiResponse({
+    status: 200,
+    description: 'Archivo binario del acta PDF descargada.',
+    schema: {
+      type: 'string',
+      format: 'binary',
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Evento no encontrado.' })
+  async generarActaEvento(@Param('id', ParseIntPipe) id: number, @Res() respuesta: Response) {
+    const buffer = await this.pdf_servicio.generarActaEventoPdf(id);
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=Acta_Asistencia_Evento_${id}.pdf`,
+      'Content-Length': buffer.length,
+    });
+
+    respuesta.end(buffer);
+  }
 }

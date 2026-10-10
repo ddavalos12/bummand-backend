@@ -12,7 +12,10 @@ describe('PdfControlador', () => {
       providers: [
         {
           provide: PdfServicio,
-          useValue: { generarPdf: jest.fn() },
+          useValue: {
+            generarPdf: jest.fn(),
+            generarActaEventoPdf: jest.fn().mockResolvedValue(Buffer.from('PDF_ACTA_TEST')),
+          },
         },
         {
           provide: EvaluacionesServicio,
@@ -26,5 +29,22 @@ describe('PdfControlador', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('debe generar y enviar el acta de asistencia a evento en PDF', async () => {
+    const respuesta_mock = {
+      set: jest.fn(),
+      end: jest.fn(),
+    } as any;
+
+    await controller.generarActaEvento(1, respuesta_mock);
+
+    expect(respuesta_mock.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'attachment; filename=Acta_Asistencia_Evento_1.pdf',
+      }),
+    );
+    expect(respuesta_mock.end).toHaveBeenCalled();
   });
 });

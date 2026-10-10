@@ -1,7 +1,10 @@
-import { Controller, Post, Body } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { InicioSesionDto } from './dtos/inicio-sesion.dto';
 import { AutenticacionServicio } from './autenticacion.servicio';
+import { JwtGuardia } from './jwt.guardia';
+import { UsuarioActual } from './usuario-actual.decorador';
+import { Usuario } from '../usuarios/entidades/usuario.entidad';
 
 @ApiTags('Autenticación')
 @Controller('autenticacion')
@@ -34,5 +37,24 @@ export class AutenticacionControlador {
   })
   iniciarSesion(@Body() inicioSesionDto: InicioSesionDto) {
     return this.autenticacionServicio.iniciarSesion(inicioSesionDto);
+  }
+
+  @UseGuards(JwtGuardia)
+  @Post('renovar-sesion')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Renovar sesión institucional',
+    description: 'Refresca el token JWT de acceso para un usuario con sesión activa.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Token renovado con éxito.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Token expirado o inválido.',
+  })
+  renovarSesion(@UsuarioActual() usuario: Usuario) {
+    return this.autenticacionServicio.renovarSesion(usuario.id);
   }
 }

@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Post, Patch, Body, Param, Query, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PasajesServicio } from './pasajes.servicio';
 import { SolicitudPasajes } from './entidades/solicitud-pasaje.entidad';
+import { TarifaTransporte } from './entidades/tarifa-transporte.entidad';
+import { ParadaTransporte } from './entidades/parada-transporte.entidad';
 import { CrearSolicitudPasajeDto } from './dtos/crear-solicitud-pasaje.dto';
 import { AgregarRecorridoDto } from './dtos/agregar-recorrido.dto';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
@@ -16,6 +18,40 @@ import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 @Controller('pasajes')
 export class PasajesControlador {
   constructor(private readonly pasajesServicio: PasajesServicio) {}
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('tarifas')
+  @ApiOperation({
+    summary: 'Catálogo de tarifas oficiales de transporte',
+    description: 'Retorna las tarifas oficiales del transporte urbano regulado en La Paz y El Alto (Minibús, Micro, Teleférico, Trufi).',
+  })
+  @ApiResponse({ status: 200, description: 'Catálogo oficial de tarifas.', type: [TarifaTransporte] })
+  obtenerTarifas(): Promise<TarifaTransporte[]> {
+    return this.pasajesServicio.obtenerTarifasOficiales();
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('paradas')
+  @ApiOperation({
+    summary: 'Listar paradas frecuentes de transporte',
+    description: 'Retorna los nodos principales y paradas habituales de transporte de La Paz y El Alto con coordenadas geodésicas.',
+  })
+  @ApiQuery({ name: 'ciudad', required: false, enum: ['La Paz', 'El Alto'], description: 'Filtrar por ciudad' })
+  @ApiResponse({ status: 200, description: 'Listado de paradas frecuentes.', type: [ParadaTransporte] })
+  obtenerParadas(@Query('ciudad') ciudad?: string): Promise<ParadaTransporte[]> {
+    return this.pasajesServicio.obtenerParadas(ciudad);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Post('paradas/sembrar')
+  @ApiOperation({
+    summary: 'Sembrar catálogo base de paradas oficiales',
+    description: 'Inicializa o actualiza en la base de datos las paradas principales de La Paz y El Alto.',
+  })
+  @ApiResponse({ status: 201, description: 'Paradas sembradas exitosamente.', type: [ParadaTransporte] })
+  sembrarParadas(): Promise<ParadaTransporte[]> {
+    return this.pasajesServicio.sembrarParadas();
+  }
 
   @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
   @Post()

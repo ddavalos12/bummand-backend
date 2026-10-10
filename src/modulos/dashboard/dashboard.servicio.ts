@@ -62,18 +62,27 @@ export class DashboardServicio {
     private readonly evaluacion_repo: Repository<Evaluacion>,
   ) {}
 
-  async obtenerEstadisticas(): Promise<EstadisticasDashboard> {
+  async obtenerEstadisticas(supervisor_id?: number): Promise<EstadisticasDashboard> {
+    const where_becario = supervisor_id ? { supervisor_id } : {};
     const [
       becarios,
-      asistencias,
-      solicitudes,
+      todas_asistencias,
+      todas_solicitudes,
       evaluaciones_pendientes,
     ] = await Promise.all([
-      this.becario_repo.find({ relations: { usuario: true } }),
+      this.becario_repo.find({ where: where_becario, relations: { usuario: true } }),
       this.asistencia_repo.find({ relations: { becario: { usuario: true } } }),
       this.pasajes_repo.find(),
       this.evaluacion_repo.count({ where: { estado: EstadoEvaluacion.PENDIENTE } }),
     ]);
+
+    const set_becarios_permitidos = new Set(becarios.map((b) => b.id));
+    const asistencias = supervisor_id
+      ? todas_asistencias.filter((a) => set_becarios_permitidos.has(a.becario_id))
+      : todas_asistencias;
+    const solicitudes = supervisor_id
+      ? todas_solicitudes.filter((s) => set_becarios_permitidos.has(s.becario_id))
+      : todas_solicitudes;
 
     const total_becarios_activos = becarios.length;
 

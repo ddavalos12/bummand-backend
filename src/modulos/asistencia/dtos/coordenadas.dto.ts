@@ -51,4 +51,12 @@ export class CoordenadasDto {
   @IsOptional()
   @IsBoolean()
   simulada?: boolean;
+
+  @ApiPropertyOptional({
+    example: 2,
+    description: 'Identificador del lugar de práctica o agencia seleccionada (para rotaciones institucionales)',
+  })
+  @IsOptional()
+  @IsNumber()
+  lugar_practica_id?: number;
 }

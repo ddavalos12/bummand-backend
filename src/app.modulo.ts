@@ -20,6 +20,12 @@ import { EvaluacionPastor } from './modulos/evaluaciones/entidades/evaluacion-pa
 import { AprobacionPracticas } from './modulos/practicas/entidades/aprobacion-practicas.entidad';
 import { Notificacion } from './modulos/notificaciones/entidades/notificacion.entidad';
 import { ReporteGenerado } from './modulos/pdf/entidades/reporte-generado.entidad';
+import { TarifaTransporte } from './modulos/pasajes/entidades/tarifa-transporte.entidad';
+import { ParadaTransporte } from './modulos/pasajes/entidades/parada-transporte.entidad';
+import { Devocional } from './modulos/devocionales/entidades/devocional.entidad';
+import { Evento } from './modulos/eventos/entidades/evento.entidad';
+import { AsistenciaEvento } from './modulos/eventos/entidades/asistencia-evento.entidad';
+import { Justificacion } from './modulos/justificaciones/entidades/justificacion.entidad';
 
 // Módulos Funcionales
 import { UsuariosModulo } from './modulos/usuarios/usuarios.modulo';
@@ -34,7 +40,11 @@ import { EvaluacionesModulo } from './modulos/evaluaciones/evaluaciones.modulo';
 import { PracticasModulo } from './modulos/practicas/practicas.modulo';
 import { NotificacionesModulo } from './modulos/notificaciones/notificaciones.modulo';
 import { DashboardModulo } from './modulos/dashboard/dashboard.modulo';
+import { DevocionalesModulo } from './modulos/devocionales/devocionales.modulo';
+import { EventosModulo } from './modulos/eventos/eventos.modulo';
+import { JustificacionesModulo } from './modulos/justificaciones/justificaciones.modulo';
 import { DatosModulo } from './datos/datos.modulo';
+import { TiempoRealModulo } from './modulos/tiempo-real/tiempo-real.modulo';
 
 @Module({
   imports: [
@@ -64,6 +74,12 @@ import { DatosModulo } from './datos/datos.modulo';
         AprobacionPracticas,
         Notificacion,
         ReporteGenerado,
+        TarifaTransporte,
+        ParadaTransporte,
+        Devocional,
+        Evento,
+        AsistenciaEvento,
+        Justificacion,
       ],
       synchronize: false, // Controlado estrictamente por migraciones SQL
     }),
@@ -79,7 +95,11 @@ import { DatosModulo } from './datos/datos.modulo';
     PracticasModulo,
     NotificacionesModulo,
     DashboardModulo,
+    DevocionalesModulo,
+    EventosModulo,
+    JustificacionesModulo,
     DatosModulo,
+    TiempoRealModulo,
   ],
   controllers: [AppControlador],
   providers: [AppServicio],
