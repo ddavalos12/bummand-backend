@@ -27,6 +27,14 @@ export class TarifaTransporte {
   @Column({ type: 'boolean', default: true })
   activo: boolean;
 
+  @ApiProperty({ example: '2026-01-01', description: 'Fecha de inicio de vigencia de la tarifa' })
+  @Column({ name: 'vigente_desde', type: 'date', default: () => 'CURRENT_DATE' })
+  vigente_desde: Date | string;
+
+  @ApiProperty({ example: null, nullable: true, description: 'Fecha de fin de vigencia de la tarifa (nulo si sigue vigente)' })
+  @Column({ name: 'vigente_hasta', type: 'date', nullable: true })
+  vigente_hasta?: Date | string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 }

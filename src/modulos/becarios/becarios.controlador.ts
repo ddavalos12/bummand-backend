@@ -3,6 +3,8 @@ import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } 
 import { BecariosServicio } from './becarios.servicio';
 import { CrearBecarioDto } from './dtos/crear-becario.dto';
 import { ActualizarBecarioDto } from './dtos/actualizar-becario.dto';
+import { AsignarSupervisorDto } from './dtos/asignar-supervisor.dto';
+import { OrdenConfirmacionDatosDto } from './dtos/orden-confirmacion-datos.dto';
 import { Becario } from './entidades/becario.entidad';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
@@ -87,6 +89,66 @@ export class BecariosControlador {
     return this.becariosServicio.actualizar(becario.id, { universidad });
   }
 
+  @Post('orden-confirmacion-datos')
+  @Roles(Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'Emitir orden de confirmación mensual de datos',
+    description: 'Activa o desactiva la bandera global institucional que obliga a los becarios a confirmar sus datos académicos.',
+  })
+  @ApiResponse({ status: 200, description: 'Estado de confirmación de datos actualizado.' })
+  ordenConfirmacionDatos(@Body() dto: OrdenConfirmacionDatosDto) {
+    return this.becariosServicio.ordenConfirmacionDatos(dto.confirmacion_datos_requerida);
+  }
+
+  @Get('estado-confirmacion-datos')
+  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @ApiOperation({
+    summary: 'Consultar estado de confirmación de datos',
+    description: 'Devuelve si el usuario autenticado tiene pendiente la confirmación de datos institucional.',
+  })
+  @ApiResponse({ status: 200, description: 'Estado de confirmación obtenido.' })
+  estadoConfirmacionDatos(@UsuarioActual() usuario: Usuario) {
+    return this.becariosServicio.obtenerEstadoConfirmacionDatos(usuario.id);
+  }
+
+  @Post('confirmar-datos')
+  @Roles(Rol.BECARIO)
+  @ApiOperation({
+    summary: 'Confirmar datos institucionales del propio becario',
+    description: 'Permite al becario autenticado confirmar formalmente que sus datos de expediente se encuentran actualizados.',
+  })
+  @ApiResponse({ status: 200, description: 'Confirmación registrada con éxito.' })
+  confirmarDatosPropios(@UsuarioActual() usuario: Usuario) {
+    return this.becariosServicio.confirmarDatosPropios(usuario.id);
+  }
+
+  @Put(':id/asignar-supervisor')
+  @Roles(Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'Asignar supervisor institucional a un becario',
+    description: 'Permite al administrador vincular un becario a un supervisor o tutor específico.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador del becario', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Supervisor asignado exitosamente.', type: Becario })
+  asignarSupervisor(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AsignarSupervisorDto,
+  ): Promise<Becario> {
+    return this.becariosServicio.asignarSupervisor(id, dto.supervisor_id);
+  }
+
+  @Put(':id/validar-datos')
+  @Roles(Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'Validar oficialmente datos del becario por administrador',
+    description: 'Marca el expediente del becario como validado y verificado por la administración.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador del becario', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Datos del becario validados.', type: Becario })
+  validarDatos(@Param('id', ParseIntPipe) id: number): Promise<Becario> {
+    return this.becariosServicio.validarDatos(id);
+  }
+
   @Get(':id')
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
   @ApiOperation({
@@ -98,24 +160,26 @@ export class BecariosControlador {
   @ApiResponse({ status: 404, description: 'Becario no encontrado o fuera de la jurisdicción del supervisor.' })
   obtener(
     @Param('id', ParseIntPipe) id: number,
-    @UsuarioActual() usuarioAutenticado: Usuario
+    @UsuarioActual() usuarioAutenticado: Usuario,
   ): Promise<Becario> {
     return this.becariosServicio.obtener(id, usuarioAutenticado);
   }
 
   @Put(':id')
-  @Roles(Rol.ADMINISTRADOR)
+  @Roles(Rol.ADMINISTRADOR, Rol.BECARIO)
   @ApiOperation({
     summary: 'Actualizar expediente de becario',
-    description: 'Modifica los datos académicos o asignaciones institucionales de un becario (Solo Administradores).',
+    description: 'Modifica datos de un becario. Si el rol es becario, se bloquea la modificación de campos protegidos con ERR-AUTORIZACION-0001.',
   })
   @ApiParam({ name: 'id', description: 'Identificador del becario', type: Number, example: 1 })
   @ApiResponse({ status: 200, description: 'Becario actualizado.', type: Becario })
+  @ApiResponse({ status: 403, description: 'Intento de modificar campos protegidos por rol becario.' })
   actualizar(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: ActualizarBecarioDto
+    @Body() dto: ActualizarBecarioDto,
+    @UsuarioActual() usuarioAutenticado: Usuario,
   ): Promise<Becario> {
-    return this.becariosServicio.actualizar(id, dto);
+    return this.becariosServicio.actualizar(id, dto, usuarioAutenticado.rol, usuarioAutenticado.id);
   }
 
   @Delete(':id')

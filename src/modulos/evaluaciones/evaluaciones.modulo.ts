@@ -8,6 +8,8 @@ import { PeriodoEvaluacion } from './entidades/periodo-evaluacion.entidad';
 import { Evaluador } from './entidades/evaluador.entidad';
 import { EvaluacionPastor } from './entidades/evaluacion-pastor.entidad';
 
+import { BibliaModulo } from '../biblia/biblia.modulo';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -17,6 +19,7 @@ import { EvaluacionPastor } from './entidades/evaluacion-pastor.entidad';
       Evaluador,
       EvaluacionPastor,
     ]),
+    BibliaModulo,
   ],
   controllers: [EvaluacionesControlador],
   providers: [EvaluacionesServicio],

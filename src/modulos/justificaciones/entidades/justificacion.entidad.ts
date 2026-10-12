@@ -42,7 +42,7 @@ export class Justificacion {
   tipo_incidencia: TipoIncidencia;
 
   @ApiProperty({ example: 12, description: 'ID de referencia externa (registro de asistencia o evento)', required: false })
-  @Column({ name: 'referencia_id', nullable: true })
+  @Column({ name: 'referencia_id', type: 'int', nullable: true })
   referencia_id: number | null;
 
   @ApiProperty({ example: '2026-10-15', description: 'Fecha en la que ocurrió la falta, retraso o incidencia' })
@@ -66,7 +66,7 @@ export class Justificacion {
   estado: EstadoJustificacion;
 
   @ApiProperty({ example: 2, description: 'Identificador del supervisor que resuelve la solicitud', required: false })
-  @Column({ name: 'supervisor_id', nullable: true })
+  @Column({ name: 'supervisor_id', type: 'int', nullable: true })
   supervisor_id: number | null;
 
   @ApiProperty({ example: 'Justificación aceptada con respaldo documental.', description: 'Dictamen y observaciones del supervisor', required: false })

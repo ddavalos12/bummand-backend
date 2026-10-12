@@ -65,4 +65,10 @@ export class CrearEvaluacionDto {
   @IsOptional()
   @IsString()
   fecha_evaluacion?: string;
+
+  @ApiPropertyOptional({
+    description: 'Detalle anexo del Formulario Pastoral F-03 si corresponde al Módulo 1',
+  })
+  @IsOptional()
+  detalle_pastor?: any;
 }

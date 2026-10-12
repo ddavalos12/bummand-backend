@@ -13,16 +13,16 @@ export class EvaluacionPastor {
   pastor_nombre: string;
 
   @Column({ name: 'pastor_correo', type: 'varchar', length: 150, nullable: true })
-  pastor_correo: string;
+  pastor_correo: string | null;
 
   @Column({ name: 'pastor_celular', type: 'varchar', length: 30, nullable: true })
-  pastor_celular: string;
+  pastor_celular: string | null;
 
   @Column({ name: 'iglesia_nombre', type: 'varchar', length: 150 })
   iglesia_nombre: string;
 
   @Column({ name: 'iglesia_direccion', type: 'varchar', length: 255, nullable: true })
-  iglesia_direccion: string;
+  iglesia_direccion: string | null;
 
   @Column({ name: 'campos_formulario', type: 'jsonb', nullable: true })
   campos_formulario: any;

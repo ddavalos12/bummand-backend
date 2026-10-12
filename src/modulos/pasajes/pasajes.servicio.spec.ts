@@ -166,4 +166,19 @@ describe('PasajesServicio', () => {
       expect(paradas_la_paz.every((p) => p.ciudad === 'La Paz')).toBe(true);
     });
   });
+
+  describe('Tarifario institucional con vigencia temporal y retroactividad', () => {
+    it('debe retornar tarifas vigentes a la fecha solicitada', async () => {
+      const tarifas = await servicio.obtenerTarifasOficiales('2026-10-11');
+      expect(tarifas.length).toBeGreaterThan(0);
+      expect(tarifas.some((t) => t.costo_bs === 2.60)).toBe(true);
+      expect(tarifas.every((t) => t.activo)).toBe(true);
+    });
+
+    it('debe permitir consultar el catálogo completo para administración', async () => {
+      const todas = await servicio.listarTodasLasTarifas();
+      expect(todas.length).toBeGreaterThan(0);
+    });
+  });
 });
+

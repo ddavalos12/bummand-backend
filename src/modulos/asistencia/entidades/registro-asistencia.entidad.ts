@@ -48,10 +48,27 @@ export class RegistroAsistencia {
   @Column({ name: 'dentro_de_horario', type: 'boolean', nullable: true })
   dentro_de_horario: boolean;
 
+  @Column({ name: 'minutos_retraso', type: 'int', default: 0 })
+  minutos_retraso: number;
+
+  @Column({ name: 'hora_prevista', type: 'varchar', length: 10, nullable: true })
+  hora_prevista: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  bloque: string | null;
+
+  @Column({ name: 'confirmado_organizador', type: 'boolean', default: false })
+  confirmado_organizador: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 
   // Getters / Setters de compatibilidad
+  get minutosRetraso(): number { return this.minutos_retraso; }
+  set minutosRetraso(v: number) { this.minutos_retraso = v; }
+
+  get horaPrevista(): string | null { return this.hora_prevista; }
+  set horaPrevista(v: string | null) { this.hora_prevista = v; }
   get horaIngreso(): string { return this.hora_ingreso; }
   set horaIngreso(v: string) { this.hora_ingreso = v; }
 

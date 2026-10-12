@@ -21,6 +21,9 @@ export class LugarPractica {
   @Column({ name: 'radio_tolerancia_m', type: 'int' })
   radio_tolerancia_m: number;
 
+  @Column({ type: 'simple-array', nullable: true })
+  bloques: string[] | null;
+
   // Getter/setter para compatibilidad con código existente
   get radioToleranciaM(): number {
     return this.radio_tolerancia_m;

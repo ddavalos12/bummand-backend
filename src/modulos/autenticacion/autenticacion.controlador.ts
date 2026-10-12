@@ -1,6 +1,7 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { InicioSesionDto } from './dtos/inicio-sesion.dto';
+import { ConfirmarCorreoDto } from './dtos/confirmar-correo.dto';
 import { AutenticacionServicio } from './autenticacion.servicio';
 import { JwtGuardia } from './jwt.guardia';
 import { UsuarioActual } from './usuario-actual.decorador';
@@ -56,5 +57,22 @@ export class AutenticacionControlador {
   })
   renovarSesion(@UsuarioActual() usuario: Usuario) {
     return this.autenticacionServicio.renovarSesion(usuario.id);
+  }
+
+  @Post('confirmar-correo')
+  @ApiOperation({
+    summary: 'Confirmar correo institucional de cuenta registrada',
+    description: 'Valida el token de verificación y activa el estado de correo confirmado.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Correo electrónico confirmado exitosamente.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Token de confirmación inválido o expirado.',
+  })
+  confirmarCorreo(@Body() dto: ConfirmarCorreoDto) {
+    return this.autenticacionServicio.confirmarCorreo(dto);
   }
 }

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString, MinLength, MaxLength, IsDateString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString, MinLength, MaxLength, IsDateString, IsObject } from 'class-validator';
 
 export class CrearBecarioDto {
   @ApiProperty({
@@ -102,4 +102,22 @@ export class CrearBecarioDto {
   @IsDateString()
   @IsNotEmpty()
   fecha_ingreso: string;
+
+  @ApiPropertyOptional({
+    example: '10028341 LP',
+    description: 'Cédula de identidad del becario',
+    maxLength: 20,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  ci?: string;
+
+  @ApiPropertyOptional({
+    example: { lun: '08:00-12:00', mar: '', mie: '08:00-12:00', jue: '', vie: '08:00-14:00', sab: '', dom: '' },
+    description: 'Matriz semanal de horarios asignados de prácticas (Lunes a Domingo)',
+  })
+  @IsOptional()
+  @IsObject()
+  horario_semanal?: Record<string, string>;
 }

@@ -1,11 +1,16 @@
-import { Controller, Get, Post, Body, Param, Patch, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Patch, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { EvaluacionesServicio } from './evaluaciones.servicio';
 import { CrearEvaluacionDto } from './dtos/crear-evaluacion.dto';
+import { GuardarFormularioF03Dto } from './dtos/guardar-formulario-f03.dto';
+import { CrearPeriodoEvaluacionDto } from './dtos/crear-periodo-evaluacion.dto';
+import { ActualizarPeriodoEvaluacionDto } from './dtos/actualizar-periodo-evaluacion.dto';
+import { CambiarEstadoPeriodoDto } from './dtos/cambiar-estado-periodo.dto';
 import { EstadoEvaluacion, Evaluacion } from './entidades/evaluacion.entidad';
 import { ModuloEvaluacion } from './entidades/modulo-evaluacion.entidad';
-import { PeriodoEvaluacion } from './entidades/periodo-evaluacion.entidad';
+import { PeriodoEvaluacion, EstadoPeriodo } from './entidades/periodo-evaluacion.entidad';
 import { Evaluador } from './entidades/evaluador.entidad';
+import { EvaluacionPastor } from './entidades/evaluacion-pastor.entidad';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
 import { Roles } from '../autenticacion/roles.decorador';
@@ -81,6 +86,22 @@ export class EvaluacionesControlador {
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('becario/:becario_id/periodo/:periodo_id/seguimiento')
+  @ApiOperation({
+    summary: 'Obtener seguimiento evaluativo y cita bíblica inspiracional',
+    description: 'Devuelve la calificación ponderada dinámica semestral, desglose de notas y pasaje bíblico diario.',
+  })
+  @ApiParam({ name: 'becario_id', description: 'Identificador del becario', type: Number, example: 1 })
+  @ApiParam({ name: 'periodo_id', description: 'Identificador del periodo académico', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Seguimiento con cita bíblica obtenido con éxito.' })
+  obtenerSeguimiento(
+    @Param('becario_id', ParseIntPipe) becario_id: number,
+    @Param('periodo_id', ParseIntPipe) periodo_id: number,
+  ) {
+    return this.evaluaciones_servicio.obtenerSeguimiento(becario_id, periodo_id);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get(':id')
   @ApiOperation({
     summary: 'Obtener evaluación por ID',
@@ -119,6 +140,119 @@ export class EvaluacionesControlador {
     @Body('estado') estado: EstadoEvaluacion,
   ) {
     return this.evaluaciones_servicio.cambiarEstado(id, estado);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post(':id/formulario-f03')
+  @ApiOperation({
+    summary: 'Registrar o actualizar el Formulario F-03 Pastoral',
+    description: 'Guarda las respuestas cualitativas, datos del pastor e iglesia local, y opcionalmente califica la evaluación pastoral.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador de la evaluación principal (Módulo 1)', type: Number, example: 1 })
+  @ApiResponse({ status: 201, description: 'Formulario F-03 guardado con éxito.', type: EvaluacionPastor })
+  registrarFormularioF03(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: GuardarFormularioF03Dto,
+  ): Promise<EvaluacionPastor> {
+    return this.evaluaciones_servicio.registrarFormularioF03(id, dto);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get(':id/formulario-f03')
+  @ApiOperation({
+    summary: 'Obtener Formulario F-03 Pastoral por ID de evaluación',
+    description: 'Recupera el formulario de evaluación ministerial eclesial anexo al becario.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador de la evaluación', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Detalle del Formulario F-03.', type: EvaluacionPastor })
+  obtenerFormularioF03(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<EvaluacionPastor> {
+    return this.evaluaciones_servicio.obtenerFormularioF03(id);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Post('periodos')
+  @ApiOperation({
+    summary: 'Crear nuevo periodo semestral de evaluación',
+    description: 'Crea un nuevo semestre con ponderaciones porcentuales dinámicas para los 5 módulos (suma debe ser 100).',
+  })
+  @ApiResponse({ status: 201, description: 'Periodo creado exitosamente.', type: PeriodoEvaluacion })
+  @ApiResponse({ status: 400, description: 'La suma de pesos porcentuales no equivale al 100%.' })
+  crearPeriodo(@Body() dto: CrearPeriodoEvaluacionDto): Promise<PeriodoEvaluacion> {
+    return this.evaluaciones_servicio.crearPeriodo(dto);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Put('periodos/:id')
+  @ApiOperation({
+    summary: 'Actualizar configuración o pesos de un periodo semestral',
+    description: 'Modifica los porcentajes o fechas del periodo asegurando que la suma sea 100%.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador del periodo académico', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Periodo actualizado exitosamente.', type: PeriodoEvaluacion })
+  actualizarPeriodo(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ActualizarPeriodoEvaluacionDto,
+  ): Promise<PeriodoEvaluacion> {
+    return this.evaluaciones_servicio.actualizarPeriodo(id, dto);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Put('periodos/:id/estado')
+  @ApiOperation({
+    summary: 'Aperturar o cerrar semestre de evaluación (PUT)',
+    description: 'Permite al administrador abrir o cerrar un periodo semestral de evaluaciones (abierto / cerrado).',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador del periodo académico', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Estado del periodo actualizado.', type: PeriodoEvaluacion })
+  actualizarEstadoPeriodo(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CambiarEstadoPeriodoDto,
+  ): Promise<PeriodoEvaluacion> {
+    return this.evaluaciones_servicio.cambiarEstadoPeriodo(id, dto.estado);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Patch('periodos/:id/estado')
+  @ApiOperation({
+    summary: 'Cambiar estado de un periodo de evaluación (Patch)',
+    description: 'Permite abrir o cerrar un periodo semestral de evaluaciones (abierto / cerrado).',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador del periodo académico', type: Number, example: 1 })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        estado: {
+          type: 'string',
+          enum: Object.values(EstadoPeriodo),
+          example: 'cerrado',
+        },
+      },
+      required: ['estado'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Estado del periodo actualizado.', type: PeriodoEvaluacion })
+  cambiarEstadoPeriodo(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('estado') estado: EstadoPeriodo,
+  ): Promise<PeriodoEvaluacion> {
+    return this.evaluaciones_servicio.cambiarEstadoPeriodo(id, estado);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Patch('catalogos/periodos/:id/estado')
+  @ApiOperation({
+    summary: 'Cambiar estado de un periodo (alias catálogo)',
+    description: 'Ruta alternativa para compatibilidad con paneles de administración.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador del periodo académico', type: Number, example: 1 })
+  cambiarEstadoPeriodoCatalogo(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('estado') estado: EstadoPeriodo,
+  ): Promise<PeriodoEvaluacion> {
+    return this.evaluaciones_servicio.cambiarEstadoPeriodo(id, estado);
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)

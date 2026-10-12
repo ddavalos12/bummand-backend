@@ -42,6 +42,12 @@ export class Usuario {
   @Column({ name: 'reset_expira', type: 'timestamp', nullable: true })
   reset_expira: Date;
 
+  @Column({ name: 'correo_confirmado', type: 'boolean', default: false })
+  correo_confirmado: boolean;
+
+  @Column({ name: 'token_confirmacion', type: 'varchar', length: 255, nullable: true })
+  token_confirmacion: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 

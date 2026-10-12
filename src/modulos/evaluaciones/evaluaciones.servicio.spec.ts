@@ -3,7 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { EvaluacionesServicio, PESOS_PONDERADOS_MODULOS } from './evaluaciones.servicio';
 import { Evaluacion, EstadoEvaluacion } from './entidades/evaluacion.entidad';
 import { ModuloEvaluacion } from './entidades/modulo-evaluacion.entidad';
-import { PeriodoEvaluacion } from './entidades/periodo-evaluacion.entidad';
+import { PeriodoEvaluacion, EstadoPeriodo } from './entidades/periodo-evaluacion.entidad';
 import { Evaluador } from './entidades/evaluador.entidad';
 import { EvaluacionPastor } from './entidades/evaluacion-pastor.entidad';
 
@@ -25,10 +25,15 @@ describe('EvaluacionesServicio', () => {
 
     modulo_repo = {
       find: jest.fn(),
+      create: jest.fn().mockImplementation((d) => ({ ...d })),
+      save: jest.fn().mockImplementation((d) => Promise.resolve({ ...d })),
     };
 
     periodo_repo = {
       find: jest.fn(),
+      findOne: jest.fn(),
+      create: jest.fn().mockImplementation((d) => ({ ...d })),
+      save: jest.fn().mockImplementation((d) => Promise.resolve({ ...d })),
     };
 
     evaluador_repo = {
@@ -36,8 +41,9 @@ describe('EvaluacionesServicio', () => {
     };
 
     evaluacion_pastor_repo = {
-      save: jest.fn(),
       findOne: jest.fn(),
+      create: jest.fn().mockImplementation((d) => ({ ...d, id: 1 })),
+      save: jest.fn().mockImplementation((d) => Promise.resolve({ ...d, id: d.id || 1 })),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -123,6 +129,120 @@ describe('EvaluacionesServicio', () => {
       expect(resultado.es_completa).toBe(false);
       expect(resultado.modulos_evaluados).toBe(1);
       expect(resultado.rendimiento).toBe('Insuficiente');
+    });
+  });
+
+  describe('Formulario F-03 Pastoral y Estado de Periodos', () => {
+    it('debe registrar el Formulario F-03 pastoral y actualizar puntaje de la evaluación', async () => {
+      evaluacion_repo.findOne.mockResolvedValue({
+        id: 1,
+        modulo_id: 1,
+        puntaje: null,
+        estado: EstadoEvaluacion.PENDIENTE,
+      });
+      evaluacion_pastor_repo.findOne.mockResolvedValue(null);
+
+      const f03_dto = {
+        pastor_nombre: 'Pr. Juan Carlos',
+        pastor_correo: 'pastor@iglesia.bo',
+        iglesia_nombre: 'Iglesia Central',
+        puntaje: 95.0,
+        observaciones: 'Excelente vocación pastoral',
+        campos_formulario: { compromiso: 'Sí', testimonio: 'Intachable' },
+      };
+
+      const resultado = await servicio.registrarFormularioF03(1, f03_dto);
+
+      expect(resultado).toBeDefined();
+      expect(resultado.pastor_nombre).toBe('Pr. Juan Carlos');
+      expect(evaluacion_repo.save).toHaveBeenCalled();
+    });
+
+    it('debe cambiar el estado de un periodo académico entre abierto y cerrado', async () => {
+      periodo_repo.findOne.mockResolvedValue({
+        id: 2,
+        nombre: 'Semestre II · 2026',
+        estado: EstadoPeriodo.ABIERTO,
+      });
+
+      const periodo_actualizado = await servicio.cambiarEstadoPeriodo(2, EstadoPeriodo.CERRADO);
+
+      expect(periodo_actualizado.estado).toBe(EstadoPeriodo.CERRADO);
+      expect(periodo_repo.save).toHaveBeenCalled();
+    });
+
+    it('debe asegurar que se listen los 5 módulos semestrales canónicos', async () => {
+      modulo_repo.find.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { id: 1, orden: 1, nombre: 'Liderazgo en la Iglesia (Formulario F-03)' },
+        { id: 2, orden: 2, nombre: 'Autoevaluación Académica' },
+        { id: 3, orden: 3, nombre: 'Evaluación del Mentor / Prácticas' },
+        { id: 4, orden: 4, nombre: 'Evaluación Escuela de Líderes' },
+        { id: 5, orden: 5, nombre: 'Evaluación Socioeconómica' },
+      ]);
+
+      const modulos = await servicio.listarModulos();
+
+      expect(modulos.length).toBe(5);
+      expect(modulo_repo.save).toHaveBeenCalledTimes(5);
+    });
+
+    it('debe rechazar la creación de un periodo si los pesos no suman 100%', async () => {
+      await expect(
+        servicio.crearPeriodo({
+          nombre: 'Periodo Inválido',
+          fecha_inicio: '2026-01-01',
+          fecha_fin: '2026-06-30',
+          peso_academica: 30,
+          peso_liderazgo: 30,
+          peso_practicas: 30,
+          peso_mentor: 10,
+          peso_socioeconomica: 10, // Suma = 110
+        }),
+      ).rejects.toThrow('La suma de los pesos porcentuales debe ser exactamente 100');
+    });
+
+    it('debe crear un periodo exitosamente cuando los pesos suman 100%', async () => {
+      periodo_repo.save.mockImplementation((p) => Promise.resolve({ ...p, id: 10 }));
+
+      const periodo = await servicio.crearPeriodo({
+        nombre: 'Periodo Válido',
+        fecha_inicio: '2026-01-01',
+        fecha_fin: '2026-06-30',
+        peso_academica: 20,
+        peso_liderazgo: 20,
+        peso_practicas: 20,
+        peso_mentor: 20,
+        peso_socioeconomica: 20,
+      });
+
+      expect(periodo.id).toBe(10);
+      expect(periodo.peso_academica).toBe(20);
+      expect(periodo_repo.save).toHaveBeenCalled();
+    });
+
+    it('debe calcular calificación total respetando pesos dinámicos configurados en el periodo', async () => {
+      // Periodo con 20% en cada uno de los 5 módulos
+      periodo_repo.findOne.mockResolvedValue({
+        id: 3,
+        peso_liderazgo: 20,
+        peso_academica: 20,
+        peso_practicas: 20,
+        peso_mentor: 20,
+        peso_socioeconomica: 20,
+      });
+
+      evaluacion_repo.find.mockResolvedValue([
+        { modulo_id: 1, puntaje: 100, estado: EstadoEvaluacion.COMPLETADO },
+        { modulo_id: 2, puntaje: 100, estado: EstadoEvaluacion.COMPLETADO },
+        { modulo_id: 3, puntaje: 100, estado: EstadoEvaluacion.COMPLETADO },
+        { modulo_id: 4, puntaje: 100, estado: EstadoEvaluacion.COMPLETADO },
+        { modulo_id: 5, puntaje: 50, estado: EstadoEvaluacion.COMPLETADO },
+      ]);
+
+      // 4 módulos con 100 * 0.2 = 80 + 1 módulo con 50 * 0.2 = 10 -> Total = 90
+      const res = await servicio.calcularCalificacionTotal(1, 3);
+      expect(res.calificacion_total_100).toBe(90.0);
+      expect(res.rendimiento).toBe('Sobresaliente');
     });
   });
 });

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CrearLugarPracticaDto {
   @ApiProperty({
@@ -52,4 +52,14 @@ export class CrearLugarPracticaDto {
   @IsOptional()
   @IsNumber()
   radioToleranciaM?: number;
+
+  @ApiPropertyOptional({
+    example: ['Bloque A', 'Bloque B', 'Auditorio'],
+    description: 'Sub-ubicaciones o bloques dentro de la sede',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  bloques?: string[];
 }

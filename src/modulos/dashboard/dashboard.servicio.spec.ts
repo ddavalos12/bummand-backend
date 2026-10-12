@@ -14,8 +14,16 @@ describe('DashboardServicio', () => {
   let evaluacion_repo: any;
 
   beforeEach(async () => {
+    const qb_mock = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
     asistencia_repo = {
       find: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(qb_mock),
     };
     pasajes_repo = {
       find: jest.fn(),
@@ -129,6 +137,63 @@ describe('DashboardServicio', () => {
       // Validación de Tendencia Mensual (Marzo debe tener 17.5 horas)
       const marzo = resultado.tendencia_horas.find((t) => t.mes === 'Mar');
       expect(marzo?.horas).toBe(17.5);
+    });
+  });
+
+  describe('Seguimiento Semanal (becarios_con_retraso y asistencia_semanal)', () => {
+    it('debe devolver becarios con retraso, clasificar asistieron/no asistieron y conteos correctos', async () => {
+      becario_repo.find.mockResolvedValue([
+        { id: 1, carrera: 'Informática', usuario: { nombre: 'Daniel Dávalos' } },
+        { id: 2, carrera: 'Economía', usuario: { nombre: 'Mario Catunta' } },
+        { id: 3, carrera: 'Derecho', usuario: { nombre: 'Ana Gómez' } },
+      ]);
+
+      const asistencias_mock = [
+        {
+          becario_id: 1,
+          hora_ingreso: '08:00',
+          hora_prevista: '08:00',
+          minutos_retraso: 0,
+          dentro_de_horario: true,
+          fecha: new Date('2026-10-12'),
+        },
+        {
+          becario_id: 2,
+          hora_ingreso: '08:25',
+          hora_prevista: '08:00',
+          minutos_retraso: 25,
+          dentro_de_horario: false,
+          fecha: new Date('2026-10-12'),
+        },
+      ];
+
+      const qb_mock = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(asistencias_mock),
+      };
+      asistencia_repo.createQueryBuilder.mockReturnValue(qb_mock);
+
+      const resultado = await servicio.obtenerSeguimientoSemanal(undefined, '2026-10-12');
+
+      // Validar becarios con retraso
+      expect(resultado.becarios_con_retraso.length).toBe(1);
+      expect(resultado.becarios_con_retraso[0].becario.nombre).toBe('Mario Catunta');
+      expect(resultado.becarios_con_retraso[0].hora_ingreso).toBe('08:25');
+      expect(resultado.becarios_con_retraso[0].hora_prevista).toBe('08:00');
+      expect(resultado.becarios_con_retraso[0].minutos_retraso).toBe(25);
+
+      // Validar clasificación semanal
+      expect(resultado.asistencia_semanal.asistieron.length).toBe(2);
+      expect(resultado.asistencia_semanal.no_asistieron.length).toBe(1);
+      expect(resultado.asistencia_semanal.no_asistieron[0].becario.nombre).toBe('Ana Gómez');
+
+      // Validar conteos
+      expect(resultado.conteo.total).toBe(3);
+      expect(resultado.conteo.asistieron).toBe(2);
+      expect(resultado.conteo.no_asistieron).toBe(1);
     });
   });
 });

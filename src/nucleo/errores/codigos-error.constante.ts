@@ -3,6 +3,7 @@ export const CODIGOS_ERROR = {
   ERR_1002: 'ERR-1002',
   ERR_1003: 'ERR-1003',
   ERR_1004: 'ERR-1004',
+  ERR_AUTORIZACION_0001: 'ERR-AUTORIZACION-0001',
 
   ERR_2001: 'ERR-2001',
   ERR_2002: 'ERR-2002',
@@ -34,6 +35,7 @@ export const DESCRIPCIONES_ERROR: Record<CodigoError, string> = {
   [CODIGOS_ERROR.ERR_1002]: 'Token JWT expirado o inválido',
   [CODIGOS_ERROR.ERR_1003]: 'Permiso denegado por rol RBAC',
   [CODIGOS_ERROR.ERR_1004]: 'Usuario deshabilitado o inactivo',
+  [CODIGOS_ERROR.ERR_AUTORIZACION_0001]: 'No autorizado para modificar campos protegidos de becario',
 
   [CODIGOS_ERROR.ERR_2001]: 'Ubicación GPS fuera del radio de tolerancia de la geocerca',
   [CODIGOS_ERROR.ERR_2002]: 'Marcación de asistencia fuera de la ventana horaria permitida',
@@ -63,6 +65,7 @@ export const DOMINIOS_ERROR: Record<CodigoError, string> = {
   [CODIGOS_ERROR.ERR_1002]: 'AUTENTICACION_SEGURIDAD',
   [CODIGOS_ERROR.ERR_1003]: 'AUTENTICACION_SEGURIDAD',
   [CODIGOS_ERROR.ERR_1004]: 'AUTENTICACION_SEGURIDAD',
+  [CODIGOS_ERROR.ERR_AUTORIZACION_0001]: 'AUTENTICACION_SEGURIDAD',
 
   [CODIGOS_ERROR.ERR_2001]: 'ASISTENCIA_GEOCERCA',
   [CODIGOS_ERROR.ERR_2002]: 'ASISTENCIA_GEOCERCA',

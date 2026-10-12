@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException, ForbiddenException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Becario } from './entidades/becario.entidad';
@@ -8,6 +8,8 @@ import { ActualizarBecarioDto } from './dtos/actualizar-becario.dto';
 import { Iglesia } from '../iglesias/entidades/iglesia.entidad';
 import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.entidad';
 import { hashearContrasena } from '../../utilidades/hash.utilidad';
+import { ExcepcionBumand } from '../../nucleo/errores/excepcion-bumand';
+import { CODIGOS_ERROR } from '../../nucleo/errores/codigos-error.constante';
 
 @Injectable()
 export class BecariosServicio {
@@ -52,10 +54,12 @@ export class BecariosServicio {
     const usuarioGuardado = await this.usuarioRepositorio.save(nuevoUsuario);
 
     const nuevoBecario = this.becarioRepositorio.create({
+      ci: dto.ci || null,
       carrera: dto.carrera,
       universidad: dto.universidad,
       institucion: dto.institucion || null,
       unidad: dto.unidad || null,
+      horario_semanal: dto.horario_semanal || null,
       fecha_ingreso: new Date(dto.fecha_ingreso),
       iglesia: dto.iglesia_id ? ({ id: dto.iglesia_id } as Iglesia) : null,
       lugar_practica: dto.lugar_practica_id ? ({ id: dto.lugar_practica_id } as LugarPractica) : null,
@@ -103,9 +107,56 @@ export class BecariosServicio {
     });
   }
 
-  async actualizar(id: number, dto: ActualizarBecarioDto): Promise<Becario> {
+  private confirmacion_datos_requerida = false;
+
+  async asignarSupervisor(id: number, supervisor_id: number): Promise<Becario> {
+    await this.validarSupervisor(supervisor_id);
+    const becario = await this.becarioRepositorio.findOne({
+      where: { id },
+      relations: { usuario: true, supervisor: true, lugar_practica: true, iglesia: true },
+    });
+    if (!becario) throw new NotFoundException('Becario no encontrado');
+
+    becario.supervisor = { id: supervisor_id } as Usuario;
+    becario.supervisor_id = supervisor_id;
+    return this.becarioRepositorio.save(becario);
+  }
+
+  async actualizar(
+    id: number,
+    dto: ActualizarBecarioDto,
+    rol_solicitante?: Rol,
+    usuario_id_solicitante?: number,
+  ): Promise<Becario> {
     const becario = await this.becarioRepositorio.findOne({ where: { id }, relations: { usuario: true } });
     if (!becario) throw new NotFoundException('Becario no encontrado');
+
+    if (rol_solicitante === Rol.BECARIO) {
+      if (usuario_id_solicitante && becario.usuario_id !== usuario_id_solicitante) {
+        throw new ForbiddenException('No tiene permisos para modificar este perfil de becario');
+      }
+
+      const dto_record = dto as Record<string, unknown>;
+      const campos_protegidos = [
+        'universidad',
+        'carrera',
+        'iglesia_id',
+        'lugar_practica_id',
+        'supervisor_id',
+      ];
+
+      const intenta_modificar_protegido = campos_protegidos.some(
+        (campo) => dto_record[campo] !== undefined && dto_record[campo] !== null,
+      );
+
+      if (intenta_modificar_protegido) {
+        throw new ExcepcionBumand(
+          CODIGOS_ERROR.ERR_AUTORIZACION_0001,
+          'No está autorizado para modificar campos protegidos de becario: universidad, carrera, iglesia_id, lugar_practica_id, supervisor_id',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+    }
 
     if (dto.supervisor_id) {
       await this.validarSupervisor(dto.supervisor_id);
@@ -122,18 +173,84 @@ export class BecariosServicio {
     if (dto.universidad !== undefined) becario.universidad = dto.universidad;
     if (dto.institucion !== undefined) becario.institucion = dto.institucion || null;
     if (dto.unidad !== undefined) becario.unidad = dto.unidad || null;
-    
+    if (dto.ci !== undefined) becario.ci = dto.ci || null;
+    if (dto.horario_semanal !== undefined) becario.horario_semanal = dto.horario_semanal || null;
+
     if (dto.iglesia_id !== undefined) {
       becario.iglesia = dto.iglesia_id ? ({ id: dto.iglesia_id } as Iglesia) : null;
+      becario.iglesia_id = dto.iglesia_id || null;
     }
     if (dto.lugar_practica_id !== undefined) {
       becario.lugar_practica = dto.lugar_practica_id ? ({ id: dto.lugar_practica_id } as LugarPractica) : null;
+      becario.lugar_practica_id = dto.lugar_practica_id || null;
     }
     if (dto.supervisor_id !== undefined) {
       becario.supervisor = dto.supervisor_id ? ({ id: dto.supervisor_id } as Usuario) : null;
+      becario.supervisor_id = dto.supervisor_id || null;
     }
 
     return this.becarioRepositorio.save(becario);
+  }
+
+  async ordenConfirmacionDatos(activa: boolean): Promise<{ mensaje: string; confirmacion_datos_requerida: boolean }> {
+    this.confirmacion_datos_requerida = activa;
+    if (activa) {
+      // Al emitir la orden periódica, se resetea la bandera para exigir confirmación
+      await this.becarioRepositorio.update({}, { datos_confirmados: false });
+    }
+    return {
+      mensaje: activa
+        ? 'Orden de confirmación periódica de datos activada'
+        : 'Orden de confirmación periódica de datos desactivada',
+      confirmacion_datos_requerida: this.confirmacion_datos_requerida,
+    };
+  }
+
+  async obtenerEstadoConfirmacionDatos(usuario_id: number): Promise<{
+    confirmacion_datos_requerida: boolean;
+    datos_confirmados: boolean;
+    datos_validados: boolean;
+    debe_confirmar: boolean;
+  }> {
+    const becario = await this.becarioRepositorio.findOne({ where: { usuario_id } });
+    const datos_confirmados = becario ? Boolean(becario.datos_confirmados) : false;
+    const datos_validados = becario ? Boolean(becario.datos_validados) : false;
+
+    return {
+      confirmacion_datos_requerida: this.confirmacion_datos_requerida,
+      datos_confirmados,
+      datos_validados,
+      debe_confirmar: this.confirmacion_datos_requerida && !datos_confirmados,
+    };
+  }
+
+  async validarDatos(id: number): Promise<Becario> {
+    const becario = await this.becarioRepositorio.findOne({
+      where: { id },
+      relations: { usuario: true, supervisor: true, lugar_practica: true, iglesia: true },
+    });
+    if (!becario) throw new NotFoundException('Becario no encontrado');
+
+    becario.datos_validados = true;
+    becario.datos_confirmados = true;
+    becario.fecha_ultima_confirmacion = new Date();
+    return this.becarioRepositorio.save(becario);
+  }
+
+  async confirmarDatosPropios(usuario_id: number): Promise<{ mensaje: string; becario: Becario }> {
+    const becario = await this.becarioRepositorio.findOne({
+      where: { usuario_id },
+      relations: { usuario: true },
+    });
+    if (!becario) throw new NotFoundException('Perfil de becario no encontrado');
+
+    becario.datos_confirmados = true;
+    becario.fecha_ultima_confirmacion = new Date();
+    const guardado = await this.becarioRepositorio.save(becario);
+    return {
+      mensaje: 'Confirmación de datos registrada exitosamente',
+      becario: guardado,
+    };
   }
 
   async eliminar(id: number): Promise<{ mensaje: string }> {

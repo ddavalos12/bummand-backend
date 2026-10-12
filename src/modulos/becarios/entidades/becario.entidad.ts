@@ -17,7 +17,7 @@ export class Becario {
   usuario_id: number;
 
   @Column({ type: 'varchar', length: 20, unique: true, nullable: true })
-  ci: string;
+  ci: string | null;
 
   @Column({ type: 'varchar', length: 100 })
   carrera: string;
@@ -28,20 +28,32 @@ export class Becario {
   @Column({ type: 'varchar', length: 150, nullable: true })
   institucion: string | null;
 
-  @Column({ name: 'iglesia_id', nullable: true })
+  @Column({ name: 'iglesia_id', type: 'int', nullable: true })
   iglesia_id: number | null;
 
-  @Column({ name: 'lugar_practica_id', nullable: true })
+  @Column({ name: 'lugar_practica_id', type: 'int', nullable: true })
   lugar_practica_id: number | null;
 
   @Column({ name: 'fecha_ingreso', type: 'date' })
   fecha_ingreso: Date;
 
-  @Column({ name: 'supervisor_id', nullable: true })
+  @Column({ name: 'supervisor_id', type: 'int', nullable: true })
   supervisor_id: number | null;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   unidad: string | null;
+
+  @Column({ name: 'horario_semanal', type: 'jsonb', nullable: true })
+  horario_semanal: Record<string, string> | null;
+
+  @Column({ name: 'datos_confirmados', type: 'boolean', default: false })
+  datos_confirmados: boolean;
+
+  @Column({ name: 'datos_validados', type: 'boolean', default: false })
+  datos_validados: boolean;
+
+  @Column({ name: 'fecha_ultima_confirmacion', type: 'timestamp', nullable: true })
+  fecha_ultima_confirmacion: Date | null;
 
   @OneToOne(() => Usuario, (usuario) => usuario.becario, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'usuario_id' })

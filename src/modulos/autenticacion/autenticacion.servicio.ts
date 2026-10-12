@@ -61,5 +61,15 @@ export class AutenticacionServicio {
       },
     };
   }
+
+  async confirmarCorreo(dto: { token: string; correo?: string }) {
+    const usuario = await this.usuariosServicio.confirmarCorreo(dto.token, dto.correo);
+    return {
+      mensaje: 'Correo confirmado exitosamente',
+      confirmado: true,
+      usuario_id: usuario.id,
+      correo: usuario.correo,
+    };
+  }
 }
 

@@ -33,7 +33,7 @@ export class SolicitudPasajes {
   @Column({ type: 'text', nullable: true })
   observaciones: string;
 
-  @Column({ name: 'supervisor_id', nullable: true })
+  @Column({ name: 'supervisor_id', type: 'int', nullable: true })
   supervisor_id: number;
 
   @Column({ name: 'datos_becario', type: 'jsonb', nullable: true })

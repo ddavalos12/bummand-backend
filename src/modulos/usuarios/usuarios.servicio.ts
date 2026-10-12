@@ -76,5 +76,19 @@ export class UsuariosServicio {
       relations: { becario: true },
     });
   }
+
+  async confirmarCorreo(token: string, correo?: string): Promise<Usuario> {
+    const condicion: Record<string, unknown> = { token_confirmacion: token };
+    if (correo) {
+      condicion.correo = correo;
+    }
+    const usuario = await this.usuarioRepositorio.findOne({ where: condicion });
+    if (!usuario) {
+      throw new BadRequestException('Token de confirmación de correo inválido o no encontrado');
+    }
+    usuario.correo_confirmado = true;
+    usuario.token_confirmacion = null;
+    return this.usuarioRepositorio.save(usuario);
+  }
 }
 

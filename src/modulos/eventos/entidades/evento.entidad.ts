@@ -34,7 +34,7 @@ export class Evento {
   id: number;
 
   @ApiProperty({ example: 1, description: 'Identificador del usuario que convocó el evento', required: false })
-  @Column({ name: 'creador_id', nullable: true })
+  @Column({ name: 'creador_id', type: 'int', nullable: true })
   creador_id: number | null;
 
   @ApiProperty({ example: 'Encuentro de Liderazgo y Acción Diaconal', description: 'Título institucional del evento' })

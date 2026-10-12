@@ -26,6 +26,8 @@ import { Devocional } from './modulos/devocionales/entidades/devocional.entidad'
 import { Evento } from './modulos/eventos/entidades/evento.entidad';
 import { AsistenciaEvento } from './modulos/eventos/entidades/asistencia-evento.entidad';
 import { Justificacion } from './modulos/justificaciones/entidades/justificacion.entidad';
+import { Multa } from './modulos/asistencia/entidades/multa.entidad';
+import { Refrigerio } from './modulos/refrigerios/entidades/refrigerio.entidad';
 
 // Módulos Funcionales
 import { UsuariosModulo } from './modulos/usuarios/usuarios.modulo';
@@ -45,6 +47,8 @@ import { EventosModulo } from './modulos/eventos/eventos.modulo';
 import { JustificacionesModulo } from './modulos/justificaciones/justificaciones.modulo';
 import { DatosModulo } from './datos/datos.modulo';
 import { TiempoRealModulo } from './modulos/tiempo-real/tiempo-real.modulo';
+import { BibliaModulo } from './modulos/biblia/biblia.modulo';
+import { RefrigeriosModulo } from './modulos/refrigerios/refrigerios.modulo';
 
 @Module({
   imports: [
@@ -80,8 +84,10 @@ import { TiempoRealModulo } from './modulos/tiempo-real/tiempo-real.modulo';
         Evento,
         AsistenciaEvento,
         Justificacion,
+        Multa,
+        Refrigerio,
       ],
-      synchronize: false, // Controlado estrictamente por migraciones SQL
+      synchronize: process.env.SINCRONIZAR_DB === 'true',
     }),
     UsuariosModulo,
     BecariosModulo,
@@ -100,6 +106,8 @@ import { TiempoRealModulo } from './modulos/tiempo-real/tiempo-real.modulo';
     JustificacionesModulo,
     DatosModulo,
     TiempoRealModulo,
+    BibliaModulo,
+    RefrigeriosModulo,
   ],
   controllers: [AppControlador],
   providers: [AppServicio],

@@ -6,9 +6,10 @@ import { SolicitudPasajes } from './entidades/solicitud-pasaje.entidad';
 import { Recorrido } from './entidades/recorrido.entidad';
 import { TarifaTransporte } from './entidades/tarifa-transporte.entidad';
 import { ParadaTransporte } from './entidades/parada-transporte.entidad';
+import { Becario } from '../becarios/entidades/becario.entidad';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SolicitudPasajes, Recorrido, TarifaTransporte, ParadaTransporte])],
+  imports: [TypeOrmModule.forFeature([SolicitudPasajes, Recorrido, TarifaTransporte, ParadaTransporte, Becario])],
   controllers: [PasajesControlador],
   providers: [PasajesServicio],
   exports: [TypeOrmModule, PasajesServicio],

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsNumber, IsOptional } from 'class-validator';
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 import { TipoAsistencia } from '../entidades/registro-asistencia.entidad';
 
 export class CoordenadasDto {
@@ -59,4 +59,12 @@ export class CoordenadasDto {
   @IsOptional()
   @IsNumber()
   lugar_practica_id?: number;
+
+  @ApiPropertyOptional({
+    example: 'Bloque A',
+    description: 'Sub-ubicación o bloque dentro de la sede/evento',
+  })
+  @IsOptional()
+  @IsString()
+  bloque?: string;
 }

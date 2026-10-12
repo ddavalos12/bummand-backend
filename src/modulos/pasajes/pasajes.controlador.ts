@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PasajesServicio } from './pasajes.servicio';
 import { SolicitudPasajes } from './entidades/solicitud-pasaje.entidad';
@@ -6,6 +6,8 @@ import { TarifaTransporte } from './entidades/tarifa-transporte.entidad';
 import { ParadaTransporte } from './entidades/parada-transporte.entidad';
 import { CrearSolicitudPasajeDto } from './dtos/crear-solicitud-pasaje.dto';
 import { AgregarRecorridoDto } from './dtos/agregar-recorrido.dto';
+import { CrearTarifaDto } from './dtos/crear-tarifa.dto';
+import { ActualizarTarifaDto } from './dtos/actualizar-tarifa.dto';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
 import { Roles } from '../autenticacion/roles.decorador';
@@ -22,12 +24,50 @@ export class PasajesControlador {
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get('tarifas')
   @ApiOperation({
-    summary: 'Catálogo de tarifas oficiales de transporte',
-    description: 'Retorna las tarifas oficiales del transporte urbano regulado en La Paz y El Alto (Minibús, Micro, Teleférico, Trufi).',
+    summary: 'Catálogo de tarifas oficiales de transporte vigentes',
+    description: 'Retorna las tarifas oficiales del transporte urbano regulado en La Paz y El Alto vigentes para una fecha opcional.',
   })
-  @ApiResponse({ status: 200, description: 'Catálogo oficial de tarifas.', type: [TarifaTransporte] })
-  obtenerTarifas(): Promise<TarifaTransporte[]> {
-    return this.pasajesServicio.obtenerTarifasOficiales();
+  @ApiQuery({ name: 'fecha', required: false, type: String, example: '2026-10-11', description: 'Fecha de referencia para validar vigencia' })
+  @ApiResponse({ status: 200, description: 'Catálogo oficial de tarifas vigentes.', type: [TarifaTransporte] })
+  obtenerTarifas(@Query('fecha') fecha?: string): Promise<TarifaTransporte[]> {
+    return this.pasajesServicio.obtenerTarifasOficiales(fecha);
+  }
+
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Get('tarifas/todas')
+  @ApiOperation({
+    summary: 'Listado completo de tarifas (vigentes, programadas e históricas)',
+    description: 'Retorna el catálogo histórico completo de tarifas para auditoría y administración.',
+  })
+  @ApiResponse({ status: 200, description: 'Historial completo de tarifas.', type: [TarifaTransporte] })
+  listarTodasLasTarifas(): Promise<TarifaTransporte[]> {
+    return this.pasajesServicio.listarTodasLasTarifas();
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Post('tarifas')
+  @ApiOperation({
+    summary: 'Crear o promulgar nueva tarifa con vigencia temporal',
+    description: 'Registra una nueva tarifa oficial con fecha de inicio de vigencia, archivando la anterior si aplica.',
+  })
+  @ApiResponse({ status: 201, description: 'Tarifa creada con éxito.', type: TarifaTransporte })
+  crearTarifa(@Body() crearTarifaDto: CrearTarifaDto): Promise<TarifaTransporte> {
+    return this.pasajesServicio.crearTarifa(crearTarifaDto);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Patch('tarifas/:id')
+  @ApiOperation({
+    summary: 'Actualizar tarifa existente',
+    description: 'Modifica los parámetros de una tarifa específica.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador de la tarifa', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Tarifa actualizada con éxito.', type: TarifaTransporte })
+  actualizarTarifa(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() actualizarTarifaDto: ActualizarTarifaDto,
+  ): Promise<TarifaTransporte> {
+    return this.pasajesServicio.actualizarTarifa(id, actualizarTarifaDto);
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
@@ -51,6 +91,39 @@ export class PasajesControlador {
   @ApiResponse({ status: 201, description: 'Paradas sembradas exitosamente.', type: [ParadaTransporte] })
   sembrarParadas(): Promise<ParadaTransporte[]> {
     return this.pasajesServicio.sembrarParadas();
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('mis-solicitudes')
+  @ApiOperation({
+    summary: 'Listar solicitudes de pasajes del usuario autenticado',
+    description: 'Retorna el historial completo de solicitudes de viáticos declaradas por el becario autenticado.',
+  })
+  @ApiResponse({ status: 200, description: 'Historial de solicitudes del usuario autenticado.', type: [SolicitudPasajes] })
+  obtenerMisSolicitudes(@UsuarioActual() usuario: Usuario): Promise<SolicitudPasajes[]> {
+    return this.pasajesServicio.obtenerPorBecario(usuario.id);
+  }
+
+  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Post('confirmar-datos')
+  @ApiOperation({
+    summary: 'Confirmar datos del becario para la declaración de pasajes',
+    description: 'Registra la confirmación formal de datos personales e institucionales para el periodo indicado.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        periodo: { type: 'string', example: 'octubre 2026', description: 'Periodo mensual a confirmar' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Datos confirmados con éxito.' })
+  confirmarDatos(
+    @Body('periodo') periodo: string,
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    return this.pasajesServicio.confirmarDatos(usuario.id, periodo);
   }
 
   @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
@@ -78,6 +151,35 @@ export class PasajesControlador {
     return this.pasajesServicio.agregarRecorrido(agregarRecorridoDto);
   }
 
+  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Delete('recorridos/:id')
+  @ApiOperation({
+    summary: 'Eliminar tramo de transporte registrado',
+    description: 'Elimina un recorrido de una solicitud editable y recalcula automáticamente los totales de la planilla.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador del recorrido', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Recorrido eliminado exitosamente.' })
+  @ApiResponse({ status: 400, description: 'La solicitud no es editable o no tiene autorización.' })
+  @ApiResponse({ status: 404, description: 'Recorrido no encontrado.' })
+  eliminarRecorrido(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    return this.pasajesServicio.eliminarRecorrido(id, usuario.id);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('becario/:becario_id')
+  @ApiOperation({
+    summary: 'Listar solicitudes de un becario',
+    description: 'Retorna el histórico de solicitudes mensuales de un becario determinado.',
+  })
+  @ApiParam({ name: 'becario_id', description: 'Identificador del becario', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Historial de solicitudes del becario.', type: [SolicitudPasajes] })
+  obtenerPorBecario(@Param('becario_id', ParseIntPipe) becario_id: number): Promise<SolicitudPasajes[]> {
+    return this.pasajesServicio.obtenerPorBecario(becario_id);
+  }
+
   @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get()
   @ApiOperation({
@@ -100,18 +202,6 @@ export class PasajesControlador {
   @ApiResponse({ status: 404, description: 'Solicitud no encontrada.' })
   obtenerPorId(@Param('id', ParseIntPipe) id: number): Promise<SolicitudPasajes> {
     return this.pasajesServicio.obtenerPorId(id);
-  }
-
-  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
-  @Get('becario/:becario_id')
-  @ApiOperation({
-    summary: 'Listar solicitudes de un becario',
-    description: 'Retorna el histórico de solicitudes mensuales de un becario determinado.',
-  })
-  @ApiParam({ name: 'becario_id', description: 'Identificador del becario', type: Number, example: 1 })
-  @ApiResponse({ status: 200, description: 'Historial de solicitudes del becario.', type: [SolicitudPasajes] })
-  obtenerPorBecario(@Param('becario_id', ParseIntPipe) becario_id: number): Promise<SolicitudPasajes[]> {
-    return this.pasajesServicio.obtenerPorBecario(becario_id);
   }
 
   @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
