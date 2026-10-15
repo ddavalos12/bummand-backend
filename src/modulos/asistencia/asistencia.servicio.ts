@@ -7,6 +7,7 @@ import { CoordenadasDto } from './dtos/coordenadas.dto';
 import { ConfirmarOrganizadorDto } from './dtos/confirmar-organizador.dto';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.entidad';
+import { Iglesia } from '../iglesias/entidades/iglesia.entidad';
 import { NotificacionesServicio } from '../notificaciones/notificaciones.servicio';
 import { calcularDistanciaMetros } from '../../utilidades/geo.utilidad';
 import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
@@ -23,6 +24,9 @@ export class AsistenciaServicio {
     @Optional()
     @InjectRepository(LugarPractica)
     private readonly lugarRepositorio?: Repository<LugarPractica>,
+    @Optional()
+    @InjectRepository(Iglesia)
+    private readonly iglesiaRepositorio?: Repository<Iglesia>,
     @Optional()
     @InjectRepository(Multa)
     private readonly multaRepositorio?: Repository<Multa>,
@@ -175,15 +179,15 @@ export class AsistenciaServicio {
   async registrarIngreso(dto: CoordenadasDto): Promise<{ registro: RegistroAsistencia; mensaje: string; advertencia?: string }> {
     const becario = await this.becarioRepositorio.findOne({
       where: [{ id: dto.becario_id }, { usuario_id: dto.becario_id }],
-      relations: { lugar_practica: true },
+      relations: { lugar_practica: true, iglesia: true },
     });
 
     if (!becario) throw new NotFoundException('Becario no encontrado');
-    if (!becario.lugar_practica && !dto.lugar_practica_id) {
+    const tipo = dto.tipo || TipoAsistencia.PRACTICAS;
+    if (tipo === TipoAsistencia.PRACTICAS && !becario.lugar_practica && !dto.lugar_practica_id) {
       throw new ConflictException('Becario sin lugar de prácticas asignado');
     }
 
-    const tipo = dto.tipo || TipoAsistencia.PRACTICAS;
     const ahora = new Date();
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
@@ -196,34 +200,87 @@ export class AsistenciaServicio {
       throw new ConflictException('Ya existe un ingreso abierto hoy. Registra la salida primero.');
     }
 
-    // Determinación de sede o agencia objetivo (soporte multisede y rotación de agencias)
-    let lugar_objetivo: LugarPractica | null = null;
-
-    if (dto.lugar_practica_id && this.lugarRepositorio) {
-      lugar_objetivo = await this.lugarRepositorio.findOne({ where: { id: dto.lugar_practica_id } });
-    }
-
-    if (!lugar_objetivo) {
-      lugar_objetivo = becario.lugar_practica;
-    }
-
+    // Selección dinámica de la geocerca objetivo según modalidad de marcación
     const margen = Math.min(Math.max(dto.precision || 0, 0), MARGEN_GPS_MAXIMO_M);
-    let distancia_m = lugar_objetivo
-      ? calcularDistanciaMetros(dto.latitud, dto.longitud, Number(lugar_objetivo.latitud), Number(lugar_objetivo.longitud))
-      : 999999;
+    let nombre_recinto_objetivo = 'Sede institucional';
+    let distancia_m = 999999;
+    let dentro_de_radio = false;
 
-    let dentro_de_radio = dto.simulada !== true && lugar_objetivo !== null && distancia_m <= lugar_objetivo.radio_tolerancia_m + margen;
+    if (tipo === TipoAsistencia.ACCIONES_SERVICIO) {
+      // 1. Modalidad Acciones de Servicio: valida contra la iglesia del becario o catálogo eclesial
+      const iglesia = becario.iglesia;
+      if (iglesia && iglesia.latitud !== null && iglesia.latitud !== undefined && iglesia.longitud !== null && iglesia.longitud !== undefined) {
+        distancia_m = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(iglesia.latitud), Number(iglesia.longitud));
+        nombre_recinto_objetivo = iglesia.nombre;
+        const radio = iglesia.radio_tolerancia_m || 60;
+        dentro_de_radio = dto.simulada !== true && distancia_m <= radio + margen;
+      }
 
-    // Si no está dentro del radio de la sede predeterminada, autodetectar si está en otra agencia autorizada de Diaconía
-    if (!dentro_de_radio && this.lugarRepositorio) {
-      const sedes_institucionales = await this.lugarRepositorio.find();
-      for (const sede of sedes_institucionales) {
-        const d = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(sede.latitud), Number(sede.longitud));
-        if (d <= sede.radio_tolerancia_m + margen && dto.simulada !== true) {
-          lugar_objetivo = sede;
-          distancia_m = d;
-          dentro_de_radio = true;
-          break;
+      // Autodetección si está en otra de las iglesias oficiales registradas en el sistema
+      if (!dentro_de_radio && this.iglesiaRepositorio) {
+        const todas_iglesias = await this.iglesiaRepositorio.find();
+        for (const igl of todas_iglesias) {
+          if (igl.latitud !== null && igl.latitud !== undefined && igl.longitud !== null && igl.longitud !== undefined) {
+            const d = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(igl.latitud), Number(igl.longitud));
+            if (d <= (igl.radio_tolerancia_m || 60) + margen && dto.simulada !== true) {
+              distancia_m = d;
+              nombre_recinto_objetivo = igl.nombre;
+              dentro_de_radio = true;
+              break;
+            }
+          }
+        }
+      }
+    } else if (tipo === TipoAsistencia.ESCUELA_LIDERES) {
+      // 2. Modalidad Escuela de Líderes: valida contra la sede de formación institucional (Sede Central El Alto o sedes autorizadas)
+      if (this.lugarRepositorio) {
+        const sedes = (await this.lugarRepositorio.find()) || [];
+        let sede_cercana = sedes[0] || null;
+        let menor_distancia = 999999;
+        for (const sede of sedes) {
+          const d = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(sede.latitud), Number(sede.longitud));
+          if (d < menor_distancia) {
+            menor_distancia = d;
+            sede_cercana = sede;
+          }
+          if (d <= (sede.radio_tolerancia_m || 60) + margen && dto.simulada !== true) {
+            distancia_m = d;
+            nombre_recinto_objetivo = `Escuela de Líderes (${sede.nombre})`;
+            dentro_de_radio = true;
+            break;
+          }
+        }
+        if (!dentro_de_radio && sede_cercana) {
+          distancia_m = menor_distancia;
+          nombre_recinto_objetivo = `Escuela de Líderes (${sede_cercana.nombre})`;
+        }
+      }
+    } else {
+      // 3. Modalidad Prácticas Preprofesionales: valida contra lugar_practica asignado o agencias autorizadas
+      let lugar_objetivo: LugarPractica | null = null;
+      if (dto.lugar_practica_id && this.lugarRepositorio) {
+        lugar_objetivo = await this.lugarRepositorio.findOne({ where: { id: dto.lugar_practica_id } });
+      }
+      if (!lugar_objetivo) {
+        lugar_objetivo = becario.lugar_practica;
+      }
+      if (lugar_objetivo) {
+        nombre_recinto_objetivo = lugar_objetivo.nombre;
+        distancia_m = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(lugar_objetivo.latitud), Number(lugar_objetivo.longitud));
+        dentro_de_radio = dto.simulada !== true && distancia_m <= lugar_objetivo.radio_tolerancia_m + margen;
+      }
+
+      // Soporte multisede y rotación de agencias Diaconía
+      if (!dentro_de_radio && this.lugarRepositorio) {
+        const sedes_institucionales = await this.lugarRepositorio.find();
+        for (const sede of sedes_institucionales) {
+          const d = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(sede.latitud), Number(sede.longitud));
+          if (d <= sede.radio_tolerancia_m + margen && dto.simulada !== true) {
+            nombre_recinto_objetivo = sede.nombre;
+            distancia_m = d;
+            dentro_de_radio = true;
+            break;
+          }
         }
       }
     }
@@ -247,10 +304,10 @@ export class AsistenciaServicio {
 
     await this.asistenciaRepositorio.save(registro);
 
-    // Motor de multas: Viernes (Escuela de Líderes) posterior a 14:30 + 5 min tolerancia (14:35)
+    // El motor de multas aplica EXCLUSIVAMENTE a la Escuela de Líderes de los días viernes
     const es_viernes = ahora.getDay() === 5;
     const es_escuela_lideres = tipo === TipoAsistencia.ESCUELA_LIDERES;
-    if (es_viernes || es_escuela_lideres) {
+    if (es_escuela_lideres && es_viernes) {
       const limite_tolerancia = new Date(ahora);
       limite_tolerancia.setHours(14, 35, 0, 0);
 
@@ -292,7 +349,7 @@ export class AsistenciaServicio {
 
     this.tiempoRealGateway?.notificarAsistencia({ accion: 'ingreso', registro });
 
-    const nombre_sede = lugar_objetivo ? lugar_objetivo.nombre : 'Sede institucional';
+    const nombre_sede = nombre_recinto_objetivo || 'Sede institucional';
     let mensaje = dentro_de_radio
       ? `Ingreso registrado correctamente en ${nombre_sede}`
       : `Ingreso registrado fuera de geocerca en ${nombre_sede} (${Math.round(distancia_m)}m)`;

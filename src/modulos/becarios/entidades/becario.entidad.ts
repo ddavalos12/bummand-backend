@@ -7,6 +7,8 @@ import { SolicitudPasajes } from '../../pasajes/entidades/solicitud-pasaje.entid
 import { Evaluacion } from '../../evaluaciones/entidades/evaluacion.entidad';
 import { AprobacionPracticas } from '../../practicas/entidades/aprobacion-practicas.entidad';
 import { ReporteGenerado } from '../../pdf/entidades/reporte-generado.entidad';
+import { HorarioApoyo } from './horario-apoyo.entidad';
+import { AsignacionPractica } from './asignacion-practica.entidad';
 
 @Entity('becarios')
 export class Becario {
@@ -85,4 +87,10 @@ export class Becario {
 
   @OneToMany(() => ReporteGenerado, (reporte) => reporte.becario)
   reportes_generados: ReporteGenerado[];
+
+  @OneToMany(() => HorarioApoyo, (horario) => horario.becario)
+  horarios_apoyo: HorarioApoyo[];
+
+  @OneToMany(() => AsignacionPractica, (asignacion) => asignacion.becario)
+  asignaciones_practica: AsignacionPractica[];
 }

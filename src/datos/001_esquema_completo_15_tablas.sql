@@ -83,9 +83,15 @@ CREATE TABLE IF NOT EXISTS usuarios (
 
 -- Tabla 02: iglesias
 CREATE TABLE IF NOT EXISTS iglesias (
-    id                SERIAL PRIMARY KEY,
-    nombre            VARCHAR(150)        NOT NULL,
-    direccion         VARCHAR(255)
+    id                    SERIAL PRIMARY KEY,
+    nombre                VARCHAR(150)        NOT NULL,
+    direccion             VARCHAR(255),
+    latitud               DECIMAL(9,6),
+    longitud              DECIMAL(9,6),
+    radio_tolerancia_m    INTEGER             NOT NULL DEFAULT 60,
+    pastor_nombre         VARCHAR(150),
+    pastor_telefono       VARCHAR(30),
+    pastor_correo         VARCHAR(150)
 );
 
 -- Tabla 03: lugares_practica
@@ -111,6 +117,34 @@ CREATE TABLE IF NOT EXISTS becarios (
     fecha_ingreso       DATE            NOT NULL,
     supervisor_id       INTEGER         REFERENCES usuarios(id) ON DELETE SET NULL,
     unidad              VARCHAR(100)
+);
+
+-- Tabla 04b: horarios_apoyo (Formalización MER con FK becario_id)
+CREATE TABLE IF NOT EXISTS horarios_apoyo (
+    id                  SERIAL PRIMARY KEY,
+    becario_id          INTEGER         NOT NULL REFERENCES becarios(id) ON DELETE CASCADE,
+    dia_semana          SMALLINT        NOT NULL, -- 0: Dom, 1: Lun ... 6: Sáb
+    hora_inicio         VARCHAR(10)     NOT NULL, -- '08:00'
+    hora_fin            VARCHAR(10)     NOT NULL, -- '12:00'
+    horas_diarias       DECIMAL(4,2)    NOT NULL DEFAULT 4.0,
+    turno               VARCHAR(30)     DEFAULT 'mañana',
+    activo              BOOLEAN         NOT NULL DEFAULT true,
+    created_at          TIMESTAMP       NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMP       NOT NULL DEFAULT now()
+);
+
+-- Tabla 04c: asignaciones_practica (Formalización MER con FK becario_id)
+CREATE TABLE IF NOT EXISTS asignaciones_practica (
+    id                  SERIAL PRIMARY KEY,
+    becario_id          INTEGER         NOT NULL REFERENCES becarios(id) ON DELETE CASCADE,
+    lugar_practica_id   INTEGER         NOT NULL REFERENCES lugares_practica(id) ON DELETE RESTRICT,
+    supervisor_id       INTEGER         REFERENCES usuarios(id) ON DELETE SET NULL,
+    area_departamento   VARCHAR(150),
+    fecha_inicio        DATE            NOT NULL,
+    fecha_conclusion    DATE,
+    estado              VARCHAR(50)     NOT NULL DEFAULT 'vigente',
+    created_at          TIMESTAMP       NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMP       NOT NULL DEFAULT now()
 );
 
 -- ---------------------------------------------------------------------------

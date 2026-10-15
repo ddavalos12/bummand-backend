@@ -6,11 +6,12 @@ import { RegistroAsistencia } from './entidades/registro-asistencia.entidad';
 import { Multa } from './entidades/multa.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.entidad';
+import { Iglesia } from '../iglesias/entidades/iglesia.entidad';
 import { NotificacionesModulo } from '../notificaciones/notificaciones.modulo';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([RegistroAsistencia, Becario, LugarPractica, Multa]),
+    TypeOrmModule.forFeature([RegistroAsistencia, Becario, LugarPractica, Multa, Iglesia]),
     NotificacionesModulo,
   ],
   controllers: [AsistenciaControlador],

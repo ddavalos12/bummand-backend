@@ -11,7 +11,15 @@ import { Evaluador, TipoEvaluador } from '../modulos/evaluaciones/entidades/eval
 import { TarifaTransporte } from '../modulos/pasajes/entidades/tarifa-transporte.entidad';
 import { ParadaTransporte, PARADAS_OFICIALES_DEFECTO } from '../modulos/pasajes/entidades/parada-transporte.entidad';
 import { Evento, TipoEvento, EstadoEvento } from '../modulos/eventos/entidades/evento.entidad';
+import { HorarioApoyo } from '../modulos/becarios/entidades/horario-apoyo.entidad';
+import { AsignacionPractica } from '../modulos/becarios/entidades/asignacion-practica.entidad';
 import { hashearContrasena } from '../utilidades/hash.utilidad';
+import {
+  ADMINISTRADORES_SEMILLA,
+  SUPERVISORES_SEMILLA,
+  BECARIOS_SEMILLA,
+  IGLESIAS_SEMILLA,
+} from './semilla-datos.constantes';
 
 @Injectable()
 export class SemillaServicio implements OnModuleInit {
@@ -33,6 +41,12 @@ export class SemillaServicio implements OnModuleInit {
     @InjectRepository(Evaluador)
     private readonly evaluador_repo: Repository<Evaluador>,
     @Optional()
+    @InjectRepository(HorarioApoyo)
+    private readonly horario_repo?: Repository<HorarioApoyo>,
+    @Optional()
+    @InjectRepository(AsignacionPractica)
+    private readonly asignacion_repo?: Repository<AsignacionPractica>,
+    @Optional()
     @InjectRepository(TarifaTransporte)
     private readonly tarifa_repo?: Repository<TarifaTransporte>,
     @Optional()
@@ -47,45 +61,86 @@ export class SemillaServicio implements OnModuleInit {
     try {
       await this.ejecutarSemilla();
     } catch (error: any) {
-      this.logger.warn(`No se pudo ejecutar la semilla automática (la BD puede estar apagada): ${error.message}`);
+      this.logger.warn(`No se pudo ejecutar la semilla automática: ${error.message}`);
     }
   }
 
   async ejecutarSemilla() {
-    this.logger.log('Iniciando verificación y siembra de datos institucionales de BUMAND...');
+    this.logger.log('Iniciando verificación y siembra exhaustiva de datos institucionales de BUMAND...');
 
-    // 1. Administrador General
-    const correo_admin = process.env.ADMIN_EMAIL || 'admin@wscrt.com';
-    const clave_admin = process.env.ADMIN_CONTRASENA || 'admin';
-    let admin_existente = await this.usuario_repo.findOne({ where: { correo: correo_admin } });
-    if (!admin_existente) {
-      admin_existente = this.usuario_repo.create({
-        nombre: 'Administrador General BUMAND',
-        correo: correo_admin,
-        contrasena_hash: await hashearContrasena(clave_admin),
-        rol: Rol.ADMINISTRADOR,
-        estado: EstadoUsuario.ACTIVO,
-      });
-      admin_existente = await this.usuario_repo.save(admin_existente);
-      this.logger.log(`Usuario administrador creado: ${correo_admin}`);
+    // 1. Administradores Institucionales
+    const mapa_administradores = new Map<string, Usuario>();
+    for (const admin of ADMINISTRADORES_SEMILLA) {
+      let usuario_admin = await this.usuario_repo.findOne({ where: { correo: admin.correo } });
+      if (!usuario_admin) {
+        usuario_admin = this.usuario_repo.create({
+          nombre: admin.nombre,
+          correo: admin.correo,
+          contrasena_hash: await hashearContrasena(admin.clave),
+          rol: Rol.ADMINISTRADOR,
+          estado: EstadoUsuario.ACTIVO,
+          correo_confirmado: true,
+        });
+        usuario_admin = await this.usuario_repo.save(usuario_admin);
+        this.logger.log(`Administrador creado: ${admin.correo} (${admin.nombre})`);
+      } else {
+        usuario_admin.nombre = admin.nombre;
+        usuario_admin.rol = Rol.ADMINISTRADOR;
+        usuario_admin.estado = EstadoUsuario.ACTIVO;
+        usuario_admin.correo_confirmado = true;
+        usuario_admin = await this.usuario_repo.save(usuario_admin);
+      }
+      mapa_administradores.set(admin.correo, usuario_admin);
     }
 
-    // 2. Supervisor Institucional (Tutor General de Prácticas)
-    const correo_supervisor = 'angel.ali@bumand.bo';
-    let usuario_supervisor = await this.usuario_repo.findOne({ where: { correo: correo_supervisor } });
-    if (!usuario_supervisor) {
-      usuario_supervisor = this.usuario_repo.create({
-        nombre: 'Angel Javier Ali Paz',
-        correo: correo_supervisor,
-        contrasena_hash: await hashearContrasena('Bumand2026!'),
-        rol: Rol.SUPERVISOR,
-        estado: EstadoUsuario.ACTIVO,
-      });
-      usuario_supervisor = await this.usuario_repo.save(usuario_supervisor);
-      this.logger.log(`Usuario supervisor creado: ${correo_supervisor}`);
+    // Depuración de cuenta genérica ficticia obsoleta si existe
+    const admin_obsoleto = await this.usuario_repo.findOne({ where: { correo: 'admin@wscrt.com' } });
+    if (admin_obsoleto) {
+      if (this.evento_repo) {
+        await this.evento_repo.update({ creador_id: admin_obsoleto.id }, { creador_id: undefined });
+      }
+      await this.usuario_repo.remove(admin_obsoleto);
+      this.logger.log('Cuenta ficticia admin@wscrt.com eliminada permanentemente.');
     }
 
-    // 3. Lugares de práctica institucionales y red de agencias de Diaconía (Rotaciones)
+    // 2. Supervisores Institucionales (Tutores y Mentores de Diaconía FRIF-IFD)
+    const mapa_supervisores = new Map<string, Usuario>();
+    for (const sup of SUPERVISORES_SEMILLA) {
+      let usuario_sup = await this.usuario_repo.findOne({ where: { correo: sup.correo } });
+      if (!usuario_sup) {
+        usuario_sup = this.usuario_repo.create({
+          nombre: sup.nombre,
+          correo: sup.correo,
+          contrasena_hash: await hashearContrasena(sup.clave),
+          rol: Rol.SUPERVISOR,
+          estado: EstadoUsuario.ACTIVO,
+          correo_confirmado: true,
+        });
+        usuario_sup = await this.usuario_repo.save(usuario_sup);
+        this.logger.log(`Supervisor creado: ${sup.correo} (${sup.nombre})`);
+      } else {
+        usuario_sup.nombre = sup.nombre;
+        usuario_sup.rol = Rol.SUPERVISOR;
+        usuario_sup.estado = EstadoUsuario.ACTIVO;
+        usuario_sup.correo_confirmado = true;
+        usuario_sup = await this.usuario_repo.save(usuario_sup);
+      }
+      mapa_supervisores.set(sup.correo, usuario_sup);
+
+      // Registrar también en la tabla de evaluadores como supervisor/mentor
+      let evaluador_sup = await this.evaluador_repo.findOne({ where: { correo: sup.correo } });
+      if (!evaluador_sup) {
+        evaluador_sup = this.evaluador_repo.create({
+          nombre: sup.nombre,
+          tipo: TipoEvaluador.SUPERVISOR,
+          correo: sup.correo,
+          telefono: sup.telefono,
+        });
+        await this.evaluador_repo.save(evaluador_sup);
+      }
+    }
+
+    // 3. Lugares de práctica institucionales (Sede Central y Red de Agencias Diaconía)
     const agencias_datos = [
       {
         nombre: 'Oficina Central Diaconía IFD - El Alto',
@@ -181,50 +236,249 @@ export class SemillaServicio implements OnModuleInit {
       lugar_central = await this.lugar_repo.findOne({ where: {} });
     }
 
-    // 4. Iglesias institucionales
-    const iglesias_datos = [
-      'Iglesia Central El Alto',
-      'Iglesia Bautista Emanuel - Sopocachi',
-      'Iglesia Metodista El Salvador',
-      'Iglesia Presbiteriana Maranata',
-    ];
-    let iglesia_central: Iglesia | null = null;
-    for (const nom_igl of iglesias_datos) {
-      let igl = await this.iglesia_repo.findOne({ where: { nombre: nom_igl } });
-      if (!igl) {
-        igl = await this.iglesia_repo.save(this.iglesia_repo.create({ nombre: nom_igl }));
+    // 4. Iglesias institucionales y registro de Evaluadores Pastorales (Formulario F-03)
+    const mapa_iglesias = new Map<string, Iglesia>();
+    for (const igl_data of IGLESIAS_SEMILLA) {
+      let iglesia = await this.iglesia_repo.findOne({ where: { nombre: igl_data.nombre } });
+      if (!iglesia) {
+        iglesia = this.iglesia_repo.create({
+          nombre: igl_data.nombre,
+          direccion: igl_data.direccion,
+          latitud: igl_data.latitud ?? null,
+          longitud: igl_data.longitud ?? null,
+          radio_tolerancia_m: igl_data.radio_tolerancia_m ?? 60,
+          pastor_nombre: igl_data.pastor,
+          pastor_telefono: igl_data.telefono,
+          pastor_correo: igl_data.pastor_correo ?? null,
+        });
+        iglesia = await this.iglesia_repo.save(iglesia);
+      } else {
+        iglesia.direccion = igl_data.direccion;
+        iglesia.latitud = igl_data.latitud ?? iglesia.latitud;
+        iglesia.longitud = igl_data.longitud ?? iglesia.longitud;
+        iglesia.radio_tolerancia_m = igl_data.radio_tolerancia_m ?? 60;
+        iglesia.pastor_nombre = igl_data.pastor;
+        iglesia.pastor_telefono = igl_data.telefono;
+        iglesia.pastor_correo = igl_data.pastor_correo ?? iglesia.pastor_correo;
+        iglesia = await this.iglesia_repo.save(iglesia);
       }
-      if (!iglesia_central) iglesia_central = igl;
+      mapa_iglesias.set(igl_data.nombre, iglesia);
+
+      // Registrar evaluador pastoral
+      if (igl_data.pastor) {
+        let evaluador_pastor = await this.evaluador_repo.findOne({
+          where: { nombre: igl_data.pastor, tipo: TipoEvaluador.PASTOR },
+        });
+        if (!evaluador_pastor) {
+          evaluador_pastor = this.evaluador_repo.create({
+            nombre: igl_data.pastor,
+            tipo: TipoEvaluador.PASTOR,
+            correo: igl_data.pastor_correo || `pastor.${igl_data.pastor.toLowerCase().replace(/[^a-z0-9]/g, '.')}@diaconia.bo`.replace(/\.+/g, '.'),
+            telefono: igl_data.telefono || '70000000',
+          });
+          await this.evaluador_repo.save(evaluador_pastor);
+        }
+      }
     }
 
-    // 5. Evaluadores institucionales
-    let evaluador_pastor = await this.evaluador_repo.findOne({
-      where: { correo: 'pastor.david@diaconia.bo' },
-    });
-    if (!evaluador_pastor) {
-      evaluador_pastor = this.evaluador_repo.create({
-        nombre: 'Pastor David Mamani',
-        tipo: TipoEvaluador.PASTOR,
-        correo: 'pastor.david@diaconia.bo',
-        telefono: '71234567',
+    // 5. Limpieza exhaustiva de usuarios de prueba o no oficiales (eliminando usuarios de prueba)
+    const correos_oficiales_becarios = new Set(BECARIOS_SEMILLA.map((b) => b.correo));
+    const correos_oficiales_admins = new Set(ADMINISTRADORES_SEMILLA.map((a) => a.correo));
+    const correos_oficiales_supervisores = new Set(SUPERVISORES_SEMILLA.map((s) => s.correo));
+
+    const todos_usuarios_db = await this.usuario_repo.find();
+    for (const u_db of todos_usuarios_db) {
+      if (u_db.rol === Rol.BECARIO && !correos_oficiales_becarios.has(u_db.correo)) {
+        this.logger.log(`Depurando usuario becario de prueba/no oficial: ${u_db.correo}`);
+        const bec = await this.becario_repo.findOne({ where: { usuario_id: u_db.id } });
+        if (bec) await this.becario_repo.remove(bec);
+        await this.usuario_repo.remove(u_db);
+      } else if (u_db.rol === Rol.SUPERVISOR && !correos_oficiales_supervisores.has(u_db.correo)) {
+        this.logger.log(`Depurando usuario supervisor de prueba: ${u_db.correo}`);
+        await this.usuario_repo.remove(u_db);
+      } else if (u_db.rol === Rol.ADMINISTRADOR && !correos_oficiales_admins.has(u_db.correo)) {
+        this.logger.log(`Depurando usuario administrador de prueba: ${u_db.correo}`);
+        await this.usuario_repo.remove(u_db);
+      }
+    }
+
+    // 6. Siembra de todos los Estudiantes / Becarios Institucionales (30 becarios oficiales)
+    const supervisor_por_defecto = mapa_supervisores.get('angel.ali@bumand.bo');
+
+    for (const b_semilla of BECARIOS_SEMILLA) {
+      // a) Crear o sincronizar usuario becario
+      let usuario_becario = await this.usuario_repo.findOne({ where: { correo: b_semilla.correo } });
+      if (!usuario_becario) {
+        usuario_becario = this.usuario_repo.create({
+          nombre: b_semilla.nombre,
+          correo: b_semilla.correo,
+          contrasena_hash: await hashearContrasena(b_semilla.clave),
+          rol: Rol.BECARIO,
+          estado: EstadoUsuario.ACTIVO,
+          correo_confirmado: true,
+        });
+        usuario_becario = await this.usuario_repo.save(usuario_becario);
+        this.logger.log(`Estudiante/Becario creado: ${b_semilla.correo} (${b_semilla.nombre})`);
+      } else {
+        usuario_becario.nombre = b_semilla.nombre;
+        usuario_becario.rol = Rol.BECARIO;
+        usuario_becario.estado = EstadoUsuario.ACTIVO;
+        usuario_becario.correo_confirmado = true;
+        usuario_becario = await this.usuario_repo.save(usuario_becario);
+      }
+
+      // b) Determinar supervisor institucional asignado
+      let supervisor_asignado = mapa_supervisores.get(b_semilla.supervisor_correo);
+      if (!supervisor_asignado) {
+        supervisor_asignado = supervisor_por_defecto;
+      }
+
+      // c) Determinar iglesia institucional asignada
+      let iglesia_asignada: Iglesia | null = mapa_iglesias.get(b_semilla.iglesia_nombre) ?? null;
+      if (!iglesia_asignada) {
+        iglesia_asignada = mapa_iglesias.get('Iglesia Central El Alto') ?? null;
+      }
+
+      // d) Crear o sincronizar perfil de becario
+      let becario_existente = await this.becario_repo.findOne({
+        where: [{ usuario_id: usuario_becario.id }, { ci: b_semilla.ci }],
       });
-      await this.evaluador_repo.save(evaluador_pastor);
+
+      if (!becario_existente) {
+        const nuevo_becario = this.becario_repo.create({
+          usuario_id: usuario_becario.id,
+          ci: b_semilla.ci,
+          carrera: b_semilla.carrera,
+          universidad: b_semilla.universidad,
+          institucion: b_semilla.institucion,
+          unidad: b_semilla.unidad,
+          fecha_ingreso: new Date('2026-01-15'),
+          lugar_practica_id: lugar_central ? lugar_central.id : null,
+          iglesia_id: iglesia_asignada ? iglesia_asignada.id : null,
+          supervisor_id: supervisor_asignado ? supervisor_asignado.id : null,
+          horario_semanal: b_semilla.horario_semanal,
+          datos_confirmados: true,
+          datos_validados: true,
+          fecha_ultima_confirmacion: new Date('2026-01-15'),
+          usuario: usuario_becario,
+        });
+        var becario_guardado = await this.becario_repo.save(nuevo_becario);
+      } else {
+        becario_existente.usuario_id = usuario_becario.id;
+        becario_existente.ci = b_semilla.ci;
+        becario_existente.carrera = b_semilla.carrera;
+        becario_existente.universidad = b_semilla.universidad;
+        becario_existente.institucion = b_semilla.institucion;
+        becario_existente.unidad = b_semilla.unidad;
+        becario_existente.lugar_practica_id = lugar_central ? lugar_central.id : null;
+        becario_existente.iglesia_id = iglesia_asignada ? iglesia_asignada.id : null;
+        becario_existente.supervisor_id = supervisor_asignado ? supervisor_asignado.id : null;
+        becario_existente.horario_semanal = b_semilla.horario_semanal;
+        becario_existente.datos_confirmados = true;
+        becario_existente.datos_validados = true;
+        var becario_guardado = await this.becario_repo.save(becario_existente);
+      }
+
+      // f) Formalización de Horarios de Apoyo con Foreign Key íntegra becario_id
+      if (this.horario_repo && b_semilla.horario_semanal) {
+        const mapa_dias: Record<string, number> = {
+          domingo: 0, dom: 0,
+          lunes: 1, lun: 1,
+          martes: 2, mar: 2,
+          miercoles: 3, miércoles: 3, mie: 3,
+          jueves: 4, jue: 4,
+          viernes: 5, vie: 5,
+          sabado: 6, sábado: 6, sab: 6,
+        };
+        for (const [clave_dia, rango] of Object.entries(b_semilla.horario_semanal)) {
+          const dia_idx = mapa_dias[clave_dia.toLowerCase()];
+          if (dia_idx !== undefined && typeof rango === 'string' && rango.includes('-')) {
+            const [h_ini, h_fin] = rango.split('-').map((s) => s.trim());
+            let horario_db = await this.horario_repo.findOne({
+              where: { becario_id: becario_guardado.id, dia_semana: dia_idx },
+            });
+            if (!horario_db) {
+              horario_db = this.horario_repo.create({
+                becario_id: becario_guardado.id,
+                dia_semana: dia_idx,
+                hora_inicio: h_ini,
+                hora_fin: h_fin,
+                horas_diarias: 4.0,
+                turno: 'mañana',
+                activo: true,
+              });
+            } else {
+              horario_db.hora_inicio = h_ini;
+              horario_db.hora_fin = h_fin;
+              horario_db.activo = true;
+            }
+            await this.horario_repo.save(horario_db);
+          }
+        }
+      }
+
+      // g) Formalización de Asignación de Práctica con Foreign Key íntegra becario_id
+      if (this.asignacion_repo && lugar_central) {
+        let asignacion_db = await this.asignacion_repo.findOne({
+          where: { becario_id: becario_guardado.id, lugar_practica_id: lugar_central.id },
+        });
+        if (!asignacion_db) {
+          asignacion_db = this.asignacion_repo.create({
+            becario_id: becario_guardado.id,
+            lugar_practica_id: lugar_central.id,
+            supervisor_id: supervisor_asignado ? supervisor_asignado.id : null,
+            area_departamento: b_semilla.unidad || 'Oficina Central',
+            fecha_inicio: new Date('2026-01-15'),
+            estado: 'vigente',
+          });
+          await this.asignacion_repo.save(asignacion_db);
+        }
+      }
+
+      // e) Registrar también al becario en evaluadores para autoevaluación académica
+      let evaluador_bec = await this.evaluador_repo.findOne({ where: { correo: b_semilla.correo } });
+      if (!evaluador_bec) {
+        evaluador_bec = this.evaluador_repo.create({
+          nombre: b_semilla.nombre,
+          tipo: TipoEvaluador.BECARIO,
+          correo: b_semilla.correo,
+          telefono: '70000000',
+        });
+        await this.evaluador_repo.save(evaluador_bec);
+      }
+    }
+    this.logger.log(`Nómina oficial sembrada con éxito: ${BECARIOS_SEMILLA.length} becarios registrados.`);
+
+    // 7. Catálogo de los 5 Módulos de Evaluación Canónicos
+    const modulos_defecto = [
+      { id: 1, nombre: 'Liderazgo en la Iglesia', descripcion: 'Evaluación realizada por el pastor de la congregación (formulario F-03)', orden: 1 },
+      { id: 2, nombre: 'Autoevaluación Académica', descripcion: 'Autoevaluación del becario sobre su desempeño y avance universitario', orden: 2 },
+      { id: 3, nombre: 'Evaluación del Mentor', descripcion: 'Evaluación cualitativa y cuantitativa por el supervisor/mentor asignado', orden: 3 },
+      { id: 4, nombre: 'Evaluación Escuela de Líderes', descripcion: 'Evaluación del facilitador sobre la participación formativa diaconal', orden: 4 },
+      { id: 5, nombre: 'Evaluación Socioeconómica', descripcion: 'Evaluación y seguimiento periódico por trabajo social institucional', orden: 5 },
+    ];
+
+    for (const m of modulos_defecto) {
+      const existe_mod = await this.modulo_repo.findOne({ where: { id: m.id } });
+      if (!existe_mod) {
+        await this.modulo_repo.save(this.modulo_repo.create(m));
+      }
     }
 
-    let evaluador_supervisor = await this.evaluador_repo.findOne({
-      where: { correo: correo_supervisor },
-    });
-    if (!evaluador_supervisor) {
-      evaluador_supervisor = this.evaluador_repo.create({
-        nombre: 'Angel Javier Ali Paz',
-        tipo: TipoEvaluador.SUPERVISOR,
-        correo: correo_supervisor,
-        telefono: '72345678',
-      });
-      await this.evaluador_repo.save(evaluador_supervisor);
+    // 8. Periodos de Evaluación Base
+    const periodos_defecto = [
+      { id: 1, nombre: 'Semestre I - 2026', fecha_inicio: new Date('2026-01-01'), fecha_fin: new Date('2026-06-30'), estado: EstadoPeriodo.CERRADO },
+      { id: 2, nombre: 'Semestre II - 2026', fecha_inicio: new Date('2026-07-01'), fecha_fin: new Date('2026-12-31'), estado: EstadoPeriodo.ABIERTO },
+    ];
+
+    for (const p of periodos_defecto) {
+      const existe_per = await this.periodo_repo.findOne({ where: { id: p.id } });
+      if (!existe_per) {
+        await this.periodo_repo.save(this.periodo_repo.create(p));
+      }
     }
 
-    // 6. Tarifas oficiales de transporte urbano
+    // 9. Tarifas Oficiales de Transporte Urbano
     if (this.tarifa_repo) {
       const cuenta_tarifas = await this.tarifa_repo.count();
       if (cuenta_tarifas === 0) {
@@ -243,97 +497,6 @@ export class SemillaServicio implements OnModuleInit {
       }
     }
 
-    // 7. Nómina oficial completa de becarios (23 becarios institucionales BUMAND 2026)
-    const becarios_datos = [
-      { ci: '10028341', nombre: 'Nilda Amalia Churata Paye', correo: 'nilda.churata@bumand.bo', carrera: 'Educación Parvularia', universidad: 'Universidad Mayor de San Andrés', unidad: 'Seguridad Física' },
-      { ci: '9160054', nombre: 'Edgar Elias Alarcon Huanca', correo: 'edgar.alarcon@bumand.bo', carrera: 'Medicina', universidad: 'Universidad Mayor de San Andrés', unidad: 'Consultorio Médico' },
-      { ci: '13696496', nombre: 'Adai Belen Huayta Cardozo', correo: 'adai.huayta@bumand.bo', carrera: 'Estadística', universidad: 'Universidad Mayor de San Andrés', unidad: 'Productos y Canales' },
-      { ci: '8329102', nombre: 'Joel David Condori Mamani', correo: 'joel.condori@bumand.bo', carrera: 'Informática', universidad: 'Universidad Mayor de San Andrés', unidad: 'Sistemas y TI' },
-      { ci: '9940123', nombre: 'Ruth Noemi Quispe Flores', correo: 'ruth.quispe@bumand.bo', carrera: 'Contaduría Pública', universidad: 'Universidad Mayor de San Andrés', unidad: 'Finanzas' },
-      { ci: '9214556', nombre: 'Samuel Israel Choque Calle', correo: 'samuel.choque@bumand.bo', carrera: 'Administración de Empresas', universidad: 'Universidad Pública de El Alto', unidad: 'Recursos Humanos' },
-      { ci: '10582314', nombre: 'Abigail Esther Mamani Ticona', correo: 'abigail.mamani@bumand.bo', carrera: 'Psicología', universidad: 'Universidad Mayor de San Andrés', unidad: 'Bienestar Social' },
-      { ci: '12485901', nombre: 'Caleb Josue Limachi Ramos', correo: 'caleb.limachi@bumand.bo', carrera: 'Derecho', universidad: 'Universidad Mayor de San Andrés', unidad: 'Asesoría Legal' },
-      { ci: '11048293', nombre: 'Debora Sarai Apaza Gutierrez', correo: 'debora.apaza@bumand.bo', carrera: 'Trabajo Social', universidad: 'Universidad Mayor de San Andrés', unidad: 'Impacto Social' },
-      { ci: '9832104', nombre: 'Mateo Lucas Fernandez Cruz', correo: 'mateo.fernandez@bumand.bo', carrera: 'Ingeniería Comercial', universidad: 'Universidad Pública de El Alto', unidad: 'Marketing y Comunicación' },
-      { ci: '10928374', nombre: 'Sara Damaris Tintaya Yujra', correo: 'sara.tintaya@bumand.bo', carrera: 'Ciencias de la Educación', universidad: 'Universidad Mayor de San Andrés', unidad: 'Formación Diaconal' },
-      { ci: '8493021', nombre: 'Daniel Esteban Laura Paxi', correo: 'daniel.laura@bumand.bo', carrera: 'Economía', universidad: 'Universidad Mayor de San Andrés', unidad: 'Riesgos y Cartera' },
-      { ci: '13849201', nombre: 'Nohemi Andrea Mendoza Luna', correo: 'nohemi.mendoza@bumand.bo', carrera: 'Enfermería', universidad: 'Universidad Pública de El Alto', unidad: 'Salud Ocupacional' },
-      { ci: '10472910', nombre: 'Marcos Antonio Quisbert Ali', correo: 'marcos.quisbert@bumand.bo', carrera: 'Lingüística', universidad: 'Universidad Mayor de San Andrés', unidad: 'Traducción y Publicaciones' },
-      { ci: '9283741', nombre: 'Miriam Raquel Huanca Tarqui', correo: 'miriam.huanca@bumand.bo', carrera: 'Contaduría Pública', universidad: 'Universidad Pública de El Alto', unidad: 'Auditoría Interna' },
-      { ci: '11928340', nombre: 'Benjamin Josias Gomez Poma', correo: 'benjamin.gomez@bumand.bo', carrera: 'Informática', universidad: 'Universidad Pública de El Alto', unidad: 'Redes e Infraestructura' },
-      { ci: '10384729', nombre: 'Ester Rebeca Carvajal Nina', correo: 'ester.carvajal@bumand.bo', carrera: 'Auditoría Financiera', universidad: 'Universidad Mayor de San Andrés', unidad: 'Control Financiero' },
-      { ci: '9482710', nombre: 'David Ezequiel Tola Quispe', correo: 'david.tola@bumand.bo', carrera: 'Comunicación Social', universidad: 'Universidad Mayor de San Andrés', unidad: 'Prensa Institucional' },
-      { ci: '12048592', nombre: 'Keila Elizabeth Solares Vega', correo: 'keila.solares@bumand.bo', carrera: 'Bioquímica', universidad: 'Universidad Mayor de San Andrés', unidad: 'Laboratorio y Salud' },
-      { ci: '11827394', nombre: 'Josue Natanael Vargas Coarite', correo: 'josue.vargas@bumand.bo', carrera: 'Ingeniería de Sistemas', universidad: 'Universidad Pública de El Alto', unidad: 'Desarrollo de Software' },
-      { ci: '10837492', nombre: 'Jemima Priscila Cachi Ramos', correo: 'jemima.cachi@bumand.bo', carrera: 'Odontología', universidad: 'Universidad Mayor de San Andrés', unidad: 'Brigadas Odontológicas' },
-      { ci: '9384729', nombre: 'Lucas Gabriel Tintaya Colque', correo: 'lucas.tintaya@bumand.bo', carrera: 'Arquitectura', universidad: 'Universidad Mayor de San Andrés', unidad: 'Proyectos de Infraestructura' },
-      { ci: '12938471', nombre: 'Salome Berenice Silva Mamani', correo: 'salome.silva@bumand.bo', carrera: 'Sociología', universidad: 'Universidad Mayor de San Andrés', unidad: 'Investigación Social' },
-    ];
-
-    const clave_becario_defecto = 'Bumand2026!';
-
-    for (const b of becarios_datos) {
-      let usuario_becario = await this.usuario_repo.findOne({ where: { correo: b.correo } });
-      if (!usuario_becario) {
-        usuario_becario = this.usuario_repo.create({
-          nombre: b.nombre,
-          correo: b.correo,
-          contrasena_hash: await hashearContrasena(clave_becario_defecto),
-          rol: Rol.BECARIO,
-          estado: EstadoUsuario.ACTIVO,
-        });
-        usuario_becario = await this.usuario_repo.save(usuario_becario);
-      }
-
-      const becario_existente = await this.becario_repo.findOne({ where: { usuario_id: usuario_becario.id } });
-      if (!becario_existente) {
-        const nuevo_becario = this.becario_repo.create({
-          usuario_id: usuario_becario.id,
-          ci: b.ci,
-          carrera: b.carrera,
-          universidad: b.universidad,
-          institucion: 'Diaconía FRIF-IFD',
-          unidad: b.unidad,
-          fecha_ingreso: new Date('2026-01-15'),
-          lugar_practica_id: lugar_central ? lugar_central.id : null,
-          iglesia_id: iglesia_central ? iglesia_central.id : null,
-          supervisor_id: usuario_supervisor.id,
-          usuario: usuario_becario,
-        });
-        await this.becario_repo.save(nuevo_becario);
-      }
-    }
-    this.logger.log(`Nómina de becarios procesada: ${becarios_datos.length} becarios registrados.`);
-
-    // 8. Catálogo de 5 Módulos de Evaluación
-    const modulos_defecto = [
-      { id: 1, nombre: 'Liderazgo en la Iglesia', descripcion: 'Evaluación realizada por el pastor de la congregación (formulario F-03)', orden: 1 },
-      { id: 2, nombre: 'Autoevaluación Académica', descripcion: 'Autoevaluación del becario sobre su desempeño y avance universitario', orden: 2 },
-      { id: 3, nombre: 'Evaluación del Mentor', descripcion: 'Evaluación cualitativa y cuantitativa por el supervisor/mentor asignado', orden: 3 },
-      { id: 4, nombre: 'Evaluación Escuela de Líderes', descripcion: 'Evaluación del facilitador sobre la participación formativa diaconal', orden: 4 },
-      { id: 5, nombre: 'Evaluación Socioeconómica', descripcion: 'Evaluación y seguimiento periódico por trabajo social institucional', orden: 5 },
-    ];
-
-    for (const m of modulos_defecto) {
-      const existe_mod = await this.modulo_repo.findOne({ where: { id: m.id } });
-      if (!existe_mod) {
-        await this.modulo_repo.save(this.modulo_repo.create(m));
-      }
-    }
-
-    // 9. Periodos de Evaluación Base
-    const periodos_defecto = [
-      { id: 1, nombre: 'Semestre I - 2026', fecha_inicio: new Date('2026-01-01'), fecha_fin: new Date('2026-06-30'), estado: EstadoPeriodo.CERRADO },
-      { id: 2, nombre: 'Semestre II - 2026', fecha_inicio: new Date('2026-07-01'), fecha_fin: new Date('2026-12-31'), estado: EstadoPeriodo.ABIERTO },
-    ];
-
-    for (const p of periodos_defecto) {
-      const existe_per = await this.periodo_repo.findOne({ where: { id: p.id } });
-      if (!existe_per) {
-        await this.periodo_repo.save(this.periodo_repo.create(p));
-      }
-    }
-
     // 10. Paradas oficiales de transporte de La Paz y El Alto
     if (this.parada_repo) {
       for (const p of PARADAS_OFICIALES_DEFECTO) {
@@ -342,7 +505,6 @@ export class SemillaServicio implements OnModuleInit {
           await this.parada_repo.save(this.parada_repo.create(p));
         }
       }
-      this.logger.log(`Paradas oficiales de transporte verificadas: ${PARADAS_OFICIALES_DEFECTO.length} registradas.`);
     }
 
     // 11. Evento semilla programado institucional
@@ -352,9 +514,12 @@ export class SemillaServicio implements OnModuleInit {
         where: { titulo: titulo_evento_semilla },
       });
 
+      const admin_principal =
+        mapa_administradores.get('daniel234.davalos@gmail.com') ||
+        Array.from(mapa_administradores.values())[0];
       if (!evento_semilla) {
         evento_semilla = this.evento_repo.create({
-          creador_id: admin_existente ? admin_existente.id : undefined,
+          creador_id: admin_principal ? admin_principal.id : undefined,
           titulo: titulo_evento_semilla,
           descripcion:
             'Jornada intensiva de formación en liderazgo cristiano, servicio social diaconal e integración formativa de becarios.',
@@ -374,6 +539,8 @@ export class SemillaServicio implements OnModuleInit {
       }
     }
 
-    this.logger.log('Verificación y siembra de datos completada exitosamente.');
+    this.logger.log(
+      `Verificación y siembra institucional completada con éxito: ${mapa_administradores.size} administradores, ${mapa_supervisores.size} supervisores, ${BECARIOS_SEMILLA.length} estudiantes/becarios y ${mapa_iglesias.size} iglesias.`,
+    );
   }
 }

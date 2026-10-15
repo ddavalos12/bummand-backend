@@ -31,7 +31,7 @@ describe('AsistenciaServicio', () => {
 
     lugar_repo = {
       findOne: jest.fn(),
-      find: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
     };
 
     multa_repo = {
@@ -240,6 +240,40 @@ describe('AsistenciaServicio', () => {
         }),
       );
       expect(multa_repo.save).toHaveBeenCalled();
+    });
+
+    it('NUNCA debe emitir multas para Prácticas incluso en día viernes por la tarde', async () => {
+      // Viernes 16 de Octubre de 2026 a las 15:00
+      jest.setSystemTime(new Date(2026, 9, 16, 15, 0, 0));
+
+      const becario_mock: Partial<Becario> = {
+        id: 15,
+        usuario_id: 15,
+        horario_semanal: { vie: '14:00-18:00' },
+        lugar_practica: {
+          id: 1,
+          nombre: 'Hospital de Clínicas',
+          latitud: -16.500000,
+          longitud: -68.150000,
+          radio_tolerancia_m: 500,
+        } as LugarPractica,
+      };
+
+      becario_repo.findOne.mockResolvedValue(becario_mock);
+      asistencia_repo.findOne.mockResolvedValue(null);
+      multa_repo.create.mockClear();
+      multa_repo.save.mockClear();
+
+      const resultado = await servicio.registrarIngreso({
+        becario_id: 15,
+        tipo: TipoAsistencia.PRACTICAS,
+        latitud: -16.500000,
+        longitud: -68.150000,
+      });
+
+      expect(resultado.registro.tipo).toBe(TipoAsistencia.PRACTICAS);
+      expect(multa_repo.create).not.toHaveBeenCalled();
+      expect(multa_repo.save).not.toHaveBeenCalled();
     });
   });
 

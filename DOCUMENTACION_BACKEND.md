@@ -371,17 +371,52 @@ Repositorio histórico de documentos oficiales exportados a PDF.
 - `fecha_generacion` (TIMESTAMP NOT NULL DEFAULT now()).
 - *Índice:* `idx_reportes_generados_becario_periodo` sobre `(becario_id, periodo)`.
 
-### 5.3. Servicio de Semilla Institucional (`src/datos/semilla.servicio.ts`)
-Para garantizar la operatividad inmediata sin requerir inserciones manuales propensas a errores, el servicio `SemillaServicio` se ejecuta automáticamente al iniciar la aplicación (`OnModuleInit`). Realiza una comprobación idempotente de los siguientes datos canónicos:
+### 5.3. Servicio de Semilla Institucional y Datos Oficiales (`src/datos/semilla.servicio.ts`)
 
-1. **Administrador General:** Valida la existencia del usuario administrador institucional (`admin@wscrt.com` o el configurado en `.env`), creando la cuenta con contraseña hasheada y rol `Rol.ADMINISTRADOR` si no existiese.
-2. **Sede Central Diaconía IFD El Alto:** Crea la sede física principal en `Av. Juan Pablo II esq. Calle Sbtte. Jorge Eulert 125, El Alto`, con coordenadas geográficas exactas (`latitud: -16.505000, longitud: -68.163000`) y radio de tolerancia de 50 metros.
-3. **Becarios Institucionales de Referencia:** Da de alta tres becarios oficiales vinculados a sus unidades operativas de Diaconía:
-   - *Nilda Amalia Churata Paye* (CI 10028341, Educación Parvularia, UMSA) asignada a la unidad de **Seguridad Física**.
-   - *Edgar Elías Alarcón Huanca* (CI 9160054, Medicina, UMSA) asignado a la unidad de **Consultorio Médico**.
-   - *Adai Belén Huayta Cardozo* (CI 13696496, Estadística, UMSA) asignada a la unidad de **Productos y Canales**.
-4. **Catálogo de 5 Módulos de Evaluación:** Garantiza la presencia de los 5 ejes formativos del Programa BUMAND.
-5. **Periodos Semestrales 2026:** Registra el *Semestre I - 2026* (estado cerrado) y el *Semestre II - 2026* (estado abierto).
+Para garantizar la operatividad inmediata sin requerir inserciones manuales propensas a errores ni migraciones frágiles, el sistema cuenta con una arquitectura de siembra institucional idempotente y robusta:
+
+#### Arquitectura de Siembra:
+- **`src/datos/semilla-datos.constantes.ts`**: Repositorio maestro de constantes institucionales tipadas (`ADMINISTRADORES_SEMILLA`, `SUPERVISORES_SEMILLA`, `BECARIOS_SEMILLA`, `IGLESIAS_SEMILLA`, `PARADAS_OFICIALES_DEFECTO`). Contiene la transcripción fiel de la nómina oficial `BUMAND 2026`, asignaciones de prácticas, horarios de apoyo y planillas de Diaconía FRIF-IFD.
+- **`src/datos/semilla.servicio.ts`**: Servicio que implementa `OnModuleInit` para verificación en el arranque y sincronización de entidades.
+- **`src/datos/sembrar.ts`**: Script de ejecución independiente que inicializa el contexto de NestJS sin levantar el servidor HTTP completo, ejecuta la semilla y cierra la conexión limpiamente.
+- **Comando Oficial de Siembra:**
+  ```bash
+  npm run sembrar
+  ```
+
+#### Componentes Sembrados en la Base de Datos:
+1. **Administradores Institucionales:**
+   - Registra y actualiza las cuentas canónicas: `daniel234.davalos@gmail.com` (Administrador de Sistemas e Infraestructura BUMAND) y `coordinacion@bumand.bo` (Coordinación Institucional), ambas con hash Bcrypt (`Bumand2026!`) y rol `Rol.ADMINISTRADOR`.
+2. **Sedes Institucionales y Agencias Diaconía IFD:**
+   - 11 agencias y oficinas operativas con coordenadas geodésicas WGS84, tolerancias métricas y bloques edilicios (`Oficina Central El Alto`, `Agencia Juan Pablo II`, `Agencia Villa Adela`, `Agencia Río Seco`, `Agencia Senkata`, `Agencia Sopocachi`, `Agencia Pérez Velasco`, `Agencia Calacoto`, etc.).
+3. **Red de Iglesias Eclesiásticas y Pastores Evaluadores:**
+   - 25 congregaciones cristianas registradas con geolocalización satelital (`latitud`, `longitud`), radio de tolerancia de 60 metros, pastor titular, contacto telefónico y correo para la emisión del Formulario F-03.
+4. **Cuerpo de Supervisores Institucionales:**
+   - 29 supervisores y tutores institucionales de Diaconía IFD registrados como usuarios activos (`Rol.SUPERVISOR`) y como evaluadores canónicos de tipo `mentor` vinculados a sus unidades funcionales (Seguridad Física, Consultorio Médico, Finanzas, Captaciones, Auditoría, etc.).
+5. **Nómina Oficial de Becarios BUMAND 2026:**
+   - 23 estudiantes becarios oficiales cargados con número de C.I., carrera universitaria, casa superior de estudios (UMSA, UPEA, etc.), unidad de apoyo asignada, sede de prácticas, iglesia de pertenencia y tutor de seguimiento.
+6. **Entidades Formales de Horario y Prácticas:**
+   - **`HorarioApoyo` (`src/modulos/becarios/entidades/horario-apoyo.entidad.ts`)**: Registros individualizados por día de la semana (`dia_semana`: 0 a 6), rango de horas (`hora_inicio`, `hora_fin`), horas diarias computables y turno ('mañana'/'tarde'), asociados mediante Foreign Key `becario_id`.
+   - **`AsignacionPractica` (`src/modulos/becarios/entidades/asignacion-practica.entidad.ts`)**: Registro formal de la pasantía o práctica con fecha de inicio, área/departamento y estado ('vigente'), garantizando trazabilidad institucional.
+7. **Catálogo de los 5 Módulos de Evaluación Canónicos:**
+   - *Módulo 1:* Liderazgo en la Iglesia (Formulario Pastoral F-03).
+   - *Módulo 2:* Autoevaluación Académica (Registro personal del becario).
+   - *Módulo 3:* Evaluación del Mentor / Prácticas Preprofesionales.
+   - *Módulo 4:* Evaluación Escuela de Líderes (Formación espiritual y liderazgo).
+   - *Módulo 5:* Evaluación Socioeconómica y Seguimiento de Bienestar.
+8. **Periodos Semestrales Base:**
+   - *Semestre I - 2026:* Estado `CERRADO`.
+   - *Semestre II - 2026:* Estado `ABIERTO` con ponderación equilibrada del 20% por módulo.
+9. **Tarifario Oficial y Paradas Emblemáticas:**
+   - Catálogo regulado de tarifas de transporte (Micro urbano Bs 2.00, Minibús Bs 2.60, Mi Teleférico Bs 3.00, Interciudad El Alto Bs 3.50, Trufi Bs 4.00) y 12 paradas emblemáticas con coordenadas fijas.
+10. **Evento Institucional Convocado:**
+    - Evento programado institucional en la Sede Central El Alto para verificación de asistencias geolocalizadas y doble confirmación.
+
+#### Enrutamiento Dinámico de Asistencias por Modalidad (`AsistenciaServicio`):
+El servicio de asistencia implementa validación geodésica dinámica según el tipo de marcación:
+- **`ACCIONES_SERVICIO`**: Valida las coordenadas satelitales contra la congregación/iglesia asignada al estudiante en `becarios.iglesia_id` (o contra la red eclesial registrada), otorgando tolerancia de 60 metros.
+- **`ESCUELA_LIDERES`**: Valida contra las sedes de formación institucional y auditorio central. Las multas por retardo (Bs 10/minuto pasadas las 14:35) aplican exclusivamente a esta modalidad en días viernes.
+- **`PRACTICAS`**: Valida contra la sede o agencia de Diaconía asignada, con autodetección multisede ante rotaciones operativas.
 
 ---
 
