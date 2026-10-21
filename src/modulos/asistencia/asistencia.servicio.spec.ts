@@ -203,7 +203,7 @@ describe('AsistenciaServicio', () => {
       }
     });
 
-    it('debe emitir multa institucional de Bs 10 por minuto cuando se marca en Escuela de Líderes pasada la tolerancia de 14:35', async () => {
+    it('debe emitir multa institucional por tramos (Bs 10 de 1 a 10 min) cuando se marca en Escuela de Líderes pasada la tolerancia de 14:35', async () => {
       // Viernes 16 de Octubre de 2026 a las 14:40 (10 minutos pasadas las 14:30)
       jest.setSystemTime(new Date(2026, 9, 16, 14, 40, 0));
 
@@ -235,7 +235,7 @@ describe('AsistenciaServicio', () => {
         expect.objectContaining({
           becario_id: 14,
           minutos_retraso: 10,
-          monto_bs: 100, // 10 min * Bs 10
+          monto_bs: 10, // Tramo 1 a 10 min = Bs 10
           es_institucional: true,
         }),
       );
@@ -298,17 +298,88 @@ describe('AsistenciaServicio', () => {
     });
   });
 
-  describe('Consultas de Multas', () => {
-    it('debe listar multas filtrando por becario_id si se solicita', async () => {
-      becario_repo.findOne.mockResolvedValue({ id: 10, usuario_id: 10 });
-      multa_repo.find.mockResolvedValue([{ id: 1, monto_bs: 50, becario_id: 10 }]);
+  describe('Registro Manual de Asistencia (Contingencia Administrativa)', () => {
+    it('debe registrar asistencia manual calculando horas trabajadas y marcando confirmado y dentro de geocerca', async () => {
+      const becario_mock = { id: 7, usuario_id: 20 };
+      becario_repo.findOne.mockResolvedValue(becario_mock);
 
-      const multas = await servicio.obtenerMisMultas(10);
-      expect(multas).toHaveLength(1);
-      expect(multa_repo.find).toHaveBeenCalledWith({
-        where: { becario_id: 10 },
-        order: { fecha_aplicacion: 'DESC' },
-        relations: { asistencia: true },
+      const dto = {
+        becario_id: 7,
+        tipo: TipoAsistencia.PRACTICAS,
+        fecha: '2026-10-18',
+        hora_ingreso: '08:30',
+        hora_salida: '12:30',
+        motivo_contingencia: 'Sin megas en el celular / olvido de marcación',
+      };
+
+      const resultado = await servicio.registrarAsistenciaManual(dto);
+
+      expect(becario_repo.findOne).toHaveBeenCalledWith({
+        where: [{ id: 7 }, { usuario_id: 7 }],
+      });
+      expect(asistencia_repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          becario_id: 7,
+          tipo: TipoAsistencia.PRACTICAS,
+          hora_ingreso: '08:30:00',
+          hora_salida: '12:30:00',
+          horas_trabajadas: 4.0,
+          dentro_de_radio: true,
+          confirmado_organizador: true,
+          es_registro_manual: true,
+          motivo_contingencia: 'Sin megas en el celular / olvido de marcación',
+        }),
+      );
+      expect(asistencia_repo.save).toHaveBeenCalled();
+      expect(resultado.es_registro_manual).toBe(true);
+      expect(resultado.horas_trabajadas).toBe(4.0);
+    });
+
+    it('debe asignar motivo de contingencia por defecto si no es provisto', async () => {
+      becario_repo.findOne.mockResolvedValue({ id: 8, usuario_id: 21 });
+
+      await servicio.registrarAsistenciaManual({
+        becario_id: 8,
+        fecha: '2026-10-18',
+        hora_ingreso: '09:00',
+      });
+
+      expect(asistencia_repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          becario_id: 8,
+          es_registro_manual: true,
+          motivo_contingencia: 'Registro manual administrativo (contingencia sin megas/olvido)',
+        }),
+      );
+    });
+
+    it('debe lanzar NotFoundException si el becario no existe', async () => {
+      becario_repo.findOne.mockResolvedValue(null);
+
+      await expect(
+        servicio.registrarAsistenciaManual({
+          becario_id: 999,
+          fecha: '2026-10-18',
+          hora_ingreso: '08:00',
+        }),
+      ).rejects.toThrow('Becario no encontrado');
+    });
+  });
+
+  describe('Consulta de Asistencias por Usuario/Becario (Evitar 403 Forbidden)', () => {
+    it('debe retornar asistencias del becario autenticado filtrando por su ID', async () => {
+      becario_repo.findOne.mockResolvedValue({ id: 7, usuario_id: 20 });
+      asistencia_repo.find.mockResolvedValue([
+        { id: 1, becario_id: 7, tipo: TipoAsistencia.PRACTICAS },
+        { id: 2, becario_id: 7, tipo: TipoAsistencia.ESCUELA_LIDERES },
+      ]);
+
+      const resultado = await servicio.obtenerPorUsuario(20);
+      expect(resultado).toHaveLength(2);
+      expect(asistencia_repo.find).toHaveBeenCalledWith({
+        where: { becario_id: 7 },
+        relations: { becario: { usuario: true } },
+        order: { fecha: 'DESC', created_at: 'DESC' },
       });
     });
   });

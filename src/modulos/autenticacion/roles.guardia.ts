@@ -8,12 +8,12 @@ export class RolesGuardia implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const rolesRequeridos = this.reflector.getAllAndOverride<Rol[]>(ROLES_KEY, [
+    const roles_requeridos = this.reflector.getAllAndOverride<Rol[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
 
-    if (!rolesRequeridos) {
+    if (!roles_requeridos) {
       return true;
     }
 
@@ -23,8 +23,21 @@ export class RolesGuardia implements CanActivate {
       throw new ForbiddenException('No hay usuario autenticado');
     }
 
-    if (rolesRequeridos.some((rol) => usuario.rol === rol)) {
+    if (
+      roles_requeridos.some(
+        (rol) => String(usuario.rol).toLowerCase().trim() === String(rol).toLowerCase().trim(),
+      )
+    ) {
       return true;
+    }
+
+    if (
+      roles_requeridos.length === 1 &&
+      String(roles_requeridos[0]).toLowerCase().trim() === String(Rol.BECARIO).toLowerCase().trim()
+    ) {
+      throw new ForbiddenException(
+        'Esta acción es exclusiva para estudiantes becarios. Inicia sesión con tu cuenta de estudiante.',
+      );
     }
 
     throw new ForbiddenException('No tienes permisos suficientes para esta acción');

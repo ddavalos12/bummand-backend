@@ -6,6 +6,8 @@ import { ModuloEvaluacion } from './entidades/modulo-evaluacion.entidad';
 import { PeriodoEvaluacion, EstadoPeriodo } from './entidades/periodo-evaluacion.entidad';
 import { Evaluador } from './entidades/evaluador.entidad';
 import { EvaluacionPastor } from './entidades/evaluacion-pastor.entidad';
+import { PreguntaBienestar } from './entidades/pregunta-bienestar.entidad';
+import { Becario } from '../becarios/entidades/becario.entidad';
 
 describe('EvaluacionesServicio', () => {
   let servicio: EvaluacionesServicio;
@@ -14,6 +16,8 @@ describe('EvaluacionesServicio', () => {
   let periodo_repo: any;
   let evaluador_repo: any;
   let evaluacion_pastor_repo: any;
+  let pregunta_bienestar_repo: any;
+  let becario_repo: any;
 
   beforeEach(async () => {
     evaluacion_repo = {
@@ -46,6 +50,18 @@ describe('EvaluacionesServicio', () => {
       save: jest.fn().mockImplementation((d) => Promise.resolve({ ...d, id: d.id || 1 })),
     };
 
+    pregunta_bienestar_repo = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn(),
+      create: jest.fn().mockImplementation((d) => ({ ...d, id: d.id || 1 })),
+      save: jest.fn().mockImplementation((d) => Promise.resolve(d)),
+    };
+
+    becario_repo = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EvaluacionesServicio,
@@ -54,6 +70,8 @@ describe('EvaluacionesServicio', () => {
         { provide: getRepositoryToken(PeriodoEvaluacion), useValue: periodo_repo },
         { provide: getRepositoryToken(Evaluador), useValue: evaluador_repo },
         { provide: getRepositoryToken(EvaluacionPastor), useValue: evaluacion_pastor_repo },
+        { provide: getRepositoryToken(PreguntaBienestar), useValue: pregunta_bienestar_repo },
+        { provide: getRepositoryToken(Becario), useValue: becario_repo },
       ],
     }).compile();
 
@@ -243,6 +261,127 @@ describe('EvaluacionesServicio', () => {
       const res = await servicio.calcularCalificacionTotal(1, 3);
       expect(res.calificacion_total_100).toBe(90.0);
       expect(res.rendimiento).toBe('Sobresaliente');
+    });
+  });
+
+  describe('Cuestionario Oficial de Bienestar Universitario (26 preguntas)', () => {
+    it('debe retornar las 26 preguntas canónicas por defecto si la base de datos está vacía', async () => {
+      pregunta_bienestar_repo.find.mockResolvedValue([]);
+      const preguntas = await servicio.obtenerCuestionarioBienestar();
+      expect(preguntas.length).toBe(26);
+      expect(preguntas[0].numero_orden).toBe(1);
+      expect(preguntas[25].numero_orden).toBe(26);
+    });
+
+    it('debe actualizar y guardar preguntas modificadas del cuestionario de bienestar', async () => {
+      const payload = [
+        {
+          numero_orden: 1,
+          titulo: 'Horas de sueño modificada',
+          enunciado: '¿Cuántas horas duerme?',
+          categoria: 'salud_bienestar',
+          opciones: ['Menos de 6', 'Entre 6 y 8', 'Más de 8'],
+          activa: true,
+        },
+      ];
+      pregunta_bienestar_repo.findOne.mockResolvedValue(null);
+      pregunta_bienestar_repo.save.mockImplementation((ent: any) => Promise.resolve(ent));
+      pregunta_bienestar_repo.find.mockResolvedValue(payload);
+
+      const res = await servicio.actualizarCuestionarioBienestar(payload);
+      expect(res.length).toBe(1);
+      expect(res[0].titulo).toBe('Horas de sueño modificada');
+    });
+  });
+
+  describe('Criterios Oficiales de Evaluación y Consolidado Semestral', () => {
+    it('debe calcular puntaje académico por criterio según promedio y reprobadas', () => {
+      // >= 70 sin reprobadas: 20 pts
+      expect(servicio.calcularPuntajeAcademicoPorCriterio(75, 0)).toBe(20);
+      // < 70 sin reprobadas: 15 pts
+      expect(servicio.calcularPuntajeAcademicoPorCriterio(65, 0)).toBe(15);
+      // 1 materia reprobada y promedio > 51: 10 pts
+      expect(servicio.calcularPuntajeAcademicoPorCriterio(80, 1)).toBe(10);
+      // 1 materia reprobada y promedio <= 51: 0 pts
+      expect(servicio.calcularPuntajeAcademicoPorCriterio(50, 1)).toBe(0);
+      // Más de una materia reprobada: 0 pts
+      expect(servicio.calcularPuntajeAcademicoPorCriterio(70, 2)).toBe(0);
+      expect(servicio.calcularPuntajeAcademicoPorCriterio(70, 3)).toBe(0);
+    });
+
+    it('debe retornar la calificación literal oficial exacta según el total sobre 100', () => {
+      expect(servicio.obtenerCalificacionLiteralOficial(70)).toBe('Aprobación óptima');
+      expect(servicio.obtenerCalificacionLiteralOficial(100)).toBe('Aprobación óptima');
+      expect(servicio.obtenerCalificacionLiteralOficial(69)).toBe('Aprobación Condicionada');
+      expect(servicio.obtenerCalificacionLiteralOficial(51)).toBe('Aprobación Condicionada');
+      expect(servicio.obtenerCalificacionLiteralOficial(50)).toBe('Reprobó y debe abandonar el programa');
+      expect(servicio.obtenerCalificacionLiteralOficial(0)).toBe('Reprobó y debe abandonar el programa');
+    });
+
+    it('debe obtener el consolidado semestral con los 21 becarios canónicos, criterios y rangos', async () => {
+      const consolidado = await servicio.obtenerConsolidadoSemestral('II-2025');
+      expect(consolidado.periodo).toBe('II-2025');
+      expect(consolidado.total_becarios).toBe(21);
+      expect(consolidado.registros.length).toBe(21);
+      expect(consolidado.criterios_oficiales).toBeDefined();
+      expect(consolidado.rangos_aprobacion.length).toBe(3);
+
+      const primer_becario = consolidado.registros[0];
+      expect(primer_becario.nombre_completo).toBe('Jose Marcos Suñagua Quispe');
+      expect(primer_becario.total).toBe(68);
+      expect(primer_becario.ceti_tareas.length).toBe(12);
+    });
+  });
+
+  describe('Procesamiento de Evaluaciones Mentor QR y Socioeconómica', () => {
+    it('debe procesar receptor mentor QR calculando puntaje vigesimal sobre 20', async () => {
+      periodo_repo.findOne.mockResolvedValue({ id: 1, estado: EstadoPeriodo.ACTIVO });
+      modulo_repo.find.mockResolvedValue([{ id: 3, clave_sistema: 'evaluacion_mentor' }]);
+      evaluador_repo.find.mockResolvedValue([{ id: 1, nombre: 'Mentor Test' }]);
+      evaluacion_repo.findOne.mockResolvedValue(null);
+      evaluacion_repo.save.mockImplementation((d: any) => Promise.resolve({ ...d, id: 99 }));
+
+      const resultado = await servicio.procesarReceptorMentorQr({
+        becario_id: 1,
+        token_qr: 'token_prueba',
+        nombre_mentor: 'David Limachi',
+        unidad_agencia: 'Iglesia Central',
+        semestre_gestion: 'II-2025',
+        calificaciones_1_18: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
+        preguntas_19_21: {
+          p19_puntos_fuertes: 'Gran compromiso y liderazgo',
+          p20_areas_mejora: 'Gestión del tiempo',
+          p21_comentario_general: 'Recomendado',
+        },
+      });
+
+      expect(resultado).toBeDefined();
+      expect(resultado.id).toBe(99);
+      expect(resultado.puntaje).toBe(20);
+    });
+
+    it('debe procesar receptor socioeconómica calculando puntaje sobre 20 y semáforo', async () => {
+      periodo_repo.findOne.mockResolvedValue({ id: 1, estado: EstadoPeriodo.ACTIVO });
+      modulo_repo.find.mockResolvedValue([{ id: 5, clave_sistema: 'evaluacion_socioeconomica' }]);
+      evaluador_repo.find.mockResolvedValue([{ id: 2, nombre: 'Trabajador Social' }]);
+      evaluacion_repo.findOne.mockResolvedValue(null);
+      evaluacion_repo.save.mockImplementation((d: any) => Promise.resolve({ ...d, id: 101 }));
+
+      const respuestas: Record<number, any> = {};
+      for (let i = 1; i <= 26; i++) {
+        respuestas[i] = 1;
+      }
+
+      const resultado = await servicio.procesarReceptorSocioeconomica({
+        becario_id: 1,
+        periodo: 'II-2025',
+        respuestas_26_preguntas: respuestas,
+      });
+
+      expect(resultado).toBeDefined();
+      expect(resultado.id).toBe(101);
+      expect(resultado.puntaje).toBeDefined();
+      expect(resultado.semaforo_socioeconomico).toBe('verde');
     });
   });
 });

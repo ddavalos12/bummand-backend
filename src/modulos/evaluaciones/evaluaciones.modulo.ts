@@ -7,8 +7,13 @@ import { ModuloEvaluacion } from './entidades/modulo-evaluacion.entidad';
 import { PeriodoEvaluacion } from './entidades/periodo-evaluacion.entidad';
 import { Evaluador } from './entidades/evaluador.entidad';
 import { EvaluacionPastor } from './entidades/evaluacion-pastor.entidad';
-
+import { PreguntaBienestar } from './entidades/pregunta-bienestar.entidad';
+import { CasoSeguimientoPastoral } from './entidades/caso-seguimiento-pastoral.entidad';
+import { Becario } from '../becarios/entidades/becario.entidad';
+import { Usuario } from '../usuarios/entidades/usuario.entidad';
 import { BibliaModulo } from '../biblia/biblia.modulo';
+import { NotificacionesModulo } from '../notificaciones/notificaciones.modulo';
+import { TiempoRealModulo } from '../tiempo-real/tiempo-real.modulo';
 
 @Module({
   imports: [
@@ -18,8 +23,14 @@ import { BibliaModulo } from '../biblia/biblia.modulo';
       PeriodoEvaluacion,
       Evaluador,
       EvaluacionPastor,
+      PreguntaBienestar,
+      CasoSeguimientoPastoral,
+      Becario,
+      Usuario,
     ]),
     BibliaModulo,
+    NotificacionesModulo,
+    TiempoRealModulo,
   ],
   controllers: [EvaluacionesControlador],
   providers: [EvaluacionesServicio],

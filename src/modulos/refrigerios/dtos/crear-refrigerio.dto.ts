@@ -43,22 +43,38 @@ export class CrearRefrigerioDto {
   @Min(1)
   cantidad_raciones: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 8.0,
-    description: 'Costo unitario en Bolivianos (Bs) por cada ración',
+    description: 'Costo unitario en Bolivianos (Bs) por cada ración (opcional si se envía costo total)',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  costo_unitario_bs: number;
+  costo_unitario_bs?: number;
 
   @ApiPropertyOptional({
     example: 240.0,
-    description: 'Costo total calculado en Bs (si se omite se calcula automáticamente)',
+    description: 'Costo total calculado en Bs (opcional si se envía costo unitario)',
   })
   @IsOptional()
   @IsNumber()
   costo_total_bs?: number;
+
+  @ApiPropertyOptional({
+    example: 4,
+    description: 'Identificador del becario encargado del refrigerio (opcional)',
+  })
+  @IsOptional()
+  @IsNumber()
+  becario_id?: number;
+
+  @ApiPropertyOptional({
+    example: 'Nilda Amalia Churata Paye',
+    description: 'Nombre del becario encargado del refrigerio (opcional)',
+  })
+  @IsOptional()
+  @IsString()
+  becario_nombre?: string;
 
   @ApiProperty({
     example: 2,

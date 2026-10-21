@@ -5,6 +5,7 @@ import { CrearBecarioDto } from './dtos/crear-becario.dto';
 import { ActualizarBecarioDto } from './dtos/actualizar-becario.dto';
 import { AsignarSupervisorDto } from './dtos/asignar-supervisor.dto';
 import { OrdenConfirmacionDatosDto } from './dtos/orden-confirmacion-datos.dto';
+import { EstadoOrdenConfirmacionDto } from './dtos/estado-orden-confirmacion.dto';
 import { Becario } from './entidades/becario.entidad';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
@@ -89,15 +90,30 @@ export class BecariosControlador {
     return this.becariosServicio.actualizar(becario.id, { universidad });
   }
 
+  @Get('estado-orden-global')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @ApiOperation({
+    summary: 'Consultar estado institucional de orden de confirmación y enfriamiento',
+    description: 'Devuelve si el botón de solicitud está disponible o bloqueado por el enfriamiento de 7 días.',
+  })
+  @ApiResponse({ status: 200, type: EstadoOrdenConfirmacionDto })
+  obtenerEstadoOrdenGlobal(): Promise<EstadoOrdenConfirmacionDto> {
+    return this.becariosServicio.calcularEstadoOrdenGlobal();
+  }
+
   @Post('orden-confirmacion-datos')
   @Roles(Rol.ADMINISTRADOR)
   @ApiOperation({
-    summary: 'Emitir orden de confirmación mensual de datos',
+    summary: 'Emitir orden de confirmación mensual de datos con enfriamiento de 7 días',
     description: 'Activa o desactiva la bandera global institucional que obliga a los becarios a confirmar sus datos académicos.',
   })
   @ApiResponse({ status: 200, description: 'Estado de confirmación de datos actualizado.' })
-  ordenConfirmacionDatos(@Body() dto: OrdenConfirmacionDatosDto) {
-    return this.becariosServicio.ordenConfirmacionDatos(dto.confirmacion_datos_requerida);
+  ordenConfirmacionDatos(
+    @UsuarioActual() usuarioAutenticado: Usuario,
+    @Body() dto?: OrdenConfirmacionDatosDto,
+  ) {
+    const activa = dto ? dto.confirmacion_datos_requerida !== false : true;
+    return this.becariosServicio.ordenConfirmacionDatos(activa, usuarioAutenticado?.id);
   }
 
   @Get('estado-confirmacion-datos')
@@ -163,6 +179,38 @@ export class BecariosControlador {
     @UsuarioActual() usuarioAutenticado: Usuario,
   ): Promise<Becario> {
     return this.becariosServicio.obtener(id, usuarioAutenticado);
+  }
+
+  @Get(':id/horarios')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @ApiOperation({
+    summary: 'Obtener grilla horaria asignada a un becario',
+  })
+  obtenerHorarios(@Param('id', ParseIntPipe) id: number) {
+    return this.becariosServicio.obtenerHorarios(id);
+  }
+
+  @Put(':id/horarios')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @ApiOperation({
+    summary: 'Guardar o actualizar la grilla horaria de práctica institucional de un becario',
+  })
+  guardarHorarios(
+    @Param('id', ParseIntPipe) id: number,
+    @Body()
+    dto: {
+      lugar_practica_id?: number;
+      dias: Array<{
+        dia_semana: number;
+        hora_inicio: string;
+        hora_fin: string;
+        horas_diarias?: number;
+        turno?: string;
+        activo?: boolean;
+      }>;
+    },
+  ) {
+    return this.becariosServicio.guardarHorarios(id, dto);
   }
 
   @Put(':id')

@@ -38,10 +38,16 @@ export class RefrigeriosServicio {
 
   async crear(dto: CrearRefrigerioDto): Promise<Refrigerio> {
     const raciones = Number(dto.cantidad_raciones);
-    const unitario = Number(dto.costo_unitario_bs);
-    const total_calculado = dto.costo_total_bs !== undefined
-      ? Number(dto.costo_total_bs)
-      : Number((raciones * unitario).toFixed(2));
+    let unitario = dto.costo_unitario_bs !== undefined ? Number(dto.costo_unitario_bs) : 0;
+    let total = dto.costo_total_bs !== undefined ? Number(dto.costo_total_bs) : 0;
+
+    if (total > 0 && raciones > 0 && (!unitario || unitario === 0)) {
+      unitario = Number((total / raciones).toFixed(2));
+    } else if (unitario > 0 && raciones > 0 && (!total || total === 0)) {
+      total = Number((raciones * unitario).toFixed(2));
+    } else if (total === 0 && unitario > 0) {
+      total = Number((raciones * unitario).toFixed(2));
+    }
 
     const nuevo_refrigerio = this.refrigerio_repo.create({
       fecha: new Date(dto.fecha),
@@ -50,8 +56,10 @@ export class RefrigeriosServicio {
       descripcion: dto.descripcion,
       cantidad_raciones: raciones,
       costo_unitario_bs: unitario,
-      costo_total_bs: total_calculado,
+      costo_total_bs: total,
       responsable_id: dto.responsable_id,
+      becario_id: dto.becario_id || null,
+      becario_nombre: dto.becario_nombre || null,
       firmas_conformidad: dto.firmas_conformidad || null,
     });
 
@@ -94,17 +102,26 @@ export class RefrigeriosServicio {
     if (dto.lugar_practica_id !== undefined) refrigerio.lugar_practica_id = dto.lugar_practica_id || null;
     if (dto.descripcion !== undefined) refrigerio.descripcion = dto.descripcion;
     if (dto.cantidad_raciones !== undefined) refrigerio.cantidad_raciones = Number(dto.cantidad_raciones);
-    if (dto.costo_unitario_bs !== undefined) refrigerio.costo_unitario_bs = Number(dto.costo_unitario_bs);
 
-    if (dto.costo_total_bs !== undefined) {
+    if (dto.costo_total_bs !== undefined && dto.costo_unitario_bs === undefined) {
       refrigerio.costo_total_bs = Number(dto.costo_total_bs);
-    } else if (dto.cantidad_raciones !== undefined || dto.costo_unitario_bs !== undefined) {
-      refrigerio.costo_total_bs = Number(
-        (refrigerio.cantidad_raciones * refrigerio.costo_unitario_bs).toFixed(2),
-      );
+      if (refrigerio.cantidad_raciones > 0) {
+        refrigerio.costo_unitario_bs = Number((refrigerio.costo_total_bs / refrigerio.cantidad_raciones).toFixed(2));
+      }
+    } else if (dto.costo_unitario_bs !== undefined && dto.costo_total_bs === undefined) {
+      refrigerio.costo_unitario_bs = Number(dto.costo_unitario_bs);
+      refrigerio.costo_total_bs = Number((refrigerio.cantidad_raciones * refrigerio.costo_unitario_bs).toFixed(2));
+    } else {
+      if (dto.costo_unitario_bs !== undefined) refrigerio.costo_unitario_bs = Number(dto.costo_unitario_bs);
+      if (dto.costo_total_bs !== undefined) refrigerio.costo_total_bs = Number(dto.costo_total_bs);
+      else if (dto.cantidad_raciones !== undefined) {
+        refrigerio.costo_total_bs = Number((refrigerio.cantidad_raciones * refrigerio.costo_unitario_bs).toFixed(2));
+      }
     }
 
     if (dto.responsable_id !== undefined) refrigerio.responsable_id = dto.responsable_id;
+    if (dto.becario_id !== undefined) refrigerio.becario_id = dto.becario_id || null;
+    if (dto.becario_nombre !== undefined) refrigerio.becario_nombre = dto.becario_nombre || null;
     if (dto.firmas_conformidad !== undefined) refrigerio.firmas_conformidad = dto.firmas_conformidad || null;
 
     return this.refrigerio_repo.save(refrigerio);

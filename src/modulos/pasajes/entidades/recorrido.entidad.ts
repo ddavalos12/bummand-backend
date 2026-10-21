@@ -44,10 +44,34 @@ export class Recorrido {
   @Column({ name: 'apoyo_realizado', type: 'varchar', length: 255, nullable: true })
   apoyo_realizado: string;
 
+  @Column({ name: 'tipo_actividad', type: 'varchar', length: 50, default: 'practicas' })
+  tipo_actividad: string;
+
+  @Column({ name: 'calles_declaradas', type: 'text', nullable: true })
+  calles_declaradas: string | null;
+
+  @Column({ name: 'medio_transporte', type: 'varchar', length: 150, nullable: true })
+  medio_transporte: string | null;
+
+  @Column({ name: 'detalle_tramos_json', type: 'text', nullable: true })
+  detalle_tramos_json: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 
   // Getters / Setters de compatibilidad
+  get tipoActividad(): string { return this.tipo_actividad; }
+  set tipoActividad(v: string) { this.tipo_actividad = v; }
+
+  get callesDeclaradas(): string | null { return this.calles_declaradas; }
+  set callesDeclaradas(v: string | null) { this.calles_declaradas = v; }
+
+  get medioTransporte(): string | null { return this.medio_transporte; }
+  set medioTransporte(v: string | null) { this.medio_transporte = v; }
+
+  get detalleTramosJson(): string | null { return this.detalle_tramos_json; }
+  set detalleTramosJson(v: string | null) { this.detalle_tramos_json = v; }
+
   get solicitudId(): number { return this.solicitud_id; }
   set solicitudId(v: number) { this.solicitud_id = v; }
 

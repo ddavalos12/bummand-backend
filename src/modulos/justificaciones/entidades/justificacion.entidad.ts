@@ -57,6 +57,14 @@ export class Justificacion {
   @Column({ type: 'text' })
   descripcion: string;
 
+  @ApiProperty({ description: 'URL o path del archivo o fotografía probatoria adjunta', required: false })
+  @Column({ name: 'archivo_prueba_url', type: 'text', nullable: true })
+  archivo_prueba_url: string | null;
+
+  @ApiProperty({ description: 'Nombre original del archivo de prueba', required: false })
+  @Column({ name: 'nombre_archivo_prueba', type: 'varchar', length: 255, nullable: true })
+  nombre_archivo_prueba: string | null;
+
   @ApiProperty({
     enum: EstadoJustificacion,
     example: EstadoJustificacion.PENDIENTE,

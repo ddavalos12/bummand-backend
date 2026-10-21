@@ -49,6 +49,14 @@ export class Refrigerio {
   @Column({ name: 'responsable_id', type: 'int' })
   responsable_id: number;
 
+  @ApiPropertyOptional({ example: 4, description: 'ID del becario encargado del refrigerio' })
+  @Column({ name: 'becario_id', type: 'int', nullable: true })
+  becario_id: number | null;
+
+  @ApiPropertyOptional({ example: 'Nilda Amalia Churata Paye', description: 'Nombre del becario encargado' })
+  @Column({ name: 'becario_nombre', type: 'varchar', length: 150, nullable: true })
+  becario_nombre: string | null;
+
   @ApiPropertyOptional({
     description: 'Firmas o registros de conformidad de los becarios que recibieron el refrigerio',
   })

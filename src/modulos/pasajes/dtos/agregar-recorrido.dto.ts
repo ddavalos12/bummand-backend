@@ -78,6 +78,23 @@ export class AgregarRecorridoDto {
   apoyoRealizado?: string;
 
   @ApiPropertyOptional({
+    example: 'practicas',
+    description: 'Tipo de actividad del recorrido (practicas, escuela_lideres, acciones_servicio)',
+    default: 'practicas',
+  })
+  @IsOptional()
+  @IsString()
+  tipo_actividad?: string;
+
+  @ApiPropertyOptional({
+    example: 'practicas',
+    description: 'Alias en camelCase del tipo de actividad',
+  })
+  @IsOptional()
+  @IsString()
+  tipoActividad?: string;
+
+  @ApiPropertyOptional({
     example: -16.505200,
     description: 'Latitud GPS del punto de origen capturada mediante botón PIN',
   })
@@ -140,4 +157,55 @@ export class AgregarRecorridoDto {
   @IsOptional()
   @IsNumber()
   lngDestino?: number;
+
+  @ApiPropertyOptional({
+    example: 'Av. 6 de Marzo, Calle 2, Av. Franco Valle',
+    description: 'Calles, avenidas o paradas intermedias declaradas durante el recorrido',
+  })
+  @IsOptional()
+  @IsString()
+  calles_declaradas?: string;
+
+  @ApiPropertyOptional({
+    example: 'Av. 6 de Marzo, Calle 2, Av. Franco Valle',
+    description: 'Alias en camelCase de calles declaradas',
+  })
+  @IsOptional()
+  @IsString()
+  callesDeclaradas?: string;
+
+  @ApiPropertyOptional({
+    example: 'Minibús',
+    description: 'Medio de transporte utilizado (Minibús, Mi Teleférico, Micro, Trufi)',
+  })
+  @IsOptional()
+  @IsString()
+  medio_transporte?: string;
+
+  @ApiPropertyOptional({
+    example: 'Minibús',
+    description: 'Alias en camelCase del medio de transporte',
+  })
+  @IsOptional()
+  @IsString()
+  medioTransporte?: string;
+
+  @ApiPropertyOptional({
+    example: '[{"tipo":"teleferico","linea":"morada"}]',
+    description: 'Detalle estructurado en formato JSON con tramos, combinaciones y líneas de teleférico',
+  })
+  @IsOptional()
+  @IsString()
+  detalle_tramos_json?: string;
+
+  @ApiPropertyOptional({
+    example: '[{"tipo":"teleferico","linea":"morada"}]',
+    description: 'Alias en camelCase de detalle de tramos en JSON',
+  })
+  @IsOptional()
+  @IsString()
+  detalleTramosJson?: string;
 }
+
+export class ItemRecorridoDto extends AgregarRecorridoDto {}
+

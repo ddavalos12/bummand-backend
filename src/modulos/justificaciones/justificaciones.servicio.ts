@@ -51,6 +51,8 @@ export class JustificacionesServicio {
       fecha_incidencia: new Date(dto.fecha_incidencia),
       motivo: dto.motivo,
       descripcion: dto.descripcion,
+      archivo_prueba_url: dto.archivo_prueba_url || null,
+      nombre_archivo_prueba: dto.nombre_archivo_prueba || null,
       estado: EstadoJustificacion.PENDIENTE,
     });
 

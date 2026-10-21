@@ -49,6 +49,12 @@ export class EventosServicio {
     return guardado;
   }
 
+  async eliminar(id: number): Promise<void> {
+    const evento = await this.obtenerPorId(id);
+    await this.evento_repo.remove(evento);
+    this.tiempoRealGateway?.notificarEvento({ accion: 'eliminar', evento_id: id });
+  }
+
   async obtenerTodos(): Promise<Evento[]> {
     return this.evento_repo.find({
       order: { fecha: 'ASC', hora_inicio: 'ASC' },

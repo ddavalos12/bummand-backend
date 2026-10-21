@@ -17,7 +17,7 @@ import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 export class DevocionalesControlador {
   constructor(private readonly devocionalesServicio: DevocionalesServicio) {}
 
-  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Roles(Rol.BECARIO)
   @Post()
   @ApiOperation({
     summary: 'Registrar devocional o meditación bíblica',

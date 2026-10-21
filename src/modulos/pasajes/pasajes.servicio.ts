@@ -7,7 +7,7 @@ import { TarifaTransporte } from './entidades/tarifa-transporte.entidad';
 import { ParadaTransporte, PARADAS_OFICIALES_DEFECTO } from './entidades/parada-transporte.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { CrearSolicitudPasajeDto } from './dtos/crear-solicitud-pasaje.dto';
-import { AgregarRecorridoDto } from './dtos/agregar-recorrido.dto';
+import { AgregarRecorridoDto, ItemRecorridoDto } from './dtos/agregar-recorrido.dto';
 import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
 
 import { CrearTarifaDto } from './dtos/crear-tarifa.dto';
@@ -44,9 +44,11 @@ export class PasajesServicio {
     if (!id_usuario_o_becario) return 0;
     if (!this.becarioRepositorio) return id_usuario_o_becario;
     const becario = await this.becarioRepositorio.findOne({
-      where: [{ id: id_usuario_o_becario }, { usuario_id: id_usuario_o_becario }],
+      where: [{ usuario_id: id_usuario_o_becario }, { id: id_usuario_o_becario }],
     });
-    return becario ? becario.id : id_usuario_o_becario;
+    if (becario) return becario.id;
+
+    return id_usuario_o_becario;
   }
 
   async obtenerTarifasOficiales(fecha_referencia?: string | Date): Promise<TarifaTransporte[]> {
@@ -204,11 +206,15 @@ export class PasajesServicio {
       origen: dto.origen,
       destino: dto.destino,
       tarifa: Number(dto.tarifa),
+      tipo_actividad: dto.tipo_actividad || dto.tipoActividad || 'practicas',
       apoyo_realizado: dto.apoyo_realizado || dto.apoyoRealizado,
       lat_origen: dto.lat_origen ?? dto.latOrigen,
       lng_origen: dto.lng_origen ?? dto.lngOrigen,
       lat_destino: dto.lat_destino ?? dto.latDestino,
       lng_destino: dto.lng_destino ?? dto.lngDestino,
+      calles_declaradas: dto.calles_declaradas ?? dto.callesDeclaradas ?? null,
+      medio_transporte: dto.medio_transporte ?? dto.medioTransporte ?? null,
+      detalle_tramos_json: dto.detalle_tramos_json ?? dto.detalleTramosJson ?? null,
     });
 
     await this.recorridoRepositorio.save(nuevo_recorrido);
@@ -223,6 +229,15 @@ export class PasajesServicio {
     this.tiempoRealGateway?.notificarPasajes({ accion: 'recorrido_agregado', recorrido: nuevo_recorrido, solicitud });
 
     return nuevo_recorrido;
+  }
+
+  async agregarRecorridos(items: (AgregarRecorridoDto | ItemRecorridoDto)[]): Promise<Recorrido[]> {
+    const guardados: Recorrido[] = [];
+    for (const item of items) {
+      const rec = await this.agregarRecorrido(item);
+      guardados.push(rec);
+    }
+    return guardados;
   }
 
   async enviarSolicitud(id: number, usuario_id?: number, fecha_referencia: Date = new Date()): Promise<SolicitudPasajes> {
@@ -340,6 +355,12 @@ export class PasajesServicio {
       recorridos: (s.recorridos || []).map((r) => ({
         ...r,
         tarifa: Number(r.tarifa) || 0,
+        calles_declaradas: r.calles_declaradas ?? null,
+        medio_transporte: r.medio_transporte ?? null,
+        detalle_tramos_json: r.detalle_tramos_json ?? null,
+        callesDeclaradas: r.calles_declaradas ?? null,
+        medioTransporte: r.medio_transporte ?? null,
+        detalleTramosJson: r.detalle_tramos_json ?? null,
       })),
     })) as SolicitudPasajes[];
   }
@@ -359,6 +380,12 @@ export class PasajesServicio {
       recorridos: (solicitud.recorridos || []).map((r) => ({
         ...r,
         tarifa: Number(r.tarifa) || 0,
+        calles_declaradas: r.calles_declaradas ?? null,
+        medio_transporte: r.medio_transporte ?? null,
+        detalle_tramos_json: r.detalle_tramos_json ?? null,
+        callesDeclaradas: r.calles_declaradas ?? null,
+        medioTransporte: r.medio_transporte ?? null,
+        detalleTramosJson: r.detalle_tramos_json ?? null,
       })),
     } as SolicitudPasajes;
   }
@@ -381,6 +408,12 @@ export class PasajesServicio {
       recorridos: (s.recorridos || []).map((r) => ({
         ...r,
         tarifa: Number(r.tarifa) || 0,
+        calles_declaradas: r.calles_declaradas ?? null,
+        medio_transporte: r.medio_transporte ?? null,
+        detalle_tramos_json: r.detalle_tramos_json ?? null,
+        callesDeclaradas: r.calles_declaradas ?? null,
+        medioTransporte: r.medio_transporte ?? null,
+        detalleTramosJson: r.detalle_tramos_json ?? null,
       })),
     })) as SolicitudPasajes[];
   }

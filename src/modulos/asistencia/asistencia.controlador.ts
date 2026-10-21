@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Post, Patch, Body, Param, Query, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
 import { AsistenciaServicio } from './asistencia.servicio';
 import { RegistroAsistencia } from './entidades/registro-asistencia.entidad';
 import { Multa } from './entidades/multa.entidad';
 import { CoordenadasDto } from './dtos/coordenadas.dto';
 import { ConfirmarOrganizadorDto } from './dtos/confirmar-organizador.dto';
+import { RegistrarAsistenciaManualDto } from './dtos/registrar-asistencia-manual.dto';
+import { RectificarAsistenciaDto } from './dtos/rectificar-asistencia.dto';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
 import { Roles } from '../autenticacion/roles.decorador';
@@ -69,6 +71,41 @@ export class AsistenciaControlador {
     return this.asistenciaServicio.confirmarOrganizador(dto);
   }
 
+  @Post('manual')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @ApiOperation({
+    summary: 'Registrar marcación manual por contingencia',
+    description: 'Permite al administrador o supervisor asentar una asistencia cuando el becario no dispuso de megas o no pudo marcar.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Asistencia manual registrada satisfactoriamente.',
+    type: RegistroAsistencia,
+  })
+  registrarManual(@Body() dto: RegistrarAsistenciaManualDto) {
+    return this.asistenciaServicio.registrarAsistenciaManual(dto);
+  }
+
+  @Patch(':id/rectificar-hora')
+  @Roles(Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'Rectificar hora de llegada y justificar retraso (Solo Administrador)',
+    description: 'Permite exclusivamente al Administrador corregir la hora de llegada, anular minutos de retraso y multas, y registrar automáticamente la justificación institucional aprobada.',
+  })
+  @ApiParam({ name: 'id', description: 'ID del registro de asistencia', type: Number, example: 1 })
+  @ApiResponse({
+    status: 200,
+    description: 'Asistencia rectificada y justificada satisfactoriamente.',
+    type: RegistroAsistencia,
+  })
+  rectificarHora(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: RectificarAsistenciaDto,
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    return this.asistenciaServicio.rectificarHoraYJustificar(id, dto, usuario?.id);
+  }
+
   @Get('multas')
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
   @ApiOperation({
@@ -91,18 +128,63 @@ export class AsistenciaControlador {
     return this.asistenciaServicio.obtenerMisMultas(usuario.id);
   }
 
+  @Get('mis-asistencias')
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'Consultar asistencias del becario autenticado',
+    description: 'Retorna el historial de marcaciones del becario en sesión.',
+  })
+  @ApiResponse({ status: 200, description: 'Listado personal de asistencias.', type: [RegistroAsistencia] })
+  obtenerMisAsistencias(
+    @UsuarioActual() usuario: Usuario,
+    @Query('becario_id') becario_id?: number,
+  ): Promise<RegistroAsistencia[]> {
+    return this.asistenciaServicio.obtenerPorUsuario(usuario.id, becario_id);
+  }
+
+  @Get('horas-mensuales')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @ApiOperation({
+    summary: 'Resumen de horas mensuales trabajadas por becario',
+    description: 'Devuelve el resumen de horas acumuladas por mes para cada becario y el total acumulado en el mes actual.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Resumen consolidado de horas trabajadas por mes.',
+  })
+  obtenerHorasMensuales() {
+    return this.asistenciaServicio.obtenerHorasMensuales();
+  }
+
   @Get()
-  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
   @ApiOperation({
     summary: 'Listar registros de asistencia',
-    description: 'Retorna el historial consolidado de marcaciones de asistencia, coordenadas de entrada/salida y horas calculadas.',
+    description: 'Retorna el historial consolidado de marcaciones de asistencia. Si el usuario autenticado es becario, filtra automáticamente sus registros para evitar error 403 Forbidden.',
   })
   @ApiResponse({
     status: 200,
     description: 'Historial de registros de asistencia.',
     type: [RegistroAsistencia],
   })
-  obtenerTodos(): Promise<RegistroAsistencia[]> {
-    return this.asistenciaServicio.obtenerTodos();
+  obtenerTodos(
+    @UsuarioActual() usuario: Usuario,
+    @Query('becario_id') becario_id?: number,
+    @Query('tipo') tipo?: string,
+    @Query('fecha_inicio') fecha_inicio?: string,
+    @Query('fecha_fin') fecha_fin?: string,
+  ): Promise<RegistroAsistencia[]> {
+    if (usuario && usuario.rol === Rol.BECARIO) {
+      return this.asistenciaServicio.obtenerPorUsuario(usuario.id, becario_id);
+    }
+    if (becario_id) {
+      return this.asistenciaServicio.obtenerPorUsuario(usuario?.id, becario_id);
+    }
+    return this.asistenciaServicio.obtenerTodos({
+      tipo,
+      fecha_inicio,
+      fecha_fin,
+      becario_id,
+    });
   }
 }

@@ -32,7 +32,7 @@ import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 export class JustificacionesControlador {
   constructor(private readonly justificaciones_servicio: JustificacionesServicio) {}
 
-  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Roles(Rol.BECARIO)
   @Post()
   @ApiOperation({
     summary: 'Enviar solicitud formal de justificación',

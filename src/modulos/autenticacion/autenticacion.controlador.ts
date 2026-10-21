@@ -2,6 +2,7 @@ import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { InicioSesionDto } from './dtos/inicio-sesion.dto';
 import { ConfirmarCorreoDto } from './dtos/confirmar-correo.dto';
+import { RegistroBecarioDto } from './dtos/registro-becario.dto';
 import { AutenticacionServicio } from './autenticacion.servicio';
 import { JwtGuardia } from './jwt.guardia';
 import { UsuarioActual } from './usuario-actual.decorador';
@@ -74,5 +75,26 @@ export class AutenticacionControlador {
   })
   confirmarCorreo(@Body() dto: ConfirmarCorreoDto) {
     return this.autenticacionServicio.confirmarCorreo(dto);
+  }
+
+  @Post('registro')
+  @ApiOperation({
+    summary: 'Registrar cuenta de becario institucional con verificación de C.I.',
+    description: 'Valida que el C.I. coincida con la nómina previa de becarios cargada por el administrador, crea el usuario con rol de becario y vincula su ficha.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Cuenta de becario creada y vinculada satisfactoriamente a la nómina.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'El C.I. ingresado no coincide con ningún becario registrado por la administración.',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'El becario con ese C.I. ya cuenta con usuario activo o el correo está duplicado.',
+  })
+  registrar(@Body() dto: RegistroBecarioDto) {
+    return this.autenticacionServicio.registrarBecario(dto);
   }
 }

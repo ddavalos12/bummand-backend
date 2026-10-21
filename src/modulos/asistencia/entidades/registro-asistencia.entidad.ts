@@ -60,6 +60,18 @@ export class RegistroAsistencia {
   @Column({ name: 'confirmado_organizador', type: 'boolean', default: false })
   confirmado_organizador: boolean;
 
+  @Column({ name: 'es_registro_manual', type: 'boolean', default: false })
+  es_registro_manual: boolean;
+
+  @Column({ name: 'motivo_contingencia', type: 'text', nullable: true })
+  motivo_contingencia: string | null;
+
+  @Column({ name: 'lugar_practica_id', type: 'int', nullable: true })
+  lugar_practica_id: number | null;
+
+  @Column({ name: 'evento_id', type: 'int', nullable: true })
+  evento_id: number | null;
+
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 
@@ -90,8 +102,23 @@ export class RegistroAsistencia {
   get dentroDeRadio(): boolean { return this.dentro_de_radio; }
   set dentroDeRadio(v: boolean) { this.dentro_de_radio = v; }
 
-  get dentroDeHorario(): boolean { return this.dentro_de_horario; }
-  set dentroDeHorario(v: boolean) { this.dentro_de_horario = v; }
+  get dentro_geocerca(): boolean { return this.dentro_de_radio; }
+  set dentro_geocerca(v: boolean) { this.dentro_de_radio = v; }
+
+  get dentroGeocerca(): boolean { return this.dentro_de_radio; }
+  set dentroGeocerca(v: boolean) { this.dentro_de_radio = v; }
+
+  get esRegistroManual(): boolean { return this.es_registro_manual; }
+  set esRegistroManual(v: boolean) { this.es_registro_manual = v; }
+
+  get motivoContingencia(): string | null { return this.motivo_contingencia; }
+  set motivoContingencia(v: string | null) { this.motivo_contingencia = v; }
+
+  get lugarPracticaId(): number | null { return this.lugar_practica_id; }
+  set lugarPracticaId(v: number | null) { this.lugar_practica_id = v; }
+
+  get eventoId(): number | null { return this.evento_id; }
+  set eventoId(v: number | null) { this.evento_id = v; }
 
   get createdAt(): Date { return this.created_at; }
   set createdAt(v: Date) { this.created_at = v; }

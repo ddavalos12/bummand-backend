@@ -22,17 +22,30 @@ export interface SupervisorSemilla {
 
 export interface BecarioSemilla {
   ci: string;
+  lugar_expedicion?: string;
+  estado_civil?: string;
+  sexo?: string;
   nombre: string;
+  ceti?: number;
+  celular?: string;
   correo: string;
-  clave: string;
+  fecha_nacimiento?: string;
+  edad?: number;
+  direccion?: string;
+  ciudad?: string;
+  clave?: string;
   carrera: string;
   universidad: string;
-  institucion: string;
+  institucion?: string;
   unidad: string;
-  ubicacion: string;
-  supervisor_correo: string;
-  horario_semanal: Record<string, string>;
-  iglesia_nombre: string;
+  ubicacion?: string;
+  supervisor_correo?: string;
+  horario_semanal?: Record<string, string>;
+  iglesia_nombre?: string;
+  modalidad_carrera?: string;
+  tipo_beca?: string;
+  comentario_academico?: string;
+  comentario_iglesia?: string;
 }
 
 export interface IglesiaSemilla {
@@ -299,532 +312,766 @@ export const SUPERVISORES_SEMILLA: SupervisorSemilla[] = [
 export const BECARIOS_SEMILLA: BecarioSemilla[] = [
   {
     "ci": "13696496",
+    "lugar_expedicion": "LP",
+    "estado_civil": "Soltero",
+    "sexo": "F",
     "nombre": "Adai Belen Huayta Cardozo",
-    "correo": "adai.huayta@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Estadística",
+    "ceti": 3,
+    "celular": "79541458",
+    "correo": "adaibelen017@gmail.com",
+    "fecha_nacimiento": "01/07/1999",
+    "edad": 27,
+    "direccion": "Pasaje 21 de noviembre",
+    "ciudad": "El Alto",
     "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
+    "carrera": "Estadística",
     "unidad": "Productos y Canales",
     "ubicacion": "2 PISO BLOQUE A",
+    "iglesia_nombre": "Sinai Los Andes",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
     "supervisor_correo": "angel.ali@bumand.bo",
     "horario_semanal": {
       "lunes": "13:00 - 16:30",
       "miercoles": "13:00 - 16:30",
       "viernes": "09:00 - 14:00"
     },
-    "iglesia_nombre": "Sinai Los Andes"
+    "modalidad_carrera": "Semestral",
+    "tipo_beca": "650",
+    "comentario_academico": "materia con abandono  nota 38, consultar.",
+    "comentario_iglesia": "Falta de tiempo en sus deberes"
+  },
+  {
+    "ci": "9107373",
+    "lugar_expedicion": "LP",
+    "estado_civil": "Soltero",
+    "sexo": "M",
+    "nombre": "Daniel Davalos Quiñonez",
+    "ceti": 2,
+    "celular": "78804045",
+    "correo": "daniel234.davalos@gmail.com",
+    "fecha_nacimiento": "11/12/1995",
+    "edad": 31,
+    "direccion": "Calle Luis tapia #27 Z.",
+    "ciudad": "La Paz",
+    "universidad": "Universidad Mayor de San Andrés",
+    "carrera": "Informática",
+    "unidad": "Seguridad Física",
+    "ubicacion": "3 PISO BLOQUE B",
+    "iglesia_nombre": "IGLESIA METODISTA MONTE DE HOREB",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
+    "supervisor_correo": "angel.ali@bumand.bo",
+    "horario_semanal": {
+      "martes": "13:00 - 16:00",
+      "viernes": "08:00 - 14:00"
+    },
+    "modalidad_carrera": "Semestral",
+    "tipo_beca": "650",
+    "comentario_academico": "Aprobado",
+    "comentario_iglesia": "Comentarios Positivos."
+  },
+  {
+    "ci": "9160054",
+    "lugar_expedicion": "LP",
+    "estado_civil": "Soltero",
+    "sexo": "M",
+    "nombre": "Edgar Elías Alarcon Huanca",
+    "ceti": 2,
+    "celular": "60662872",
+    "correo": "edgaralarcon112@gmail.com",
+    "fecha_nacimiento": "09/07/2000",
+    "edad": 26,
+    "direccion": "Zona las delicias, calle",
+    "ciudad": "La Paz",
+    "universidad": "Universidad de Aquino Bolivia",
+    "carrera": "Medicina",
+    "unidad": "Consultorio Médico",
+    "ubicacion": "2 PISO BLOQUE B",
+    "iglesia_nombre": "Eli - Ezer",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
+    "supervisor_correo": "angel.ali@bumand.bo",
+    "horario_semanal": {
+      "lunes": "08:00 - 16:00",
+      "viernes": "10:00 - 14:00"
+    },
+    "modalidad_carrera": "Semestral",
+    "tipo_beca": "650",
+    "comentario_academico": "Aprobado",
+    "comentario_iglesia": "Comentarios Positivos"
+  },
+  {
+    "ci": "10028341",
+    "lugar_expedicion": "LP",
+    "estado_civil": "Soltero",
+    "sexo": "F",
+    "nombre": "Nilda Amalia Churata Paye",
+    "ceti": 2,
+    "celular": "63140016",
+    "correo": "nildachurata99@gmail.com",
+    "fecha_nacimiento": "16/04/2002",
+    "edad": 24,
+    "direccion": "Zona Puerto Camacho",
+    "ciudad": "El Alto",
+    "universidad": "Universidad Pública de El Alto",
+    "carrera": "Educación Parvularia",
+    "unidad": "Seguridad Física",
+    "ubicacion": "3 PISO BLOQUE B",
+    "iglesia_nombre": "Iglesia Evangélica Amigos Central de Bolivia Bautista Saavedra Más que Vencedores",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
+    "supervisor_correo": "angel.ali@bumand.bo",
+    "horario_semanal": {
+      "martes": "08:00 - 13:00",
+      "jueves": "08:00 - 13:00"
+    },
+    "modalidad_carrera": "Semestral",
+    "tipo_beca": "650",
+    "comentario_academico": "Aprobado",
+    "comentario_iglesia": "Comentarios Positivos"
   },
   {
     "ci": "10064956",
+    "lugar_expedicion": "LP",
+    "estado_civil": "Soltero",
+    "sexo": "M",
     "nombre": "Alejandro Roberth Paredes Tarquino",
-    "correo": "alejandro.paredes@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Comunicación Social",
+    "ceti": 1,
+    "celular": "78816188",
+    "correo": "roberthp092@gmail.com",
+    "fecha_nacimiento": "24/10/2004",
+    "edad": 22,
+    "direccion": "Zona Mcal. Santa Cruz",
+    "ciudad": "Viacha",
     "universidad": "Universidad Pública de El Alto",
-    "institucion": "Diaconía FRIF-IFD",
+    "carrera": "Comunicación Social",
     "unidad": "Marketing y Comunicación",
     "ubicacion": "1 PISO BLOQUE B",
+    "iglesia_nombre": "Centró Evangelistico Caluyo",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
     "supervisor_correo": "angel.ali@bumand.bo",
     "horario_semanal": {
       "martes": "10:30 - 13:30",
       "jueves": "10:30 - 13:30",
       "viernes": "10:30 - 13:30"
     },
-    "iglesia_nombre": "Centró Evangelistico Caluyo"
+    "modalidad_carrera": "Anual",
+    "tipo_beca": "650",
+    "comentario_academico": "Aprobado",
+    "comentario_iglesia": "Comentarios Positivos"
   },
   {
     "ci": "9952878",
+    "lugar_expedicion": "LP",
+    "estado_civil": "Soltero",
+    "sexo": "F",
     "nombre": "Aydee Ruth Ali Condori",
-    "correo": "aydee.ali@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Contaduría Pública",
+    "ceti": 1,
+    "celular": "63101324",
+    "correo": "alicondoriaydeeruth@gmail.com",
+    "fecha_nacimiento": "03/08/2004",
+    "edad": 22,
+    "direccion": "Zona Mcal. Sucre Sec",
+    "ciudad": "El Alto",
     "universidad": "Universidad Pública de El Alto",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Finanzas y Tesoreria",
+    "carrera": "Contaduría Pública",
+    "unidad": "Finanzas y Tesorería",
     "ubicacion": "2 PISO BLOQUE A",
+    "iglesia_nombre": "Iglesia del Nazareno El Progreso",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
     "supervisor_correo": "angel.ali@bumand.bo",
     "horario_semanal": {
       "martes": "10:00 - 13:00",
       "jueves": "10:00 - 13:00",
       "viernes": "10:00 - 13:00"
     },
-    "iglesia_nombre": "Iglesia del Nazareno El Progreso"
+    "modalidad_carrera": "Anual",
+    "tipo_beca": "250",
+    "comentario_academico": "reprobo 1 materia",
+    "comentario_iglesia": "Desarrolla sus dones."
   },
   {
     "ci": "9943280",
+    "lugar_expedicion": "El Alto",
+    "estado_civil": "Soltero",
+    "sexo": "M",
     "nombre": "Carlos Oscar Luna Lizarraga",
-    "correo": "carlos.luna@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Economía",
+    "ceti": 1,
+    "celular": "69902655",
+    "correo": "shionaries477@gmail.com",
+    "fecha_nacimiento": "04/04/2002",
+    "edad": 24,
+    "direccion": "Zona El Kenko, Av. Ka",
+    "ciudad": "El Alto",
     "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Auditoria Interna",
+    "carrera": "Economía",
+    "unidad": "Auditoría Interna",
     "ubicacion": "3 PISO BLOQUE A",
+    "iglesia_nombre": "Nazareno 6 de junio",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
     "supervisor_correo": "angel.ali@bumand.bo",
     "horario_semanal": {
       "martes": "08:00 - 12:00",
       "jueves": "08:00 - 12:00",
       "viernes": "08:00 - 14:00"
     },
-    "iglesia_nombre": "Nazareno 6 de junio"
-  },
-  {
-    "ci": "10930509",
-    "nombre": "Cristhian Alejandro Soto Apaza",
-    "correo": "cristhian.soto@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Administración de Empresas",
-    "universidad": "Universidad Pública de El Alto",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Finanzas y Tesorería",
-    "ubicacion": "Oficina Central Diaconía IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "08:30 - 16:30",
-      "miercoles": "08:30 - 16:30"
-    },
-    "iglesia_nombre": "Arca de Dios"
-  },
-  {
-    "ci": "9107373",
-    "nombre": "Daniel Davalos Quiñonez",
-    "correo": "daniel.davalos@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Informática",
-    "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Seguridad Física",
-    "ubicacion": "3 PISO BLOQUE B",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "martes": "13:00 - 16:00",
-      "viernes": "08:00 - 14:00"
-    },
-    "iglesia_nombre": "IGLESIA METODISTA MONTE DE HOREB"
-  },
-  {
-    "ci": "9160054",
-    "nombre": "Edgar Elias Alarcon Huanca",
-    "correo": "edgar.alarcon@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Medicina",
-    "universidad": "Universidad de Aquino Bolivia",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Consultorio Médico",
-    "ubicacion": "2 PISO BLOQUE B",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "08:00 - 16:00",
-      "viernes": "10:00 - 14:00"
-    },
-    "iglesia_nombre": "Eli - Ezer"
-  },
-  {
-    "ci": "12423846",
-    "nombre": "Fernando Rene Yujra Quispe",
-    "correo": "fernando.yujra@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "ING. CIVIL",
-    "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "ADMINISTRACION",
-    "ubicacion": "Oficina Central Diaconía IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "08:30 - 16:30",
-      "miercoles": "08:30 - 16:30"
-    },
-    "iglesia_nombre": "IGLESIA EVANGELICA DE DIOS BOLIVIANA PAMPAHASI"
-  },
-  {
-    "ci": "8416501",
-    "nombre": "Gonzalo Valencia Laura",
-    "correo": "gonzalo.valencia@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Contaduría Pública",
-    "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Contabilidad e Impuestos",
-    "ubicacion": "4 PISO BLOQUE A",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "14:00 - 16:00",
-      "martes": "13:00 - 14:00",
-      "miercoles": "14:00 - 16:00",
-      "jueves": "14:00 - 16:00"
-    },
-    "iglesia_nombre": "Iglesia Central El Alto"
-  },
-  {
-    "ci": "13088041",
-    "nombre": "Gustavo Ariel Condori Montaño",
-    "correo": "gustavo.condori@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Contaduría Pública",
-    "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Captaciones y Canales",
-    "ubicacion": "2 PISO BLOQUE A",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "14:00 - 16:00",
-      "martes": "14:00 - 16:00",
-      "miercoles": "14:00 - 16:00",
-      "jueves": "08:00 - 12:00"
-    },
-    "iglesia_nombre": "Iglesia Central El Alto"
+    "modalidad_carrera": "Semestral",
+    "tipo_beca": "650",
+    "comentario_academico": "Aprobado",
+    "comentario_iglesia": "Comentarios Positivos, es candidato a cargo, no desarrolla nuevos lideres"
   },
   {
     "ci": "10920862",
-    "nombre": "Isaias Daniel Herrera Mamani",
-    "correo": "isaias.herrera@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Arquitectura",
+    "lugar_expedicion": "El Alto",
+    "estado_civil": "Soltero",
+    "sexo": "M",
+    "nombre": "Isaías Daniel Herrera Mamani",
+    "ceti": 1,
+    "celular": "62484594",
+    "correo": "herreraisaias667@gmail.com",
+    "fecha_nacimiento": "31/05/2004",
+    "edad": 22,
+    "direccion": "Zona Senkata Av. Ojo",
+    "ciudad": "El Alto",
     "universidad": "Universidad Pública de El Alto",
-    "institucion": "Diaconía FRIF-IFD",
+    "carrera": "Arquitectura",
     "unidad": "Subgerencia Nacional de Administración",
     "ubicacion": "2 PISO BLOQUE A",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "09:00 - 15:00",
-      "miercoles": "08:00 - 16:00"
-    },
-    "iglesia_nombre": "Bautista para la familia"
-  },
-  {
-    "ci": "6950093",
-    "nombre": "Jhoselin Quispe Morales",
-    "correo": "jhoselin.quispe@bumand.bo",
+    "iglesia_nombre": "Bautista para la familia",
     "clave": "Bumand2026!",
-    "carrera": "Comunicación Social",
-    "universidad": "Universidad Mayor de San Andrés",
     "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Procesos y Normas",
-    "ubicacion": "Oficina Central Diaconía IFD",
     "supervisor_correo": "angel.ali@bumand.bo",
     "horario_semanal": {
-      "lunes": "08:30 - 16:30",
-      "miercoles": "08:30 - 16:30"
+      "lunes": "08:00 - 12:00",
+      "miercoles": "08:00 - 12:00",
+      "viernes": "08:00 - 14:00"
     },
-    "iglesia_nombre": "Pacajes"
-  },
-  {
-    "ci": "9208456",
-    "nombre": "Johan Ludvig Misme Flores",
-    "correo": "johan.misme@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Informatica",
-    "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Seguridad de la Información",
-    "ubicacion": "3 PISO BLOQUE A",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "08:00 - 12:30",
-      "miercoles": "08:00 - 12:30"
-    },
-    "iglesia_nombre": "Iglesia Central El Alto"
-  },
-  {
-    "ci": "12604724",
-    "nombre": "Joselin Wara Huanca Paucara",
-    "correo": "joselin.huanca@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Contaduría Pública",
-    "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Cumplimiento",
-    "ubicacion": "3 PISO BLOQUE A",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "13:30 - 16:00",
-      "miercoles": "13:30 - 16:00",
-      "jueves": "13:30 - 16:00",
-      "sabado": "08:30 - 10:00"
-    },
-    "iglesia_nombre": "Iglesia Central El Alto"
+    "modalidad_carrera": "Semestral",
+    "tipo_beca": "650",
+    "comentario_academico": "Aprobado",
+    "comentario_iglesia": "Un poco impuntual"
   },
   {
     "ci": "14378720",
+    "lugar_expedicion": "Viacha",
+    "estado_civil": "Soltero",
+    "sexo": "M",
     "nombre": "José Marcos Suñagua Quispe",
-    "correo": "jose.sunagua@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Informática",
+    "ceti": 1,
+    "celular": "62270620",
+    "correo": "marcossunagua0@gmail.com",
+    "fecha_nacimiento": "07/02/2003",
+    "edad": 23,
+    "direccion": "Zona Tilata - Viacha C",
+    "ciudad": "Viacha",
     "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
+    "carrera": "Informática",
     "unidad": "Riesgos",
     "ubicacion": "3 PISO BLOQUE A",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "miercoles": "08:30 - 11:30",
-      "jueves": "08:30 - 11:30",
-      "viernes": "08:30 - 13:30"
-    },
-    "iglesia_nombre": "6 de Junio"
-  },
-  {
-    "ci": "13603536",
-    "nombre": "Lizbeth Pacasi Machaca",
-    "correo": "lizbeth.pacasi@bumand.bo",
+    "iglesia_nombre": "6 de Junio",
     "clave": "Bumand2026!",
-    "carrera": "Bioquimica y farmacia",
-    "universidad": "Universidad Mayor de San Andrés",
     "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Consultorio Médico",
-    "ubicacion": "2 PISO BLOQUE B",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "martes": "08:30 - 14:00",
-      "jueves": "11:30 - 15:30"
-    },
-    "iglesia_nombre": "Iglesia Central El Alto"
-  },
-  {
-    "ci": "9927657",
-    "nombre": "Luis Santiago Enrriquez Conde",
-    "correo": "luis.enrriquez@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Ciencias de la Comunicación Social",
-    "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Unidad de Marketing",
-    "ubicacion": "Oficina Central Diaconía IFD",
     "supervisor_correo": "angel.ali@bumand.bo",
     "horario_semanal": {
       "lunes": "08:30 - 16:30",
       "miercoles": "08:30 - 16:30"
     },
-    "iglesia_nombre": "Bet-el"
+    "modalidad_carrera": "Semestral",
+    "tipo_beca": "650",
+    "comentario_academico": "reprobo 2 materias",
+    "comentario_iglesia": "Comentarios Positivos"
   },
   {
     "ci": "12959656",
+    "lugar_expedicion": "La Paz",
+    "estado_civil": "Soltero",
+    "sexo": "F",
     "nombre": "Mariela Dayana Jimenez Chambi",
-    "correo": "mariela.jimenez@bumand.bo",
-    "clave": "Bumand2026!",
+    "ceti": 1,
+    "celular": "70590493",
+    "correo": "jimenezcmarielaa@gmail.com",
+    "fecha_nacimiento": "19/07/2001",
+    "edad": 25,
+    "direccion": "Zona Obrajes Bella Vi",
+    "ciudad": "La Paz",
+    "universidad": "Universidad Mayor de San Andrés",
     "carrera": "Contaduría Pública",
-    "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
     "unidad": "Seguros",
     "ubicacion": "2 PISO BLOQUE A",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "14:00 - 18:00",
-      "martes": "11:00 - 16:20",
-      "jueves": "11:00 - 16:20"
-    },
-    "iglesia_nombre": "Ministerio misión Boliviana"
-  },
-  {
-    "ci": "7077936",
-    "nombre": "Mario Catunta Laime",
-    "correo": "mario.catunta@bumand.bo",
+    "iglesia_nombre": "Ministerio misión Boliviana",
     "clave": "Bumand2026!",
-    "carrera": "Economía",
-    "universidad": "Universidad Pública de El Alto",
     "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Créditos",
-    "ubicacion": "Oficina Central Diaconía IFD",
     "supervisor_correo": "angel.ali@bumand.bo",
     "horario_semanal": {
-      "lunes": "08:30 - 16:30",
-      "miercoles": "08:30 - 16:30"
+      "martes": "08:30 - 12:30",
+      "jueves": "08:30 - 12:30",
+      "viernes": "08:30 - 14:00"
     },
-    "iglesia_nombre": "Nazareno Rio Seco"
-  },
-  {
-    "ci": "8411610",
-    "nombre": "Mateo Miguel Cussi Flores",
-    "correo": "mateo.cussi@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Informatica",
-    "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Seguros",
-    "ubicacion": "2 PISO BLOQUE A",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "08:00 - 10:00",
-      "miercoles": "08:00 - 10:00",
-      "viernes": "08:00 - 13:00"
-    },
-    "iglesia_nombre": "Iglesia Central El Alto"
-  },
-  {
-    "ci": "13627440",
-    "nombre": "Matias José Uri Flores",
-    "correo": "matias.uri@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Lingüística e Idiomas",
-    "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Sostenibilidad y Responsabilidad Diaconal",
-    "ubicacion": "5 PISO BLOQUE A",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "08:00 - 13:00",
-      "martes": "08:00 - 13:00",
-      "miercoles": "08:00 - 13:00",
-      "jueves": "08:00 - 13:00"
-    },
-    "iglesia_nombre": "Iglesia Central El Alto"
+    "modalidad_carrera": "Anual",
+    "tipo_beca": "650",
+    "comentario_academico": "Aprobado",
+    "comentario_iglesia": "No ocupa algun cargo, no desarrolla nuevos lideres"
   },
   {
     "ci": "9925727",
+    "lugar_expedicion": "El Alto",
+    "estado_civil": "Soltero",
+    "sexo": "F",
     "nombre": "Mayherli Alejandra Loza Villalobos",
-    "correo": "mayherli.loza@bumand.bo",
-    "clave": "Bumand2026!",
+    "ceti": 1,
+    "celular": "60107414",
+    "correo": "villalobosbetty96@gmail.com",
+    "fecha_nacimiento": "07/06/2003",
+    "edad": 23,
+    "direccion": "Zona Villa Adela Plan",
+    "ciudad": "El Alto",
+    "universidad": "Universidad Mayor de San Andrés",
     "carrera": "Contaduría Pública",
-    "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Finanzas y Tesoreria",
+    "unidad": "Finanzas y Tesorería",
     "ubicacion": "4 PISO BLOQUE A",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "08:15 - 14:30",
-      "miercoles": "10:00 - 15:00",
-      "viernes": "10:00 - 14:00"
-    },
-    "iglesia_nombre": "CANAAN"
-  },
-  {
-    "ci": "14155448",
-    "nombre": "Milenka Quispe Coarite",
-    "correo": "milenka.quispe@bumand.bo",
+    "iglesia_nombre": "CANAAN",
     "clave": "Bumand2026!",
-    "carrera": "Administración de Empresas",
-    "universidad": "Universidad Mayor de San Andrés",
     "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Procesos y Normas",
-    "ubicacion": "4 PISO BLOQUE A",
     "supervisor_correo": "angel.ali@bumand.bo",
     "horario_semanal": {
-      "miercoles": "08:00 - 13:00",
-      "jueves": "08:00 - 12:00"
+      "lunes": "08:00 - 12:00",
+      "miercoles": "08:00 - 12:00",
+      "viernes": "08:00 - 14:00"
     },
-    "iglesia_nombre": "Iglesia Central El Alto"
-  },
-  {
-    "ci": "10369104",
-    "nombre": "Monica Mamani Mamani",
-    "correo": "monica.mamani@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Lingüística e Idiomas",
-    "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "RSDyA",
-    "ubicacion": "Oficina Central Diaconía IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "08:30 - 16:30",
-      "miercoles": "08:30 - 16:30"
-    },
-    "iglesia_nombre": "La Hermosa"
-  },
-  {
-    "ci": "10028341",
-    "nombre": "Nilda Amalia Churata Paye",
-    "correo": "nilda.churata@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Educación Parvularia",
-    "universidad": "Universidad Pública de El Alto",
-    "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Seguridad Física",
-    "ubicacion": "3 PISO BLOQUE B",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "martes": "08:00 - 13:00",
-      "jueves": "08:00 - 13:00"
-    },
-    "iglesia_nombre": "Iglesia Evangélica Amigos Central de Bolivia Bautista Saavedra Más que Vencedores"
+    "modalidad_carrera": "Anual",
+    "tipo_beca": "250",
+    "comentario_academico": "Aprobado",
+    "comentario_iglesia": "no puede administrar bien su tiempo, no desarrolla nuevos líderes"
   },
   {
     "ci": "7093658",
+    "lugar_expedicion": "El Alto",
+    "estado_civil": "Soltero",
+    "sexo": "F",
     "nombre": "Noemi Callisaya Alvarez",
-    "correo": "noemi.callisaya@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Psicomotricidad y Deportes",
+    "ceti": 1,
+    "celular": "60140086",
+    "correo": "k6924383@gmail.com",
+    "fecha_nacimiento": "24/04/1999",
+    "edad": 27,
+    "direccion": "Zona 31 de Enero Av.",
+    "ciudad": "El Alto",
     "universidad": "Universidad Pública de El Alto",
-    "institucion": "Diaconía FRIF-IFD",
+    "carrera": "Psicomotricidad y Deportes",
     "unidad": "Consultorio Médico",
     "ubicacion": "2 PISO BLOQUE B",
+    "iglesia_nombre": "\"El Progreso\"",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
     "supervisor_correo": "angel.ali@bumand.bo",
     "horario_semanal": {
-      "lunes": "08:30 - 12:30",
-      "viernes": "08:30 - 13:30"
+      "lunes": "08:00 - 12:00",
+      "miercoles": "08:00 - 12:00",
+      "viernes": "08:00 - 14:00"
     },
-    "iglesia_nombre": "\"El Progreso\""
+    "modalidad_carrera": "Semestral",
+    "tipo_beca": "650",
+    "comentario_academico": "reprobo 1 materia",
+    "comentario_iglesia": "Necesita ser guiada en el desarrollo de sus dones"
   },
   {
     "ci": "6172054",
+    "lugar_expedicion": "El Alto",
+    "estado_civil": "Soltero",
+    "sexo": "M",
     "nombre": "Ronald Mauricio Quiquijana Mayta",
-    "correo": "ronald.quiquijana@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Ingeniería en Telecomunicaciones",
+    "ceti": 1,
+    "celular": "65604882",
+    "correo": "quiquijana333@gmail.com",
+    "fecha_nacimiento": "30/06/2001",
+    "edad": 25,
+    "direccion": "Zona Villa Dolores \"F\"",
+    "ciudad": "El Alto",
     "universidad": "Escuela Militar de Ingeniería",
-    "institucion": "Diaconía FRIF-IFD",
+    "carrera": "Ingeniería en Telecomunicaciones",
     "unidad": "Seguridad de la Información",
     "ubicacion": "3 PISO BLOQUE A",
+    "iglesia_nombre": "Centro Evangelistico Caluyo",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
     "supervisor_correo": "angel.ali@bumand.bo",
     "horario_semanal": {
-      "lunes": "08:00 - 16:00",
-      "jueves": "14:00 - 16:00"
+      "martes": "08:30 - 12:30",
+      "jueves": "08:30 - 12:30",
+      "viernes": "08:30 - 14:00"
     },
-    "iglesia_nombre": "Centro Evangelistico Caluyo"
+    "modalidad_carrera": "Semestral",
+    "tipo_beca": "250",
+    "comentario_academico": "Aprobado",
+    "comentario_iglesia": "Introvertido y reservado"
   },
   {
     "ci": "9974211",
+    "lugar_expedicion": "El Alto",
+    "estado_civil": "Soltero",
+    "sexo": "M",
     "nombre": "Ruddy Flores Tapia",
-    "correo": "ruddy.flores@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Informática",
+    "ceti": 1,
+    "celular": "78777631",
+    "correo": "ruddyalan123@gmail.com",
+    "fecha_nacimiento": "03/01/1997",
+    "edad": 29,
+    "direccion": "Zona 16 de Febrero C",
+    "ciudad": "El Alto",
     "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
+    "carrera": "Informática",
     "unidad": "Planificación, Control y Presupuesto",
     "ubicacion": "5 PISO BLOQUE A",
-    "supervisor_correo": "angel.ali@bumand.bo",
-    "horario_semanal": {
-      "lunes": "09:00 - 16:00",
-      "miercoles": "09:00 - 16:00"
-    },
-    "iglesia_nombre": "Iglesia del Nazareno Río Seco"
-  },
-  {
-    "ci": "10915872",
-    "nombre": "Ruth Alesandra Choque Huanca",
-    "correo": "ruth.choque@bumand.bo",
+    "iglesia_nombre": "Iglesia del Nazareno Río Seco",
     "clave": "Bumand2026!",
-    "carrera": "Ingeniería Comercial",
-    "universidad": "Universidad Central Sede La Paz",
     "institucion": "Diaconía FRIF-IFD",
-    "unidad": "Cumplimiento",
-    "ubicacion": "Oficina Central Diaconía IFD",
     "supervisor_correo": "angel.ali@bumand.bo",
     "horario_semanal": {
       "lunes": "08:30 - 16:30",
       "miercoles": "08:30 - 16:30"
     },
-    "iglesia_nombre": "El Buen Pastor"
+    "modalidad_carrera": "Semestral",
+    "tipo_beca": "250",
+    "comentario_academico": "Aprobado",
+    "comentario_iglesia": "le falta conocer a los hermanos mayores, y ha llegado de manera impuntual a las clases que imparte."
+  },
+  {
+    "ci": "8416501",
+    "lugar_expedicion": "Provincial",
+    "estado_civil": "Soltero",
+    "sexo": "M",
+    "nombre": "Gonzalo Valencia Laura",
+    "ceti": 0,
+    "celular": "75161427",
+    "correo": "gonzalovalencialau@gmail.com",
+    "fecha_nacimiento": "22/04/2002",
+    "edad": 24,
+    "direccion": "-16.470978,-68.5061",
+    "ciudad": "Provincial",
+    "universidad": "Universidad Pública de El Alto",
+    "carrera": "Contaduría Pública",
+    "unidad": "Contabilidad e Impuestos",
+    "ubicacion": "4 PISO BLOQUE A",
+    "iglesia_nombre": "Iglesia Central El Alto",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
+    "supervisor_correo": "angel.ali@bumand.bo",
+    "horario_semanal": {
+      "lunes": "08:30 - 12:30",
+      "miercoles": "08:30 - 12:30"
+    }
+  },
+  {
+    "ci": "13088041",
+    "lugar_expedicion": "La Paz",
+    "estado_civil": "Soltero",
+    "sexo": "M",
+    "nombre": "Gustavo Ariel Condori Montaño",
+    "ceti": 0,
+    "celular": "67339896",
+    "correo": "tavitolpb@gmail.com",
+    "fecha_nacimiento": "29/07/2003",
+    "edad": 23,
+    "direccion": "Al inicio de la Av. Mar",
+    "ciudad": "La Paz",
+    "universidad": "Universidad Salesiana de Bolivia",
+    "carrera": "Contaduría Pública",
+    "unidad": "Captaciones y Canales",
+    "ubicacion": "2 PISO BLOQUE A",
+    "iglesia_nombre": "Iglesia Central El Alto",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
+    "supervisor_correo": "angel.ali@bumand.bo",
+    "horario_semanal": {
+      "martes": "08:30 - 12:30",
+      "jueves": "08:30 - 12:30"
+    }
+  },
+  {
+    "ci": "13603536",
+    "lugar_expedicion": "La Paz",
+    "estado_civil": "Soltera",
+    "sexo": "F",
+    "nombre": "Lisbeth Pacasi Machaca",
+    "ceti": 0,
+    "celular": "78022401",
+    "correo": "lizbethpacasiesperanza@gmail.com",
+    "fecha_nacimiento": "27/07/2006",
+    "edad": 20,
+    "direccion": "Jupapina, calle 11, N",
+    "ciudad": "La Paz",
+    "universidad": "Universidad de Aquino Bolivia",
+    "carrera": "Bioquímica y Farmacia",
+    "unidad": "Consultorio Médico",
+    "ubicacion": "2 PISO BLOQUE B",
+    "iglesia_nombre": "Iglesia Central El Alto",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
+    "supervisor_correo": "angel.ali@bumand.bo",
+    "horario_semanal": {
+      "lunes": "08:00 - 12:00",
+      "miercoles": "08:00 - 12:00"
+    }
   },
   {
     "ci": "13693151",
+    "lugar_expedicion": "El Alto",
+    "estado_civil": "Soltera",
+    "sexo": "F",
     "nombre": "Selena Fernanda Pillco Mamani",
-    "correo": "selena.pillco@bumand.bo",
-    "clave": "Bumand2026!",
-    "carrera": "Economia",
+    "ceti": 0,
+    "celular": "71957515",
+    "correo": "selenafernandapillcomamani@gmail.com",
+    "fecha_nacimiento": "25/06/2007",
+    "edad": 19,
+    "direccion": "EA Junthuma Fabril C",
+    "ciudad": "El Alto",
     "universidad": "Universidad Mayor de San Andrés",
-    "institucion": "Diaconía FRIF-IFD",
+    "carrera": "Economía",
     "unidad": "Captaciones y Canales",
     "ubicacion": "2 PISO BLOQUE A",
+    "iglesia_nombre": "Iglesia Central El Alto",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
     "supervisor_correo": "angel.ali@bumand.bo",
     "horario_semanal": {
-      "lunes": "08:00 - 11:00",
-      "martes": "08:00 - 10:30",
-      "miercoles": "08:00 - 11:00",
-      "jueves": "08:00 - 10:30"
-    },
-    "iglesia_nombre": "Iglesia Central El Alto"
+      "martes": "08:30 - 12:30",
+      "jueves": "08:30 - 12:30"
+    }
+  },
+  {
+    "ci": "14155448",
+    "lugar_expedicion": "El Alto",
+    "estado_civil": "Soltera",
+    "sexo": "F",
+    "nombre": "Milenka Quispe Coarite",
+    "ceti": 0,
+    "celular": "63155199",
+    "correo": "milenkaquispecoarite@gmail.com",
+    "fecha_nacimiento": "21/06/2006",
+    "edad": 20,
+    "direccion": "z/ Ballivian c/Jose Ch",
+    "ciudad": "El Alto",
+    "universidad": "Universidad Tecnológica Boliviana",
+    "carrera": "Administración de Empresas",
+    "unidad": "Procesos y Normas",
+    "ubicacion": "4 PISO BLOQUE A",
+    "iglesia_nombre": "Iglesia Central El Alto",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
+    "supervisor_correo": "angel.ali@bumand.bo",
+    "horario_semanal": {
+      "lunes": "08:30 - 12:30",
+      "miercoles": "08:30 - 12:30"
+    }
+  },
+  {
+    "ci": "12604724",
+    "lugar_expedicion": "El Alto",
+    "estado_civil": "Soltera",
+    "sexo": "F",
+    "nombre": "Joselin Wara Huanca Paucara",
+    "ceti": 0,
+    "celular": "75263547",
+    "correo": "joselinhuancapaucara@gmail.com",
+    "fecha_nacimiento": "02/03/2000",
+    "edad": 26,
+    "direccion": "Zona Alto Villa Victori",
+    "ciudad": "El Alto",
+    "universidad": "Universidad Pública de El Alto",
+    "carrera": "Contaduría Pública",
+    "unidad": "Cumplimiento",
+    "ubicacion": "3 PISO BLOQUE A",
+    "iglesia_nombre": "Iglesia Central El Alto",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
+    "supervisor_correo": "angel.ali@bumand.bo",
+    "horario_semanal": {
+      "martes": "08:00 - 12:00",
+      "jueves": "08:00 - 12:00"
+    }
+  },
+  {
+    "ci": "9208456",
+    "lugar_expedicion": "El Alto",
+    "estado_civil": "Soltero",
+    "sexo": "M",
+    "nombre": "Johan Ludving Misme Flores",
+    "ceti": 0,
+    "celular": "69865195",
+    "correo": "johan69865195@gmail.com",
+    "fecha_nacimiento": "27/04/2004",
+    "edad": 22,
+    "direccion": "Z.EL MIRADOR, AV.",
+    "ciudad": "El Alto",
+    "universidad": "Universidad Mayor de San Andrés",
+    "carrera": "Informática",
+    "unidad": "Seguridad de la Información",
+    "ubicacion": "3 PISO BLOQUE A",
+    "iglesia_nombre": "Iglesia Central El Alto",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
+    "supervisor_correo": "angel.ali@bumand.bo",
+    "horario_semanal": {
+      "lunes": "08:30 - 12:30",
+      "miercoles": "08:30 - 12:30"
+    }
+  },
+  {
+    "ci": "13627440",
+    "lugar_expedicion": "El Alto",
+    "estado_civil": "Soltero",
+    "sexo": "M",
+    "nombre": "Matias Jose Uri Flores",
+    "ceti": 0,
+    "celular": "72018255",
+    "correo": "matiasjoseuriflores@gmail.com",
+    "fecha_nacimiento": "24/04/2006",
+    "edad": 20,
+    "direccion": "Zona 23 de Marzo Ca",
+    "ciudad": "El Alto",
+    "universidad": "Universidad Mayor de San Andrés",
+    "carrera": "Lingüística e Idiomas",
+    "unidad": "Sostenibilidad y Responsabilidad Diaconal",
+    "ubicacion": "5 PISO BLOQUE A",
+    "iglesia_nombre": "Iglesia Central El Alto",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
+    "supervisor_correo": "angel.ali@bumand.bo",
+    "horario_semanal": {
+      "martes": "08:30 - 12:30",
+      "jueves": "08:30 - 12:30"
+    }
+  },
+  {
+    "ci": "8411610",
+    "lugar_expedicion": "La Paz",
+    "estado_civil": "Soltero",
+    "sexo": "M",
+    "nombre": "Mateo Miguel Cussi Flores",
+    "ceti": 0,
+    "celular": "65120464",
+    "correo": "mateocussi11@gmail.com",
+    "fecha_nacimiento": "11/06/2002",
+    "edad": 24,
+    "direccion": "Z/ BARRIO MUNICIP",
+    "ciudad": "La Paz",
+    "universidad": "Universidad Mayor de San Andrés",
+    "carrera": "Informática",
+    "unidad": "Seguros",
+    "ubicacion": "2 PISO BLOQUE A",
+    "iglesia_nombre": "Iglesia Central El Alto",
+    "clave": "Bumand2026!",
+    "institucion": "Diaconía FRIF-IFD",
+    "supervisor_correo": "angel.ali@bumand.bo",
+    "horario_semanal": {
+      "lunes": "08:30 - 12:30",
+      "miercoles": "08:30 - 12:30"
+    }
   }
+,
+{
+  "ci": "12423846",
+  "nombre": "Fernando Rene Yujra Quispe",
+  "correo": "fernando.yujra@diaconia.bo",
+  "clave": "Bumand2026!",
+  "universidad": "Universidad Mayor de San Andrés",
+  "carrera": "Ingeniería Civil",
+  "unidad": "Oficina Central",
+  "institucion": "Diaconía FRIF-IFD",
+  "modalidad_carrera": "Semestral",
+  "tipo_beca": "650",
+  "comentario_academico": "reprobo 2 materias, materia de maquinarias aun no hay notas",
+  "comentario_iglesia": "Comentarios positivos"
+},
+{
+  "ci": "9927657",
+  "nombre": "Luis Santiago Enrriquez Conde",
+  "correo": "luis.enrriquez@diaconia.bo",
+  "clave": "Bumand2026!",
+  "universidad": "Universidad Mayor de San Andrés",
+  "carrera": "Ciencias de la Comunicación Social",
+  "unidad": "Oficina Central",
+  "institucion": "Diaconía FRIF-IFD",
+  "modalidad_carrera": "Anual",
+  "tipo_beca": "650",
+  "comentario_academico": "Aprobado",
+  "comentario_iglesia": "Debilidad, falta de tiempo persona muy proactiva con comentarios muy positivos"
+},
+{
+  "ci": "7077936",
+  "nombre": "Mario Catunta Laime",
+  "correo": "mario.catunta@diaconia.bo",
+  "clave": "Bumand2026!",
+  "universidad": "Universidad Pública de El Alto",
+  "carrera": "Economía",
+  "unidad": "Oficina Central",
+  "institucion": "Diaconía FRIF-IFD",
+  "modalidad_carrera": "Mixta",
+  "tipo_beca": "250",
+  "comentario_academico": "Aprobado",
+  "comentario_iglesia": "Tiende a postergar responsabilidades y descuida otras áreas"
+},
+{
+  "ci": "6950093",
+  "nombre": "Jhoselin Quispe Morales",
+  "correo": "jhoselin.quispe@diaconia.bo",
+  "clave": "Bumand2026!",
+  "universidad": "Universidad Mayor de San Andrés",
+  "carrera": "Comunicación Social",
+  "unidad": "Oficina Central",
+  "institucion": "Diaconía FRIF-IFD",
+  "modalidad_carrera": "Anual",
+  "tipo_beca": "650",
+  "comentario_academico": "Aprobado",
+  "comentario_iglesia": "Comentarios Positivos"
+},
+{
+  "ci": "10369104",
+  "nombre": "Monica Mamani Mamani",
+  "correo": "monica.mamani@diaconia.bo",
+  "clave": "Bumand2026!",
+  "universidad": "Universidad Mayor de San Andrés",
+  "carrera": "Lingüística e Idiomas",
+  "unidad": "Oficina Central",
+  "institucion": "Diaconía FRIF-IFD",
+  "modalidad_carrera": "Semestral",
+  "tipo_beca": "650",
+  "comentario_academico": "Aprobado",
+  "comentario_iglesia": "Comentarios muy positivos"
+},
+{
+  "ci": "10930509",
+  "nombre": "Cristhian Alejandro Soto Apaza",
+  "correo": "cristhian.soto@diaconia.bo",
+  "clave": "Bumand2026!",
+  "universidad": "Universidad Pública de El Alto",
+  "carrera": "Administración de Empresas",
+  "unidad": "Oficina Central",
+  "institucion": "Diaconía FRIF-IFD",
+  "modalidad_carrera": "Anual",
+  "tipo_beca": "650",
+  "comentario_academico": "Egresado",
+  "comentario_iglesia": "Trabajar paciencia"
+},
+{
+  "ci": "10915872",
+  "nombre": "Ruth Alesandra Choque Huanca",
+  "correo": "ruth.choque@diaconia.bo",
+  "clave": "Bumand2026!",
+  "universidad": "Universidad Central Sede La Paz",
+  "carrera": "Ingeniería comercial",
+  "unidad": "Oficina Central",
+  "institucion": "Diaconía FRIF-IFD",
+  "modalidad_carrera": "Semestral",
+  "tipo_beca": "250",
+  "comentario_academico": "Aprobado",
+  "comentario_iglesia": "Comentarios positivos"
+}
 ];
 
 export const IGLESIAS_SEMILLA: IglesiaSemilla[] = [

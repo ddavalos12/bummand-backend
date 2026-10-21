@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException } from '@nestjs/common';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { UnauthorizedException, NotFoundException, ConflictException } from '@nestjs/common';
 import { AutenticacionServicio } from './autenticacion.servicio';
 import { UsuariosServicio } from '../usuarios/usuarios.servicio';
-import { Rol, EstadoUsuario } from '../usuarios/entidades/usuario.entidad';
+import { Usuario, Rol, EstadoUsuario } from '../usuarios/entidades/usuario.entidad';
+import { Becario } from '../becarios/entidades/becario.entidad';
 import { hashearContrasena } from '../../utilidades/hash.utilidad';
 
 jest.mock('@nestjs/jwt', () => {
@@ -18,11 +20,24 @@ import { JwtService } from '@nestjs/jwt';
 describe('AutenticacionServicio', () => {
   let servicio: AutenticacionServicio;
   let usuariosServicio: jest.Mocked<Partial<UsuariosServicio>>;
+  let becarioRepo: any;
+  let usuarioRepo: any;
   let jwtService: any;
 
   beforeEach(async () => {
     usuariosServicio = {
       obtenerPorCorreoConRelaciones: jest.fn(),
+    };
+
+    becarioRepo = {
+      find: jest.fn(),
+      save: jest.fn().mockImplementation((b) => Promise.resolve(b)),
+    };
+
+    usuarioRepo = {
+      findOne: jest.fn(),
+      create: jest.fn().mockImplementation((u) => ({ id: 99, ...u })),
+      save: jest.fn().mockImplementation((u) => Promise.resolve({ id: 99, ...u })),
     };
 
     jwtService = new (JwtService as any)();
@@ -32,6 +47,8 @@ describe('AutenticacionServicio', () => {
         AutenticacionServicio,
         { provide: UsuariosServicio, useValue: usuariosServicio },
         { provide: JwtService, useValue: jwtService },
+        { provide: getRepositoryToken(Becario), useValue: becarioRepo },
+        { provide: getRepositoryToken(Usuario), useValue: usuarioRepo },
       ],
     }).compile();
 
@@ -115,5 +132,81 @@ describe('AutenticacionServicio', () => {
         contrasena: 'Bumand2026!',
       }),
     ).rejects.toThrow(UnauthorizedException);
+  });
+
+  describe('registrarBecario', () => {
+    it('debe registrar y vincular exitosamente un usuario becario cuando el CI coincide con la lista del admin', async () => {
+      const becarioRoster = {
+        id: 7,
+        ci: '13696496',
+        nombre: 'Adai Belen Huayta Cardozo',
+        usuario_id: null,
+        usuario: null,
+      };
+
+      becarioRepo.find.mockResolvedValue([becarioRoster]);
+      usuarioRepo.findOne.mockResolvedValue(null);
+
+      const resultado = await servicio.registrarBecario({
+        ci: '13696496',
+        correo: 'adaibelen017@gmail.com',
+        contrasena: 'Bumand2026!',
+      });
+
+      expect(resultado.mensaje).toContain('vinculado');
+      expect(resultado.token).toBe('jwt_token_simulado');
+      expect(resultado.usuario.rol).toBe(Rol.BECARIO);
+      expect(resultado.usuario.becario_id).toBe(7);
+      expect(becarioRoster.usuario_id).toBe(99);
+    });
+
+    it('debe rechazar con NotFoundException si el CI no coincide con ningún becario registrado por el admin', async () => {
+      becarioRepo.find.mockResolvedValue([
+        { id: 1, ci: '1234567', usuario_id: null },
+      ]);
+
+      await expect(
+        servicio.registrarBecario({
+          ci: '9999999',
+          correo: 'noexiste@gmail.com',
+          contrasena: 'Bumand2026!',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('debe rechazar con ConflictException si el becario ya cuenta con usuario activo', async () => {
+      becarioRepo.find.mockResolvedValue([
+        {
+          id: 5,
+          ci: '10028341',
+          nombre: 'Nilda Churata',
+          usuario_id: 15,
+          usuario: { id: 15, correo: 'nilda@bumand.bo' },
+        },
+      ]);
+
+      await expect(
+        servicio.registrarBecario({
+          ci: '10028341',
+          correo: 'nuevo@correo.com',
+          contrasena: 'Bumand2026!',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('debe rechazar con ConflictException si el correo ya se encuentra registrado', async () => {
+      becarioRepo.find.mockResolvedValue([
+        { id: 2, ci: '9160054', usuario_id: null, usuario: null },
+      ]);
+      usuarioRepo.findOne.mockResolvedValue({ id: 80, correo: 'ya_existe@correo.com' });
+
+      await expect(
+        servicio.registrarBecario({
+          ci: '9160054',
+          correo: 'ya_existe@correo.com',
+          contrasena: 'Bumand2026!',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
   });
 });

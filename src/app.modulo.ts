@@ -11,6 +11,7 @@ import { LugarPractica } from './modulos/lugares-practica/entidades/lugar-practi
 import { Becario } from './modulos/becarios/entidades/becario.entidad';
 import { HorarioApoyo } from './modulos/becarios/entidades/horario-apoyo.entidad';
 import { AsignacionPractica } from './modulos/becarios/entidades/asignacion-practica.entidad';
+import { ConfiguracionInstitucional } from './modulos/becarios/entidades/configuracion-institucional.entidad';
 import { RegistroAsistencia } from './modulos/asistencia/entidades/registro-asistencia.entidad';
 import { SolicitudPasajes } from './modulos/pasajes/entidades/solicitud-pasaje.entidad';
 import { Recorrido } from './modulos/pasajes/entidades/recorrido.entidad';
@@ -19,6 +20,8 @@ import { PeriodoEvaluacion } from './modulos/evaluaciones/entidades/periodo-eval
 import { Evaluador } from './modulos/evaluaciones/entidades/evaluador.entidad';
 import { Evaluacion } from './modulos/evaluaciones/entidades/evaluacion.entidad';
 import { EvaluacionPastor } from './modulos/evaluaciones/entidades/evaluacion-pastor.entidad';
+import { PreguntaBienestar } from './modulos/evaluaciones/entidades/pregunta-bienestar.entidad';
+import { CasoSeguimientoPastoral } from './modulos/evaluaciones/entidades/caso-seguimiento-pastoral.entidad';
 import { AprobacionPracticas } from './modulos/practicas/entidades/aprobacion-practicas.entidad';
 import { Notificacion } from './modulos/notificaciones/entidades/notificacion.entidad';
 import { ReporteGenerado } from './modulos/pdf/entidades/reporte-generado.entidad';
@@ -71,6 +74,7 @@ import { RefrigeriosModulo } from './modulos/refrigerios/refrigerios.modulo';
         Becario,
         HorarioApoyo,
         AsignacionPractica,
+        ConfiguracionInstitucional,
         RegistroAsistencia,
         SolicitudPasajes,
         Recorrido,
@@ -79,6 +83,8 @@ import { RefrigeriosModulo } from './modulos/refrigerios/refrigerios.modulo';
         Evaluador,
         Evaluacion,
         EvaluacionPastor,
+        PreguntaBienestar,
+        CasoSeguimientoPastoral,
         AprobacionPracticas,
         Notificacion,
         ReporteGenerado,

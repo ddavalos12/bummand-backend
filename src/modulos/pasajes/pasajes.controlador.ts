@@ -5,7 +5,7 @@ import { SolicitudPasajes } from './entidades/solicitud-pasaje.entidad';
 import { TarifaTransporte } from './entidades/tarifa-transporte.entidad';
 import { ParadaTransporte } from './entidades/parada-transporte.entidad';
 import { CrearSolicitudPasajeDto } from './dtos/crear-solicitud-pasaje.dto';
-import { AgregarRecorridoDto } from './dtos/agregar-recorrido.dto';
+import { AgregarRecorridoDto, ItemRecorridoDto } from './dtos/agregar-recorrido.dto';
 import { CrearTarifaDto } from './dtos/crear-tarifa.dto';
 import { ActualizarTarifaDto } from './dtos/actualizar-tarifa.dto';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
@@ -93,7 +93,7 @@ export class PasajesControlador {
     return this.pasajesServicio.sembrarParadas();
   }
 
-  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Roles(Rol.BECARIO)
   @Get('mis-solicitudes')
   @ApiOperation({
     summary: 'Listar solicitudes de pasajes del usuario autenticado',
@@ -104,7 +104,7 @@ export class PasajesControlador {
     return this.pasajesServicio.obtenerPorBecario(usuario.id);
   }
 
-  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Roles(Rol.BECARIO)
   @Post('confirmar-datos')
   @ApiOperation({
     summary: 'Confirmar datos del becario para la declaración de pasajes',
@@ -126,7 +126,7 @@ export class PasajesControlador {
     return this.pasajesServicio.confirmarDatos(usuario.id, periodo);
   }
 
-  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Roles(Rol.BECARIO)
   @Post()
   @ApiOperation({
     summary: 'Crear solicitud mensual de pasajes',
@@ -139,19 +139,30 @@ export class PasajesControlador {
     return this.pasajesServicio.crear(crearSolicitudPasajeDto);
   }
 
-  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Roles(Rol.BECARIO)
   @Post('recorridos')
   @ApiOperation({
     summary: 'Registrar tramo de transporte diario',
-    description: 'Añade un recorrido (ida o vuelta) con tarifa, origen, destino y coordenadas GPS, recalculando el 80% en centavos.',
+    description: 'Añade un recorrido (ida o vuelta) con tarifa, origen, destino, medio de transporte y trazabilidad de calles, recalculando el 80% en centavos.',
   })
   @ApiResponse({ status: 201, description: 'Recorrido registrado y totales actualizados.' })
-  agregarRecorrido(@Body() agregarRecorridoDto: AgregarRecorridoDto, @UsuarioActual() usuario: Usuario) {
-    agregarRecorridoDto.becario_id = usuario.id;
-    return this.pasajesServicio.agregarRecorrido(agregarRecorridoDto);
+  agregarRecorrido(
+    @Body() dto: AgregarRecorridoDto | ItemRecorridoDto | (AgregarRecorridoDto | ItemRecorridoDto)[],
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    if (Array.isArray(dto)) {
+      dto.forEach((item) => {
+        if (!item.becario_id) item.becario_id = usuario.id;
+      });
+      return this.pasajesServicio.agregarRecorridos(dto);
+    }
+    if (!dto.becario_id) {
+      dto.becario_id = usuario.id;
+    }
+    return this.pasajesServicio.agregarRecorrido(dto);
   }
 
-  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Roles(Rol.BECARIO)
   @Delete('recorridos/:id')
   @ApiOperation({
     summary: 'Eliminar tramo de transporte registrado',
@@ -204,7 +215,7 @@ export class PasajesControlador {
     return this.pasajesServicio.obtenerPorId(id);
   }
 
-  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Roles(Rol.BECARIO)
   @Post(':id/enviar')
   @ApiOperation({
     summary: 'Enviar solicitud formal a revisión (Regla del Día 24)',
@@ -220,7 +231,7 @@ export class PasajesControlador {
     return this.pasajesServicio.enviarSolicitud(id, usuario.id);
   }
 
-  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Roles(Rol.BECARIO)
   @Patch(':id/enviar')
   @ApiOperation({
     summary: 'Enviar solicitud formal a revisión (Alias PATCH)',

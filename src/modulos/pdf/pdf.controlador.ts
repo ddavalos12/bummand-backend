@@ -1,5 +1,5 @@
-import { Controller, Get, Param, Res, ParseIntPipe, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Param, Query, Res, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { PdfServicio } from './pdf.servicio';
 import { EvaluacionesServicio } from '../evaluaciones/evaluaciones.servicio';
@@ -121,6 +121,83 @@ export class PdfControlador {
     respuesta.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename=Acta_Asistencia_Evento_${id}.pdf`,
+      'Content-Length': buffer.length,
+    });
+
+    respuesta.end(buffer);
+  }
+
+  @Get('evaluacion-semestral')
+  @ApiOperation({
+    summary: 'Generar y descargar informe consolidado de evaluación semestral en PDF',
+    description: 'Genera el PDF oficial en formato apaisado (landscape) con las 14 columnas, observaciones cualitativas, rangos de aprobación y firmas de conformidad.',
+  })
+  @ApiQuery({ name: 'periodo', required: false, description: 'Periodo o gestión (ej. II-2025)' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({
+    status: 200,
+    description: 'Archivo binario del consolidado semestral PDF descargado.',
+    schema: {
+      type: 'string',
+      format: 'binary',
+    },
+  })
+  async generarReporteEvaluacionSemestral(
+    @Query('periodo') periodo: string | undefined,
+    @Res() respuesta: Response,
+  ) {
+    const consolidado = await this.evaluaciones_servicio.obtenerConsolidadoSemestral(periodo);
+    const buffer = await this.pdf_servicio.generarReporteEvaluacionSemestralPdf(consolidado.registros);
+
+    const periodo_limpio = (periodo || 'II_2025').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const nombre_archivo = `Evaluacion_Semestre_${periodo_limpio}.pdf`;
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${nombre_archivo}`,
+      'Content-Length': buffer.length,
+    });
+
+    respuesta.end(buffer);
+  }
+
+  @Get('corte-asistencia')
+  @ApiOperation({
+    summary: 'Generar y descargar informe de corte de asistencia semanal en PDF con Puppeteer',
+    description: 'Genera el PDF oficial institucional de auditoría de corte con métricas de puntualidad, retrasos y horas.',
+  })
+  @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio del corte (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin del corte (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'tipo', required: false, description: 'Tipo de actividad (todas, practicas, escuela_lideres, acciones_servicio)' })
+  @ApiQuery({ name: 'supervisor_id', required: false, description: 'ID opcional del supervisor para filtrar' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({
+    status: 200,
+    description: 'Archivo binario del corte de asistencia en PDF descargado.',
+    schema: {
+      type: 'string',
+      format: 'binary',
+    },
+  })
+  async generarCorteAsistencia(
+    @Query('fecha_inicio') fecha_inicio: string | undefined,
+    @Query('fecha_fin') fecha_fin: string | undefined,
+    @Query('tipo') tipo: string | undefined,
+    @Query('supervisor_id') supervisor_id: number | undefined,
+    @Res() respuesta: Response,
+  ) {
+    const buffer = await this.pdf_servicio.generarCorteAsistenciaPdf({
+      fecha_inicio,
+      fecha_fin,
+      tipo,
+      supervisor_id: supervisor_id ? Number(supervisor_id) : undefined,
+    });
+
+    const nombre_archivo = `Corte_Asistencia_${(fecha_inicio || 'semanal').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${nombre_archivo}`,
       'Content-Length': buffer.length,
     });
 

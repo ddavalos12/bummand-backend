@@ -41,4 +41,14 @@ export class CrearJustificacionDto {
   @IsOptional()
   @IsNumber({}, { message: 'El ID del becario debe ser numérico' })
   becario_id?: number;
+
+  @ApiProperty({ example: 'https://storage.bumand.bo/pruebas/cert_medico.pdf', description: 'URL del archivo probatorio', required: false })
+  @IsOptional()
+  @IsString()
+  archivo_prueba_url?: string;
+
+  @ApiProperty({ example: 'cert_medico.pdf', description: 'Nombre original del archivo de prueba', required: false })
+  @IsOptional()
+  @IsString()
+  nombre_archivo_prueba?: string;
 }

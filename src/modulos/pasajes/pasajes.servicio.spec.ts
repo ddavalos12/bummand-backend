@@ -180,5 +180,122 @@ describe('PasajesServicio', () => {
       expect(todas.length).toBeGreaterThan(0);
     });
   });
+
+  describe('Trazabilidad de calles, medios de transporte y teleférico en recorridos', () => {
+    it('debe persistir calles_declaradas, medio_transporte y detalle_tramos_json al agregar un recorrido', async () => {
+      solicitud_repo.findOne.mockResolvedValue({
+        id: 1,
+        becario_id: 5,
+        estado: EstadoSolicitud.BORRADOR,
+        monto_total: 0,
+        monto_devolucion: 0,
+      });
+
+      recorrido_repo.find.mockResolvedValue([]);
+
+      await servicio.agregarRecorrido({
+        becario_id: 5,
+        fecha: '2026-09-24',
+        tramo: Tramo.IDA,
+        origen: 'Estación 16 de Julio (Línea Roja)',
+        destino: 'Oficina Central Diaconía',
+        tarifa: 3.0,
+        calles_declaradas: 'Av. Panorámica, Estación Central, Av. Montes',
+        medio_transporte: 'Mi Teleférico',
+        detalle_tramos_json: JSON.stringify([{ tramo: 1, linea: 'Roja', costo: 3.0 }]),
+      });
+
+      expect(recorrido_repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          calles_declaradas: 'Av. Panorámica, Estación Central, Av. Montes',
+          medio_transporte: 'Mi Teleférico',
+          detalle_tramos_json: JSON.stringify([{ tramo: 1, linea: 'Roja', costo: 3.0 }]),
+        }),
+      );
+      expect(recorrido_repo.save).toHaveBeenCalled();
+    });
+
+    it('debe permitir agregar múltiples recorridos con agregarRecorridos', async () => {
+      solicitud_repo.findOne.mockResolvedValue({
+        id: 1,
+        becario_id: 5,
+        estado: EstadoSolicitud.BORRADOR,
+        monto_total: 0,
+        monto_devolucion: 0,
+      });
+
+      recorrido_repo.find.mockResolvedValue([]);
+
+      const items = [
+        {
+          becario_id: 5,
+          fecha: '2026-09-24',
+          tramo: Tramo.IDA,
+          origen: 'Ceja El Alto',
+          destino: 'Sede Central',
+          tarifa: 2.5,
+          calles_declaradas: 'Av. 6 de Marzo',
+          medio_transporte: 'Minibús',
+        },
+        {
+          becario_id: 5,
+          fecha: '2026-09-24',
+          tramo: Tramo.VUELTA,
+          origen: 'Sede Central',
+          destino: 'Ceja El Alto',
+          tarifa: 2.5,
+          calles_declaradas: 'Autopista La Paz - El Alto',
+          medio_transporte: 'Minibús',
+        },
+      ];
+
+      const resultado = await servicio.agregarRecorridos(items);
+      expect(resultado).toHaveLength(2);
+      expect(recorrido_repo.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('debe retornar los campos de trazabilidad en obtenerTodas y obtenerPorId', async () => {
+      solicitud_repo.find.mockResolvedValue([
+        {
+          id: 1,
+          monto_total: 6.0,
+          monto_devolucion: 4.8,
+          recorridos: [
+            {
+              id: 10,
+              tarifa: 3.0,
+              calles_declaradas: 'Av. Busch, Plaza Villarroel',
+              medio_transporte: 'Mi Teleférico',
+              detalle_tramos_json: '{"linea":"Blanca"}',
+            },
+          ],
+        },
+      ]);
+
+      const todas = await servicio.obtenerTodas();
+      expect(todas[0].recorridos[0].calles_declaradas).toBe('Av. Busch, Plaza Villarroel');
+      expect(todas[0].recorridos[0].medio_transporte).toBe('Mi Teleférico');
+      expect(todas[0].recorridos[0].detalle_tramos_json).toBe('{"linea":"Blanca"}');
+
+      solicitud_repo.findOne.mockResolvedValue({
+        id: 1,
+        monto_total: 6.0,
+        monto_devolucion: 4.8,
+        recorridos: [
+          {
+            id: 10,
+            tarifa: 3.0,
+            calles_declaradas: 'Av. Busch, Plaza Villarroel',
+            medio_transporte: 'Mi Teleférico',
+            detalle_tramos_json: '{"linea":"Blanca"}',
+          },
+        ],
+      });
+
+      const una = await servicio.obtenerPorId(1);
+      expect(una.recorridos[0].calles_declaradas).toBe('Av. Busch, Plaza Villarroel');
+      expect(una.recorridos[0].medio_transporte).toBe('Mi Teleférico');
+    });
+  });
 });
 

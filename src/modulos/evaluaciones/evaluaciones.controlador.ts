@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Put, Body, Param, Patch, ParseIntPipe, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Body, Param, Patch, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { EvaluacionesServicio } from './evaluaciones.servicio';
 import { CrearEvaluacionDto } from './dtos/crear-evaluacion.dto';
 import { GuardarFormularioF03Dto } from './dtos/guardar-formulario-f03.dto';
@@ -11,10 +11,16 @@ import { ModuloEvaluacion } from './entidades/modulo-evaluacion.entidad';
 import { PeriodoEvaluacion, EstadoPeriodo } from './entidades/periodo-evaluacion.entidad';
 import { Evaluador } from './entidades/evaluador.entidad';
 import { EvaluacionPastor } from './entidades/evaluacion-pastor.entidad';
+import { PreguntaBienestar } from './entidades/pregunta-bienestar.entidad';
+import { ReceptorAcademicaDto } from './dtos/receptor-academica.dto';
+import { ReceptorMentorQrDto } from './dtos/receptor-mentor-qr.dto';
+import { ReceptorSocioeconomicaDto } from './dtos/receptor-socioeconomica.dto';
+import { SolicitarCodigoTutorDto, VerificarCodigoTutorDto } from './dtos/verificacion-tutor.dto';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
 import { Roles } from '../autenticacion/roles.decorador';
-import { Rol } from '../usuarios/entidades/usuario.entidad';
+import { UsuarioActual } from '../autenticacion/usuario-actual.decorador';
+import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 
 @ApiTags('Evaluaciones')
 @ApiBearerAuth('JWT-auth')
@@ -22,6 +28,97 @@ import { Rol } from '../usuarios/entidades/usuario.entidad';
 @Controller('evaluaciones')
 export class EvaluacionesControlador {
   constructor(private readonly evaluaciones_servicio: EvaluacionesServicio) {}
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('tutor/solicitar-codigo')
+  @ApiOperation({
+    summary: 'Solicitar código OTP de 6 dígitos para verificación del Supervisor/Tutor',
+    description: 'Genera un código temporal de 6 dígitos y lo envía inmediatamente como notificación a la pantalla del Supervisor asignado.',
+  })
+  @ApiResponse({ status: 201, description: 'Código generado y notificado a la pantalla del supervisor.' })
+  solicitarCodigoTutor(
+    @Body() dto: SolicitarCodigoTutorDto,
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    return this.evaluaciones_servicio.solicitarCodigoTutor(dto, usuario);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('tutor/verificar-codigo')
+  @ApiOperation({
+    summary: 'Verificar identidad del Supervisor/Tutor mediante código de notificación o credenciales',
+    description: 'Valida el código de 6 dígitos enviado a la pantalla del supervisor o sus credenciales institucionales para desbloquear el formulario de evaluación.',
+  })
+  @ApiResponse({ status: 200, description: 'Identidad del supervisor verificada con éxito.' })
+  verificarCodigoTutor(@Body() dto: VerificarCodigoTutorDto) {
+    return this.evaluaciones_servicio.verificarCodigoTutor(dto);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('receptor/academica')
+  @ApiOperation({
+    summary: 'Receptor de autoevaluación académica (Módulo 2)',
+    description: 'Recibe promedio académico, materias, récord/historial académico y respuestas del becario.',
+  })
+  @ApiResponse({ status: 201, description: 'Autoevaluación académica procesada con éxito.', type: Evaluacion })
+  procesarReceptorAcademica(@Body() dto: ReceptorAcademicaDto): Promise<Evaluacion> {
+    return this.evaluaciones_servicio.procesarReceptorAcademica(dto);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('receptor/mentor-qr')
+  @ApiOperation({
+    summary: 'Receptor de evaluación mentor / prácticas vía QR (Módulo 3)',
+    description: 'Procesa respuestas de rúbrica Likert enviadas por el mentor o supervisor de prácticas.',
+  })
+  @ApiResponse({ status: 201, description: 'Evaluación del mentor procesada con éxito.', type: Evaluacion })
+  procesarReceptorMentorQr(@Body() dto: ReceptorMentorQrDto): Promise<Evaluacion> {
+    return this.evaluaciones_servicio.procesarReceptorMentorQr(dto);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('receptor/socioeconomica')
+  @ApiOperation({
+    summary: 'Receptor de evaluación socioeconómica (Módulo 5)',
+    description: 'Procesa datos del formulario socioeconómico y asigna el semáforo de vulnerabilidad.',
+  })
+  @ApiResponse({ status: 201, description: 'Evaluación socioeconómica procesada con éxito.', type: Evaluacion })
+  procesarReceptorSocioeconomica(@Body() dto: ReceptorSocioeconomicaDto): Promise<Evaluacion> {
+    return this.evaluaciones_servicio.procesarReceptorSocioeconomica(dto);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('cuestionario-bienestar')
+  @ApiOperation({
+    summary: 'Obtener cuestionario de bienestar universitario (26 preguntas)',
+    description: 'Retorna las 26 preguntas oficiales ordenadas. Si la tabla está vacía, se inicializa automáticamente.',
+  })
+  @ApiResponse({ status: 200, description: 'Catálogo de preguntas de bienestar.', type: [PreguntaBienestar] })
+  obtenerCuestionarioBienestar(): Promise<PreguntaBienestar[]> {
+    return this.evaluaciones_servicio.obtenerCuestionarioBienestar();
+  }
+
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Put('cuestionario-bienestar')
+  @ApiOperation({
+    summary: 'Actualizar o personalizar cuestionario de bienestar universitario',
+    description: 'Permite a la institución modificar enunciados, incisos, puntajes o añadir preguntas.',
+  })
+  @ApiResponse({ status: 200, description: 'Cuestionario actualizado con éxito.', type: [PreguntaBienestar] })
+  actualizarCuestionarioBienestar(@Body() payload: any): Promise<PreguntaBienestar[]> {
+    return this.evaluaciones_servicio.actualizarCuestionarioBienestar(payload);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('consolidado-semestral')
+  @ApiOperation({
+    summary: 'Obtener consolidado y matriz semestral de evaluaciones',
+    description: 'Retorna los criterios oficiales (23.jpeg), rangos de aprobación y la nómina completa de 21 becarios con notas y comentarios de Evaluacion_semestre_II.',
+  })
+  @ApiResponse({ status: 200, description: 'Consolidado semestral obtenido con éxito.' })
+  obtenerConsolidadoSemestral(@Query('periodo') periodo?: string) {
+    return this.evaluaciones_servicio.obtenerConsolidadoSemestral(periodo);
+  }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post()
@@ -99,6 +196,79 @@ export class EvaluacionesControlador {
     @Param('periodo_id', ParseIntPipe) periodo_id: number,
   ) {
     return this.evaluaciones_servicio.obtenerSeguimiento(becario_id, periodo_id);
+  }
+
+  // ==============================================================
+  // GESTIÓN DE CASOS DE SEGUIMIENTO PASTORAL Y MENTORÍA
+  // ==============================================================
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('casos-pastorales')
+  @ApiOperation({
+    summary: 'Listar casos de seguimiento pastoral y mentoría',
+    description: 'Devuelve los casos de becarios que requieren tutoría pastoral, con estados (PENDIENTE, EN_TUTORIA, RESUELTO).',
+  })
+  @ApiQuery({ name: 'estado', required: false, description: 'Filtrar por estado (todos, PENDIENTE, EN_TUTORIA, RESUELTO)' })
+  @ApiQuery({ name: 'becario_id', required: false, description: 'Filtrar por ID de becario' })
+  obtenerCasosPastorales(
+    @Query('estado') estado?: string,
+    @Query('becario_id') becario_id?: number,
+  ) {
+    return this.evaluaciones_servicio.obtenerCasosPastorales({
+      estado,
+      becario_id: becario_id ? Number(becario_id) : undefined,
+    });
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('casos-pastorales')
+  @ApiOperation({
+    summary: 'Registrar un nuevo caso de seguimiento pastoral',
+    description: 'Permite a la coordinación o tutor crear un expediente de acompañamiento pastoral o derivado de F-03.',
+  })
+  crearCasoPastoral(
+    @Body()
+    dto: {
+      becario_id: number;
+      observacion_pastoral: string;
+      origen?: string;
+      prioridad?: any;
+      plan_accion?: string;
+      responsable_nombre?: string;
+    },
+  ) {
+    return this.evaluaciones_servicio.crearCasoPastoral(dto);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Put('casos-pastorales/:id/gestionar')
+  @ApiOperation({
+    summary: 'Actualizar plan de acción, estado o registrar avance en caso pastoral',
+  })
+  gestionarCasoPastoral(
+    @Param('id', ParseIntPipe) id: number,
+    @Body()
+    dto: {
+      plan_accion?: string;
+      estado?: any;
+      prioridad?: any;
+      responsable_nombre?: string;
+      nueva_nota?: { autor: string; rol_autor: string; contenido: string; acuerdos?: string };
+    },
+  ) {
+    return this.evaluaciones_servicio.gestionarCasoPastoral(id, dto);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('casos-pastorales/:id/resolver')
+  @ApiOperation({
+    summary: 'Dar por superado y resolver caso de seguimiento pastoral',
+  })
+  resolverCasoPastoral(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('conclusion') conclusion: string,
+  ) {
+    return this.evaluaciones_servicio.resolverCasoPastoral(id, conclusion);
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)

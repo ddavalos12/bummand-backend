@@ -40,6 +40,21 @@ export class Evaluacion {
   @Column({ name: 'archivo_pdf', type: 'varchar', length: 255, nullable: true })
   archivo_pdf: string;
 
+  @Column({ name: 'archivo_record_academico', type: 'text', nullable: true })
+  archivo_record_academico: string | null;
+
+  @Column({ name: 'archivo_historial_academico', type: 'text', nullable: true })
+  archivo_historial_academico: string | null;
+
+  @Column({ name: 'promedio_academico', type: 'decimal', precision: 5, scale: 2, nullable: true })
+  promedio_academico: number | null;
+
+  @Column({ name: 'datos_formulario', type: 'jsonb', nullable: true })
+  datos_formulario: Record<string, unknown> | null;
+
+  @Column({ name: 'semaforo_socioeconomico', type: 'varchar', length: 20, nullable: true })
+  semaforo_socioeconomico: string | null;
+
   @Column({ name: 'fecha_evaluacion', type: 'date', nullable: true })
   fecha_evaluacion: Date;
 

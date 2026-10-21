@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   ParseIntPipe,
@@ -63,6 +64,19 @@ export class EventosControlador {
     @Body() actualizarEventoDto: ActualizarEventoDto,
   ): Promise<Evento> {
     return this.eventos_servicio.actualizar(id, actualizarEventoDto);
+  }
+
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'Eliminar una acción de servicio',
+    description: 'Elimina permanentemente una convocatoria de evento del sistema.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador del evento', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Evento eliminado exitosamente.' })
+  @ApiResponse({ status: 404, description: 'Evento no encontrado.' })
+  eliminar(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    return this.eventos_servicio.eliminar(id);
   }
 
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)

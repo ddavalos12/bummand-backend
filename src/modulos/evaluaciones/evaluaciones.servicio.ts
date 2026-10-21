@@ -4,13 +4,37 @@ import { Repository } from 'typeorm';
 import { Evaluacion, EstadoEvaluacion } from './entidades/evaluacion.entidad';
 import { ModuloEvaluacion } from './entidades/modulo-evaluacion.entidad';
 import { PeriodoEvaluacion, EstadoPeriodo } from './entidades/periodo-evaluacion.entidad';
-import { Evaluador } from './entidades/evaluador.entidad';
+import { Evaluador, TipoEvaluador } from './entidades/evaluador.entidad';
 import { EvaluacionPastor } from './entidades/evaluacion-pastor.entidad';
+import { PreguntaBienestar } from './entidades/pregunta-bienestar.entidad';
+import {
+  CasoSeguimientoPastoral,
+  EstadoCasoPastoral,
+  PrioridadCasoPastoral,
+} from './entidades/caso-seguimiento-pastoral.entidad';
+import { PREGUNTAS_BIENESTAR_DEFECTO } from './constantes/preguntas-bienestar.constantes';
+import {
+  CRITERIOS_OFICIALES_TABLA,
+  RANGOS_APROBACION_OFICIALES,
+  REGISTROS_CONSOLIDADO_SEM_II,
+  RegistroConsolidadoSemestral,
+  CriteriosOficiales,
+  RangoAprobacion,
+} from './constantes/consolidado-semestral-datos.constantes';
 import { CrearEvaluacionDto } from './dtos/crear-evaluacion.dto';
 import { GuardarFormularioF03Dto } from './dtos/guardar-formulario-f03.dto';
 import { CrearPeriodoEvaluacionDto } from './dtos/crear-periodo-evaluacion.dto';
 import { ActualizarPeriodoEvaluacionDto } from './dtos/actualizar-periodo-evaluacion.dto';
+import { ReceptorAcademicaDto } from './dtos/receptor-academica.dto';
+import { ReceptorMentorQrDto } from './dtos/receptor-mentor-qr.dto';
+import { ReceptorSocioeconomicaDto } from './dtos/receptor-socioeconomica.dto';
+import { SolicitarCodigoTutorDto, VerificarCodigoTutorDto } from './dtos/verificacion-tutor.dto';
 import { BibliaServicio } from '../biblia/biblia.servicio';
+import { Becario } from '../becarios/entidades/becario.entidad';
+import { Usuario, Rol } from '../usuarios/entidades/usuario.entidad';
+import { NotificacionesServicio } from '../notificaciones/notificaciones.servicio';
+import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
+import { compararContrasena } from '../../utilidades/hash.utilidad';
 
 export const PESOS_PONDERADOS_MODULOS: Record<
   number,
@@ -68,6 +92,11 @@ export interface ResultadoCalificacionTotal {
 
 @Injectable()
 export class EvaluacionesServicio {
+  private readonly codigos_tutor = new Map<
+    number,
+    { codigo: string; expira: number; supervisor_nombre: string; supervisor_correo: string }
+  >();
+
   constructor(
     @InjectRepository(Evaluacion)
     private readonly evaluacion_repo: Repository<Evaluacion>,
@@ -80,7 +109,23 @@ export class EvaluacionesServicio {
     @InjectRepository(EvaluacionPastor)
     private readonly evaluacion_pastor_repo: Repository<EvaluacionPastor>,
     @Optional()
+    @InjectRepository(PreguntaBienestar)
+    private readonly pregunta_bienestar_repo?: Repository<PreguntaBienestar>,
+    @Optional()
+    @InjectRepository(CasoSeguimientoPastoral)
+    private readonly caso_pastoral_repo?: Repository<CasoSeguimientoPastoral>,
+    @Optional()
     private readonly biblia_servicio?: BibliaServicio,
+    @Optional()
+    @InjectRepository(Becario)
+    private readonly becario_repo?: Repository<Becario>,
+    @Optional()
+    @InjectRepository(Usuario)
+    private readonly usuario_repo?: Repository<Usuario>,
+    @Optional()
+    private readonly notificaciones_servicio?: NotificacionesServicio,
+    @Optional()
+    private readonly tiempo_real_gateway?: TiempoRealGateway,
   ) {}
 
   calcularCalificacionPonderadaDirecta(
@@ -473,4 +518,859 @@ export class EvaluacionesServicio {
   async listarEvaluadores(): Promise<Evaluador[]> {
     return this.evaluador_repo.find({ order: { nombre: 'ASC' } });
   }
+
+  async procesarReceptorAcademica(dto: ReceptorAcademicaDto): Promise<Evaluacion> {
+    const promedio = Number(dto.promedio_academico);
+    let puntaje: number;
+    let observaciones: string;
+
+    if (promedio >= 75) {
+      puntaje = Math.min(Math.round(Math.max(promedio, 100)), 100);
+      observaciones = `Meta académica contractual cumplida con promedio de ${promedio} puntos.`;
+    } else {
+      puntaje = Math.round((promedio / 75) * 100);
+      observaciones = `Alerta académica: El promedio registrado (${promedio}) se encuentra por debajo del estándar contractual de 75 puntos. Puntaje ponderado ajustado: ${puntaje}/100.`;
+    }
+
+    let evaluador_id = 1;
+    if (this.evaluador_repo?.findOne) {
+      let evaluador = await this.evaluador_repo.findOne({ where: { tipo: TipoEvaluador.BECARIO } });
+      if (!evaluador && this.evaluador_repo.create && this.evaluador_repo.save) {
+        evaluador = this.evaluador_repo.create({
+          nombre: 'Autoevaluación Becario',
+          tipo: TipoEvaluador.BECARIO,
+          correo: 'becario@diaconia.bo',
+        });
+        evaluador = await this.evaluador_repo.save(evaluador);
+      }
+      if (evaluador) evaluador_id = evaluador.id;
+    }
+
+    let evaluacion = await this.evaluacion_repo.findOne({
+      where: { becario_id: dto.becario_id, periodo_id: dto.periodo_id, modulo_id: 2 },
+    });
+
+    if (!evaluacion) {
+      evaluacion = this.evaluacion_repo.create({
+        becario_id: dto.becario_id,
+        periodo_id: dto.periodo_id,
+        modulo_id: 2,
+        evaluador_id,
+        puntaje,
+        estado: EstadoEvaluacion.COMPLETADO,
+        observaciones,
+        promedio_academico: promedio,
+        archivo_record_academico: dto.archivo_record_academico || null,
+        archivo_historial_academico: dto.archivo_historial_academico || null,
+        fecha_evaluacion: new Date(),
+      });
+    } else {
+      evaluacion.puntaje = puntaje;
+      evaluacion.estado = EstadoEvaluacion.COMPLETADO;
+      evaluacion.observaciones = observaciones;
+      evaluacion.promedio_academico = promedio;
+      if (dto.archivo_record_academico !== undefined) {
+        evaluacion.archivo_record_academico = dto.archivo_record_academico || null;
+      }
+      if (dto.archivo_historial_academico !== undefined) {
+        evaluacion.archivo_historial_academico = dto.archivo_historial_academico || null;
+      }
+      evaluacion.fecha_evaluacion = new Date();
+    }
+
+    return this.evaluacion_repo.save(evaluacion);
+  }
+
+  async obtenerCuestionarioBienestar(): Promise<PreguntaBienestar[]> {
+    if (this.pregunta_bienestar_repo) {
+      let preguntas = await this.pregunta_bienestar_repo.find({
+        order: { numero_orden: 'ASC' },
+      });
+      if (preguntas.length === 0) {
+        for (const p of PREGUNTAS_BIENESTAR_DEFECTO) {
+          await this.pregunta_bienestar_repo.save(this.pregunta_bienestar_repo.create(p));
+        }
+        preguntas = await this.pregunta_bienestar_repo.find({
+          order: { numero_orden: 'ASC' },
+        });
+        if (preguntas.length === 0) {
+          return PREGUNTAS_BIENESTAR_DEFECTO as unknown as PreguntaBienestar[];
+        }
+      }
+      return preguntas;
+    }
+    return PREGUNTAS_BIENESTAR_DEFECTO as unknown as PreguntaBienestar[];
+  }
+
+  async actualizarCuestionarioBienestar(payload: any): Promise<PreguntaBienestar[]> {
+    if (!this.pregunta_bienestar_repo) {
+      throw new BadRequestException('Repositorio de preguntas de bienestar no disponible');
+    }
+    const lista: any[] = Array.isArray(payload)
+      ? payload
+      : payload && Array.isArray(payload.preguntas)
+      ? payload.preguntas
+      : [payload];
+
+    for (const item of lista) {
+      if (!item) continue;
+      if (item.id) {
+        const existente = await this.pregunta_bienestar_repo.findOne({ where: { id: item.id } });
+        if (existente) {
+          Object.assign(existente, item);
+          await this.pregunta_bienestar_repo.save(existente);
+          continue;
+        }
+      }
+      if (item.numero_orden) {
+        const existente = await this.pregunta_bienestar_repo.findOne({ where: { numero_orden: item.numero_orden } });
+        if (existente) {
+          Object.assign(existente, item);
+          await this.pregunta_bienestar_repo.save(existente);
+          continue;
+        }
+      }
+      await this.pregunta_bienestar_repo.save(this.pregunta_bienestar_repo.create(item));
+    }
+    return this.pregunta_bienestar_repo.find({ order: { numero_orden: 'ASC' } });
+  }
+
+  async procesarReceptorMentorQr(dto: ReceptorMentorQrDto): Promise<Evaluacion> {
+    let periodo_id = dto.periodo_id;
+    if (!periodo_id && this.periodo_repo?.findOne) {
+      if (dto.periodo) {
+        const p_por_nombre = await this.periodo_repo.findOne({ where: { nombre: dto.periodo } });
+        if (p_por_nombre) periodo_id = p_por_nombre.id;
+      }
+      if (!periodo_id) {
+        const p_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+        if (p_activo) periodo_id = p_activo.id;
+      }
+    }
+    if (!periodo_id) periodo_id = 2;
+
+    let evaluador_id = 1;
+    const nombre_evaluador = dto.nombre_mentor || dto.supervisor_nombre || 'Supervisor Diaconía';
+    if (this.evaluador_repo?.findOne) {
+      let evaluador = await this.evaluador_repo.findOne({ where: { nombre: nombre_evaluador } });
+      if (!evaluador) {
+        evaluador = await this.evaluador_repo.findOne({ where: { tipo: TipoEvaluador.SUPERVISOR } });
+      }
+      if (!evaluador && this.evaluador_repo.create && this.evaluador_repo.save) {
+        evaluador = this.evaluador_repo.create({
+          nombre: nombre_evaluador,
+          tipo: TipoEvaluador.SUPERVISOR,
+          correo: 'supervisor@diaconia.bo',
+        });
+        evaluador = await this.evaluador_repo.save(evaluador);
+      }
+      if (evaluador) evaluador_id = evaluador.id;
+    }
+
+    let puntaje = 20;
+
+    if (dto.calificaciones_1_18) {
+      const raw_nums = Array.isArray(dto.calificaciones_1_18)
+        ? dto.calificaciones_1_18
+        : Object.values(dto.calificaciones_1_18);
+      const numeros = raw_nums.map(Number).filter((n) => !isNaN(n));
+      const cant_preguntas = Math.max(numeros.length, 1);
+      const suma_18 = numeros.reduce((acc, curr) => acc + curr, 0);
+      const promedio_1_18 = suma_18 / cant_preguntas;
+      const nota_bloque_1 = Math.min(Math.max(promedio_1_18, 0), 10);
+
+      const p19 = dto.puntaje_19 !== undefined && dto.puntaje_19 !== null ? Math.min(Math.max(Number(dto.puntaje_19), 0), 3.33) : 0;
+      const p20 = dto.puntaje_20 !== undefined && dto.puntaje_20 !== null ? Math.min(Math.max(Number(dto.puntaje_20), 0), 3.33) : 0;
+      const p21 = dto.puntaje_21 !== undefined && dto.puntaje_21 !== null ? Math.min(Math.max(Number(dto.puntaje_21), 0), 3.34) : 0;
+      const nota_bloque_2 = p19 + p20 + p21;
+
+      if (nota_bloque_2 > 0) {
+        puntaje = Number((nota_bloque_1 + nota_bloque_2).toFixed(1));
+      } else {
+        puntaje = Number((nota_bloque_1 * 2).toFixed(1));
+      }
+    } else if (dto.respuestas) {
+      const valores: number[] = [];
+      const extraerNumeros = (obj: unknown) => {
+        if (typeof obj === 'number') {
+          valores.push(obj);
+        } else if (typeof obj === 'object' && obj !== null) {
+          for (const v of Object.values(obj)) {
+            extraerNumeros(v);
+          }
+        }
+      };
+      extraerNumeros(dto.respuestas);
+
+      if (valores.length > 0) {
+        const suma = valores.reduce((acc, curr) => acc + curr, 0);
+        const todos_likert = valores.every((v) => v <= 5 && v >= 0);
+        if (todos_likert) {
+          puntaje = Math.round((suma / (valores.length * 5)) * 100);
+        } else {
+          puntaje = Math.round(suma / valores.length);
+        }
+      } else {
+        puntaje = 100;
+      }
+      puntaje = Math.min(Math.max(puntaje, 0), 100);
+    }
+
+    const payload_formulario = {
+      nombre_mentor: dto.nombre_mentor || dto.supervisor_nombre,
+      unidad_agencia: dto.unidad_agencia,
+      semestre_gestion: dto.semestre_gestion,
+      fecha: dto.fecha,
+      calificaciones_1_18: dto.calificaciones_1_18,
+      pregunta_19_apoyo: dto.pregunta_19_apoyo,
+      puntaje_19: dto.puntaje_19,
+      pregunta_20_destacado: dto.pregunta_20_destacado,
+      puntaje_20: dto.puntaje_20,
+      pregunta_21_sugerencias: dto.pregunta_21_sugerencias,
+      puntaje_21: dto.puntaje_21,
+      ...(dto.respuestas || {}),
+    };
+
+    let evaluacion = await this.evaluacion_repo.findOne({
+      where: { becario_id: dto.becario_id, periodo_id, modulo_id: 3 },
+    });
+
+    if (!evaluacion) {
+      evaluacion = this.evaluacion_repo.create({
+        becario_id: dto.becario_id,
+        periodo_id,
+        modulo_id: 3,
+        evaluador_id,
+        puntaje,
+        estado: EstadoEvaluacion.COMPLETADO,
+        observaciones: dto.observaciones || 'Evaluación del mentor registrada satisfactoriamente mediante QR.',
+        datos_formulario: payload_formulario,
+        fecha_evaluacion: new Date(),
+      });
+    } else {
+      evaluacion.puntaje = puntaje;
+      evaluacion.estado = EstadoEvaluacion.COMPLETADO;
+      evaluacion.datos_formulario = payload_formulario;
+      if (dto.observaciones) evaluacion.observaciones = dto.observaciones;
+      evaluacion.fecha_evaluacion = new Date();
+    }
+
+    return this.evaluacion_repo.save(evaluacion);
+  }
+
+  async procesarReceptorSocioeconomica(dto: ReceptorSocioeconomicaDto): Promise<Evaluacion> {
+    let periodo_id = dto.periodo_id;
+    if (!periodo_id && this.periodo_repo?.findOne) {
+      if (dto.periodo) {
+        const p_por_nombre = await this.periodo_repo.findOne({ where: { nombre: dto.periodo } });
+        if (p_por_nombre) periodo_id = p_por_nombre.id;
+      }
+      if (!periodo_id) {
+        const p_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+        if (p_activo) periodo_id = p_activo.id;
+      }
+    }
+    if (!periodo_id) periodo_id = 2;
+
+    let evaluador_id = 1;
+    if (this.evaluador_repo?.findOne) {
+      let evaluador = await this.evaluador_repo.findOne({ where: { tipo: TipoEvaluador.TRABAJADOR_SOCIAL } });
+      if (!evaluador && this.evaluador_repo.create && this.evaluador_repo.save) {
+        evaluador = this.evaluador_repo.create({
+          nombre: 'Trabajador Social Diaconía',
+          tipo: TipoEvaluador.TRABAJADOR_SOCIAL,
+          correo: 'social@diaconia.bo',
+        });
+        evaluador = await this.evaluador_repo.save(evaluador);
+      }
+      if (evaluador) evaluador_id = evaluador.id;
+    }
+
+    let puntaje_20 = 20;
+    let total_respondidas = 0;
+    let suma_puntos = 0;
+
+    if (dto.respuestas && typeof dto.respuestas === 'object') {
+      for (const [key, val] of Object.entries(dto.respuestas)) {
+        const num = parseInt(key, 10);
+        if (!isNaN(num) && typeof val === 'string') {
+          const letra = val.trim().toUpperCase();
+          total_respondidas++;
+          if (num === 19) {
+            if (letra === 'A') suma_puntos += 1.0;
+            else if (letra === 'B') suma_puntos += 0.5;
+            else if (letra === 'C') suma_puntos += 0.0;
+            else if (letra === 'D') suma_puntos += 0.5;
+          } else if (num >= 21 && num <= 26) {
+            if (letra === 'A') suma_puntos += 0.0;
+            else if (letra === 'B') suma_puntos += 0.33;
+            else if (letra === 'C') suma_puntos += 0.67;
+            else if (letra === 'D') suma_puntos += 1.0;
+          } else {
+            if (letra === 'A') suma_puntos += 1.0;
+            else if (letra === 'B') suma_puntos += 0.5;
+            else if (letra === 'C') suma_puntos += 0.0;
+          }
+        }
+      }
+    }
+
+    if (total_respondidas > 0) {
+      const proporcion = suma_puntos / total_respondidas;
+      puntaje_20 = Number((proporcion * 20).toFixed(1));
+    } else {
+      const valores: number[] = [];
+      const extraerNumeros = (obj: unknown) => {
+        if (typeof obj === 'number') {
+          valores.push(obj);
+        } else if (typeof obj === 'object' && obj !== null) {
+          for (const v of Object.values(obj)) {
+            extraerNumeros(v);
+          }
+        }
+      };
+      extraerNumeros(dto.respuestas);
+
+      let indice = 85;
+      if (valores.length > 0) {
+        const suma = valores.reduce((acc, curr) => acc + curr, 0);
+        const todos_likert = valores.every((v) => v <= 5 && v >= 0);
+        if (todos_likert) {
+          indice = Math.round((suma / (valores.length * 5)) * 100);
+        } else {
+          indice = Math.round(suma / valores.length);
+        }
+      }
+      puntaje_20 = Number(((indice / 100) * 20).toFixed(1));
+    }
+    puntaje_20 = Math.min(Math.max(puntaje_20, 0), 20);
+
+    let semaforo: 'verde' | 'amarillo' | 'rojo' = 'verde';
+    const s_explicit = dto.respuestas && typeof (dto.respuestas as any).semaforo === 'string'
+      ? String((dto.respuestas as any).semaforo).toLowerCase()
+      : null;
+
+    if (s_explicit === 'verde' || s_explicit === 'amarillo' || s_explicit === 'rojo') {
+      semaforo = s_explicit as 'verde' | 'amarillo' | 'rojo';
+    } else {
+      if (puntaje_20 >= 14) {
+        semaforo = 'verde';
+      } else if (puntaje_20 >= 10) {
+        semaforo = 'amarillo';
+      } else {
+        semaforo = 'rojo';
+      }
+    }
+
+    let evaluacion = await this.evaluacion_repo.findOne({
+      where: { becario_id: dto.becario_id, periodo_id, modulo_id: 5 },
+    });
+
+    if (!evaluacion) {
+      evaluacion = this.evaluacion_repo.create({
+        becario_id: dto.becario_id,
+        periodo_id,
+        modulo_id: 5,
+        evaluador_id,
+        puntaje: puntaje_20,
+        estado: EstadoEvaluacion.COMPLETADO,
+        observaciones: dto.observaciones || `Evaluación socioeconómica procesada (${puntaje_20}/20 pts) con semáforo ${semaforo}.`,
+        datos_formulario: dto.respuestas,
+        semaforo_socioeconomico: semaforo,
+        fecha_evaluacion: new Date(),
+      });
+    } else {
+      evaluacion.puntaje = puntaje_20;
+      evaluacion.estado = EstadoEvaluacion.COMPLETADO;
+      evaluacion.datos_formulario = dto.respuestas;
+      evaluacion.semaforo_socioeconomico = semaforo;
+      if (dto.observaciones) evaluacion.observaciones = dto.observaciones;
+      evaluacion.fecha_evaluacion = new Date();
+    }
+
+    return this.evaluacion_repo.save(evaluacion);
+  }
+
+  calcularPuntajeAcademicoPorCriterio(promedio: number, materias_reprobadas: number = 0): number {
+    if (materias_reprobadas > 1) {
+      return 0;
+    }
+    if (materias_reprobadas === 1) {
+      return promedio > 51 ? 10 : 0;
+    }
+    if (promedio >= 70) {
+      return 20;
+    }
+    return 15;
+  }
+
+  obtenerCalificacionLiteralOficial(total_100: number): string {
+    if (total_100 >= 70) {
+      return 'Aprobación óptima';
+    }
+    if (total_100 >= 51) {
+      return 'Aprobación Condicionada';
+    }
+    return 'Reprobó y debe abandonar el programa';
+  }
+
+  async obtenerConsolidadoSemestral(periodo?: string): Promise<{
+    periodo: string;
+    total_becarios: number;
+    criterios_oficiales: CriteriosOficiales;
+    rangos_aprobacion: RangoAprobacion[];
+    registros: RegistroConsolidadoSemestral[];
+  }> {
+    const periodo_nombre = periodo || 'II-2025';
+    const registros_copia = REGISTROS_CONSOLIDADO_SEM_II.map((r) => ({ ...r }));
+
+    if (this.evaluacion_repo?.find) {
+      try {
+        const evaluaciones_bd = await this.evaluacion_repo.find({
+          relations: { becario: true },
+        });
+
+        for (const reg of registros_copia) {
+          const evs_becario = evaluaciones_bd.filter((e) => e.becario?.ci === reg.ci);
+          for (const ev of evs_becario) {
+            const pts = ev.puntaje !== null && ev.puntaje !== undefined ? Number(ev.puntaje) : null;
+            if (pts === null) continue;
+            if (ev.modulo_id === 1) reg.liderazgo_iglesia = pts;
+            else if (ev.modulo_id === 2) reg.academica = pts;
+            else if (ev.modulo_id === 3) reg.practicas_preprofesionales = pts;
+            else if (ev.modulo_id === 4) reg.escuela_lideres = pts;
+            else if (ev.modulo_id === 5) reg.socioeconomico = pts;
+          }
+          const total = Number(
+            (reg.academica + reg.liderazgo_iglesia + reg.practicas_preprofesionales + reg.escuela_lideres + reg.socioeconomico).toFixed(1),
+          );
+          reg.total = total;
+          reg.total_calificacion = this.obtenerCalificacionLiteralOficial(total);
+        }
+      } catch {
+        // En caso de que la tabla aún no contenga registros, se retorna la lista canónica del Excel
+      }
+    }
+
+    return {
+      periodo: periodo_nombre,
+      total_becarios: registros_copia.length,
+      criterios_oficiales: CRITERIOS_OFICIALES_TABLA,
+      rangos_aprobacion: RANGOS_APROBACION_OFICIALES,
+      registros: registros_copia,
+    };
+  }
+
+  async solicitarCodigoTutor(
+    dto: SolicitarCodigoTutorDto,
+    usuario_actual?: Usuario,
+  ): Promise<{
+    enviado: boolean;
+    becario_id: number;
+    becario_nombre: string;
+    supervisor_nombre: string;
+    supervisor_correo: string;
+    expira_en_segundos: number;
+    mensaje: string;
+  }> {
+    let becario: Becario | null = null;
+    const referencia_id = dto.becario_id || usuario_actual?.id || 1;
+
+    if (this.becario_repo) {
+      becario = await this.becario_repo.findOne({
+        where: [{ id: referencia_id }, { usuario_id: referencia_id }],
+        relations: { usuario: true, supervisor: true },
+      });
+      if (!becario) {
+        becario = await this.becario_repo.findOne({
+          where: {},
+          relations: { usuario: true, supervisor: true },
+          order: { id: 'ASC' },
+        });
+      }
+    }
+
+    const becario_id_clave = becario?.id || referencia_id;
+    const becario_nombre = becario?.usuario?.nombre || usuario_actual?.nombre || 'María Catunta Laime';
+
+    let supervisor_usuario: Usuario | null = becario?.supervisor || null;
+    if (!supervisor_usuario && this.usuario_repo) {
+      supervisor_usuario = await this.usuario_repo.findOne({
+        where: { rol: Rol.SUPERVISOR },
+        order: { id: 'ASC' },
+      });
+    }
+
+    const supervisor_nombre = supervisor_usuario?.nombre || 'Angel Javier Ali Paz';
+    const supervisor_correo = supervisor_usuario?.correo || 'angel.ali@bumand.bo';
+
+    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+    const expira = Date.now() + 10 * 60 * 1000;
+
+    const registro_codigo = {
+      codigo,
+      expira,
+      supervisor_nombre,
+      supervisor_correo,
+    };
+
+    this.codigos_tutor.set(becario_id_clave, registro_codigo);
+    this.codigos_tutor.set(0, registro_codigo);
+
+    const texto_notificacion = `🔐 Código de autorización para evaluar a ${becario_nombre} (Módulo 03 - Pasantías): ${codigo}. Válido por 10 minutos.`;
+
+    if (this.notificaciones_servicio) {
+      const destinatarios_ids = new Set<number>();
+      if (supervisor_usuario?.id) {
+        destinatarios_ids.add(supervisor_usuario.id);
+      }
+      if (this.usuario_repo) {
+        const supervisores_y_admins = await this.usuario_repo.find({
+          where: [{ rol: Rol.SUPERVISOR }, { rol: Rol.ADMINISTRADOR }],
+        });
+        for (const u of supervisores_y_admins) {
+          destinatarios_ids.add(u.id);
+        }
+      }
+
+      for (const uid of destinatarios_ids) {
+        try {
+          await this.notificaciones_servicio.crear({
+            usuario_id: uid,
+            tipo: 'evaluacion_codigo_tutor',
+            mensaje: texto_notificacion,
+          });
+        } catch {
+          // Continuar si algún destinatario no puede recibir la notificación
+        }
+      }
+    }
+
+    this.tiempo_real_gateway?.notificarCodigoTutor({
+      becario_id: becario_id_clave,
+      becario_nombre,
+      supervisor_nombre,
+      supervisor_correo,
+      codigo,
+      mensaje: texto_notificacion,
+      fecha_envio: new Date().toISOString(),
+    });
+
+    return {
+      enviado: true,
+      becario_id: becario_id_clave,
+      becario_nombre,
+      supervisor_nombre,
+      supervisor_correo,
+      expira_en_segundos: 600,
+      mensaje: `Se envió una notificación con el código de 6 dígitos a la pantalla del supervisor (${supervisor_nombre}).`,
+    };
+  }
+
+  async verificarCodigoTutor(dto: VerificarCodigoTutorDto): Promise<{
+    verificado: boolean;
+    metodo: string;
+    supervisor_nombre: string;
+    supervisor_correo: string;
+    mensaje: string;
+  }> {
+    if (dto.codigo && dto.codigo.trim().length > 0) {
+      const codigo_limpio = dto.codigo.trim();
+      const ahora = Date.now();
+
+      for (const [clave, valor] of this.codigos_tutor.entries()) {
+        if (valor.codigo === codigo_limpio && valor.expira >= ahora) {
+          this.codigos_tutor.delete(clave);
+          return {
+            verificado: true,
+            metodo: 'codigo_notificacion',
+            supervisor_nombre: valor.supervisor_nombre,
+            supervisor_correo: valor.supervisor_correo,
+            mensaje: `Identidad confirmada: ${valor.supervisor_nombre}`,
+          };
+        }
+      }
+
+      throw new BadRequestException(
+        'El código ingresado es incorrecto o ha expirado. Revisa la notificación en la pantalla del supervisor o solicita un nuevo código.',
+      );
+    }
+
+    if (dto.correo && dto.contrasena) {
+      const correo_limpio = dto.correo.trim().toLowerCase();
+      if (this.usuario_repo) {
+        const usuario = await this.usuario_repo.findOne({
+          where: { correo: correo_limpio },
+        });
+        if (
+          usuario &&
+          (usuario.rol === Rol.SUPERVISOR || usuario.rol === Rol.ADMINISTRADOR) &&
+          (await compararContrasena(dto.contrasena, usuario.contrasena_hash))
+        ) {
+          return {
+            verificado: true,
+            metodo: 'credenciales',
+            supervisor_nombre: usuario.nombre,
+            supervisor_correo: usuario.correo,
+            mensaje: `Identidad confirmada: ${usuario.nombre}`,
+          };
+        }
+      }
+
+      throw new BadRequestException(
+        'Credenciales inválidas o la cuenta ingresada no corresponde a un Supervisor/Tutor autorizado.',
+      );
+    }
+
+    throw new BadRequestException(
+      'Debes ingresar el código de 6 dígitos enviado por notificación o las credenciales del supervisor.',
+    );
+  }
+
+  // ==============================================================
+  // MÓDULO DE GESTIÓN Y SEGUIMIENTO PASTORAL / MENTORÍA
+  // ==============================================================
+
+  async obtenerCasosPastorales(filtros?: {
+    estado?: string;
+    becario_id?: number;
+  }): Promise<any[]> {
+    if (this.caso_pastoral_repo) {
+      try {
+        const qb = this.caso_pastoral_repo
+          .createQueryBuilder('caso')
+          .leftJoinAndSelect('caso.becario', 'becario')
+          .leftJoinAndSelect('becario.usuario', 'usuario')
+          .leftJoinAndSelect('becario.iglesia', 'iglesia');
+
+        if (filtros?.estado && filtros.estado !== 'todos') {
+          qb.andWhere('caso.estado = :estado', { estado: filtros.estado });
+        }
+        if (filtros?.becario_id) {
+          qb.andWhere('caso.becario_id = :becarioId', { becarioId: filtros.becario_id });
+        }
+
+        qb.orderBy('caso.created_at', 'DESC');
+        const casos = await qb.getMany();
+
+        if (casos.length > 0) {
+          return casos;
+        }
+      } catch (err) {
+        // En caso de que la tabla aún no esté sincronizada, recurre al catálogo institucional
+      }
+    }
+
+    const por_defecto = this.obtenerCasosPastoralesPorDefecto();
+    if (filtros?.estado && filtros.estado !== 'todos') {
+      return por_defecto.filter((c) => c.estado === filtros.estado);
+    }
+    return por_defecto;
+  }
+
+  obtenerCasosPastoralesPorDefecto(): any[] {
+    return [
+      {
+        id: 1,
+        becario_id: 1,
+        becario: { nombre: 'Carlos Oscar Luna Lizarraga', carrera: 'Economía', universidad: 'UMSA' },
+        origen: 'Formulario F-03 (Pastor)',
+        observacion_pastoral: 'Aún no es miembro de la iglesia; requiere mayor contacto con la congregación.',
+        plan_accion: '3 sesiones de acompañamiento con pastor de jóvenes y vinculación a discipulado.',
+        estado: EstadoCasoPastoral.PENDIENTE,
+        prioridad: PrioridadCasoPastoral.ALTA,
+        responsable_nombre: 'Pr. Juan Ramos (Tutoría Pastoral)',
+        notas_seguimiento: [
+          {
+            fecha: '2026-08-10',
+            autor: 'Pr. Juan Ramos',
+            rol_autor: 'Pastor Local',
+            contenido: 'Primera entrevista inicial de acogida pastoral.',
+            acuerdos: 'Asistir a reunión de jóvenes los sábados.',
+          },
+        ],
+        created_at: new Date('2026-08-01'),
+      },
+      {
+        id: 2,
+        becario_id: 2,
+        becario: { nombre: 'Jhoselin Quispe Morales', carrera: 'Comunicación Social', universidad: 'UMSA' },
+        origen: 'Formulario F-03 (Pastor)',
+        observacion_pastoral: 'No desempeña algún cargo de liderazgo.',
+        plan_accion: 'Mentoría de servicio: integración en el equipo de medios y transmisión dominical.',
+        estado: EstadoCasoPastoral.EN_TUTORIA,
+        prioridad: PrioridadCasoPastoral.MEDIA,
+        responsable_nombre: 'Hno. David Mendoza (Diaconía)',
+        notas_seguimiento: [
+          {
+            fecha: '2026-08-15',
+            autor: 'Hno. David Mendoza',
+            rol_autor: 'Mentor',
+            contenido: 'Becaria muestra buena disposición a colaborar con streaming.',
+            acuerdos: 'Capacitación en consola de audio el viernes.',
+          },
+        ],
+        created_at: new Date('2026-08-01'),
+      },
+      {
+        id: 3,
+        becario_id: 3,
+        becario: { nombre: 'José Marcos Suñagua Quispe', carrera: 'Informática', universidad: 'UMSA' },
+        origen: 'Formulario F-03 (Pastor)',
+        observacion_pastoral: 'Trabajar en debilidades: puntualidad en la iglesia.',
+        plan_accion: 'Compromiso de puntualidad y asignación de bienvenida 15 min antes del culto.',
+        estado: EstadoCasoPastoral.PENDIENTE,
+        prioridad: PrioridadCasoPastoral.ALTA,
+        responsable_nombre: 'Tutor Pastoral Diaconía',
+        notas_seguimiento: [],
+        created_at: new Date('2026-08-01'),
+      },
+      {
+        id: 4,
+        becario_id: 4,
+        becario: { nombre: 'Luis Santiago Enrriquez Conde', carrera: 'Cs. de la Comunicación Social', universidad: 'UMSA' },
+        origen: 'Formulario F-03 (Pastor)',
+        observacion_pastoral: 'No desempeña algún cargo; no forma a nuevos líderes, pero tiene potencial.',
+        plan_accion: 'Plan de formación de líderes junior en Escuela Dominical.',
+        estado: EstadoCasoPastoral.EN_TUTORIA,
+        prioridad: PrioridadCasoPastoral.MEDIA,
+        responsable_nombre: 'Pr. Marcos Caluyo',
+        notas_seguimiento: [
+          {
+            fecha: '2026-08-20',
+            autor: 'Pr. Marcos Caluyo',
+            rol_autor: 'Pastor',
+            contenido: 'Inició como asistente en grupo de adolescentes.',
+            acuerdos: 'Preparar devocional para fin de mes.',
+          },
+        ],
+        created_at: new Date('2026-08-01'),
+      },
+      {
+        id: 5,
+        becario_id: 5,
+        becario: { nombre: 'Mariela Dayana Jimenez Chambi', carrera: 'Contaduría Pública', universidad: 'UMSA' },
+        origen: 'Formulario F-03 (Pastor)',
+        observacion_pastoral: 'No desempeña algún cargo de liderazgo.',
+        plan_accion: 'Incorporación en la tesorería o mayordomía auxiliar de la congregación.',
+        estado: EstadoCasoPastoral.PENDIENTE,
+        prioridad: PrioridadCasoPastoral.BAJA,
+        responsable_nombre: 'Coordinación Pastoral',
+        notas_seguimiento: [],
+        created_at: new Date('2026-08-01'),
+      },
+      {
+        id: 6,
+        becario_id: 6,
+        becario: { nombre: 'Mayherli Alejandra Loza Villalobos', carrera: 'Contaduría Pública', universidad: 'UMSA' },
+        origen: 'Formulario F-03 (Pastor)',
+        observacion_pastoral: 'No desempeña algún cargo; se encuentra en formación.',
+        plan_accion: 'Seguimiento en discipulado de liderazgo juvenil.',
+        estado: EstadoCasoPastoral.EN_TUTORIA,
+        prioridad: PrioridadCasoPastoral.BAJA,
+        responsable_nombre: 'Líder Débora Quispe',
+        notas_seguimiento: [],
+        created_at: new Date('2026-08-01'),
+      },
+      {
+        id: 7,
+        becario_id: 7,
+        becario: { nombre: 'Nilda Amalia Churata Paye', carrera: 'Educación Parvularia', universidad: 'UPEA' },
+        origen: 'Formulario F-03 (Pastor)',
+        observacion_pastoral: 'Asiste solo domingos; falta mejorar el compromiso e involucrarse más.',
+        plan_accion: 'Acompañamiento integral para conciliar horarios de estudio con actividades congregacionales.',
+        estado: EstadoCasoPastoral.PENDIENTE,
+        prioridad: PrioridadCasoPastoral.ALTA,
+        responsable_nombre: 'Pr. Samuel Amigos Central',
+        notas_seguimiento: [],
+        created_at: new Date('2026-08-01'),
+      },
+    ];
+  }
+
+  async crearCasoPastoral(dto: {
+    becario_id: number;
+    observacion_pastoral: string;
+    origen?: string;
+    prioridad?: PrioridadCasoPastoral;
+    plan_accion?: string;
+    responsable_nombre?: string;
+  }): Promise<CasoSeguimientoPastoral> {
+    if (!this.caso_pastoral_repo) {
+      throw new BadRequestException('Módulo de casos pastorales no disponible');
+    }
+    const nuevo = this.caso_pastoral_repo.create({
+      becario_id: dto.becario_id,
+      observacion_pastoral: dto.observacion_pastoral,
+      origen: dto.origen || 'Formulario F-03 (Pastor)',
+      prioridad: dto.prioridad || PrioridadCasoPastoral.ALTA,
+      plan_accion: dto.plan_accion || null,
+      responsable_nombre: dto.responsable_nombre || 'Tutoría Pastoral Diaconía',
+      estado: EstadoCasoPastoral.PENDIENTE,
+      notas_seguimiento: [],
+    });
+    return this.caso_pastoral_repo.save(nuevo);
+  }
+
+  async gestionarCasoPastoral(
+    id: number,
+    dto: {
+      plan_accion?: string;
+      estado?: EstadoCasoPastoral;
+      prioridad?: PrioridadCasoPastoral;
+      responsable_nombre?: string;
+      nueva_nota?: { autor: string; rol_autor: string; contenido: string; acuerdos?: string };
+    },
+  ): Promise<CasoSeguimientoPastoral> {
+    if (!this.caso_pastoral_repo) {
+      throw new BadRequestException('Módulo de casos pastorales no disponible');
+    }
+    const caso = await this.caso_pastoral_repo.findOne({ where: { id }, relations: { becario: true } });
+    if (!caso) {
+      throw new NotFoundException(`Caso con ID ${id} no encontrado`);
+    }
+    if (dto.plan_accion !== undefined) caso.plan_accion = dto.plan_accion;
+    if (dto.estado !== undefined) caso.estado = dto.estado;
+    if (dto.prioridad !== undefined) caso.prioridad = dto.prioridad;
+    if (dto.responsable_nombre !== undefined) caso.responsable_nombre = dto.responsable_nombre;
+
+    if (dto.nueva_nota) {
+      const notas = Array.isArray(caso.notas_seguimiento) ? [...caso.notas_seguimiento] : [];
+      notas.push({
+        fecha: new Date().toISOString().split('T')[0],
+        autor: dto.nueva_nota.autor || 'Supervisor',
+        rol_autor: dto.nueva_nota.rol_autor || 'Tutor',
+        contenido: dto.nueva_nota.contenido,
+        acuerdos: dto.nueva_nota.acuerdos,
+      });
+      caso.notas_seguimiento = notas;
+    }
+
+    return this.caso_pastoral_repo.save(caso);
+  }
+
+  async resolverCasoPastoral(id: number, conclusion: string): Promise<CasoSeguimientoPastoral> {
+    if (!this.caso_pastoral_repo) {
+      throw new BadRequestException('Módulo de casos pastorales no disponible');
+    }
+    const caso = await this.caso_pastoral_repo.findOne({ where: { id }, relations: { becario: true } });
+    if (!caso) {
+      throw new NotFoundException(`Caso con ID ${id} no encontrado`);
+    }
+    caso.estado = EstadoCasoPastoral.RESUELTO;
+    caso.conclusion_resolucion = conclusion || 'Caso superado y convalidado satisfactoriamente.';
+    caso.fecha_resolucion = new Date();
+
+    const notas = Array.isArray(caso.notas_seguimiento) ? [...caso.notas_seguimiento] : [];
+    notas.push({
+      fecha: new Date().toISOString().split('T')[0],
+      autor: 'Coordinación Diaconía',
+      rol_autor: 'Auditoría Pastoral',
+      contenido: `Caso marcado como Resuelto: ${caso.conclusion_resolucion}`,
+    });
+    caso.notas_seguimiento = notas;
+
+    return this.caso_pastoral_repo.save(caso);
+  }
 }
+

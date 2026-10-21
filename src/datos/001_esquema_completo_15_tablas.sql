@@ -116,7 +116,11 @@ CREATE TABLE IF NOT EXISTS becarios (
     lugar_practica_id   INTEGER         REFERENCES lugares_practica(id) ON DELETE SET NULL,
     fecha_ingreso       DATE            NOT NULL,
     supervisor_id       INTEGER         REFERENCES usuarios(id) ON DELETE SET NULL,
-    unidad              VARCHAR(100)
+    unidad              VARCHAR(100),
+    modalidad_carrera   VARCHAR(50),
+    tipo_beca           VARCHAR(50),
+    comentario_academico TEXT,
+    comentario_iglesia   TEXT
 );
 
 -- Tabla 04b: horarios_apoyo (Formalización MER con FK becario_id)
@@ -275,6 +279,18 @@ CREATE TABLE IF NOT EXISTS evaluaciones_pastor (
     iglesia_direccion   VARCHAR(255),
     campos_formulario   JSONB,
     fecha               DATE               NOT NULL DEFAULT CURRENT_DATE
+);
+
+-- Tabla 12b: preguntas_bienestar (Cuestionario dinámico e institucional de 26 preguntas)
+CREATE TABLE IF NOT EXISTS preguntas_bienestar (
+    id                  SERIAL PRIMARY KEY,
+    numero_orden        INTEGER            NOT NULL,
+    titulo              VARCHAR(150)       NOT NULL,
+    enunciado           TEXT               NOT NULL,
+    categoria           VARCHAR(100)       NOT NULL,
+    opciones            JSONB              NOT NULL,
+    activa              BOOLEAN            NOT NULL DEFAULT true,
+    updated_at          TIMESTAMP          NOT NULL DEFAULT now()
 );
 
 -- ---------------------------------------------------------------------------

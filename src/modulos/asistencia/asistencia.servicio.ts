@@ -5,9 +5,12 @@ import { RegistroAsistencia, TipoAsistencia } from './entidades/registro-asisten
 import { Multa } from './entidades/multa.entidad';
 import { CoordenadasDto } from './dtos/coordenadas.dto';
 import { ConfirmarOrganizadorDto } from './dtos/confirmar-organizador.dto';
+import { RegistrarAsistenciaManualDto } from './dtos/registrar-asistencia-manual.dto';
+import { RectificarAsistenciaDto } from './dtos/rectificar-asistencia.dto';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.entidad';
 import { Iglesia } from '../iglesias/entidades/iglesia.entidad';
+import { Justificacion, EstadoJustificacion, TipoIncidencia } from '../justificaciones/entidades/justificacion.entidad';
 import { NotificacionesServicio } from '../notificaciones/notificaciones.servicio';
 import { calcularDistanciaMetros } from '../../utilidades/geo.utilidad';
 import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
@@ -30,6 +33,9 @@ export class AsistenciaServicio {
     @Optional()
     @InjectRepository(Multa)
     private readonly multaRepositorio?: Repository<Multa>,
+    @Optional()
+    @InjectRepository(Justificacion)
+    private readonly justificacionRepositorio?: Repository<Justificacion>,
     @Optional()
     private readonly notificacionesServicio?: NotificacionesServicio,
     @Optional()
@@ -318,7 +324,7 @@ export class AsistenciaServicio {
           Math.round((ahora.getTime() - limite_oficial.getTime()) / 60000),
           1,
         );
-        const monto_bs = minutos_retraso_multa * 10;
+        const { monto_bs, tramo } = this.calcularMultaEscuelaLideres(minutos_retraso_multa);
 
         if (this.multaRepositorio) {
           const nueva_multa = this.multaRepositorio.create({
@@ -326,7 +332,7 @@ export class AsistenciaServicio {
             asistencia_id: registro.id,
             minutos_retraso: minutos_retraso_multa,
             monto_bs,
-            motivo: `Retraso de ${minutos_retraso_multa} min en Escuela de Líderes (tolerancia máxima: 14:35)`,
+            motivo: `Retraso de ${minutos_retraso_multa} min en Escuela de Líderes (${tramo})`,
             fecha_aplicacion: ahora,
             es_institucional: true,
           });
@@ -337,7 +343,7 @@ export class AsistenciaServicio {
               await this.notificacionesServicio.crear({
                 usuario_id: becario.usuario_id,
                 tipo: 'multa_retraso',
-                mensaje: `Se ha emitido una multa institucional de Bs ${monto_bs} por retraso de ${minutos_retraso_multa} min en Escuela de Líderes.`,
+                mensaje: `Se ha emitido una multa institucional de Bs ${monto_bs} por retraso de ${minutos_retraso_multa} min en Escuela de Líderes (${tramo}).`,
               });
             } catch {
               // Silencioso ante fallos de notificación
@@ -450,11 +456,273 @@ export class AsistenciaServicio {
     });
   }
 
-  async obtenerTodos(): Promise<RegistroAsistencia[]> {
+  async registrarAsistenciaManual(
+    dto: RegistrarAsistenciaManualDto,
+  ): Promise<RegistroAsistencia> {
+    const id_busqueda = dto.becario_id ?? dto.becarioId;
+    if (!id_busqueda) {
+      throw new BadRequestException('El identificador del becario es requerido');
+    }
+
+    const becario = await this.becarioRepositorio.findOne({
+      where: [{ id: id_busqueda }, { usuario_id: id_busqueda }],
+    });
+
+    if (!becario) {
+      throw new NotFoundException('Becario no encontrado');
+    }
+
+    const tipo = dto.tipo || TipoAsistencia.PRACTICAS;
+    const hora_ingreso_raw = dto.hora_ingreso || dto.horaIngreso || '08:00';
+    const hora_salida_raw = dto.hora_salida || dto.horaSalida || null;
+
+    const hora_ingreso = hora_ingreso_raw.length === 5 ? `${hora_ingreso_raw}:00` : hora_ingreso_raw;
+    const hora_salida = hora_salida_raw ? (hora_salida_raw.length === 5 ? `${hora_salida_raw}:00` : hora_salida_raw) : null;
+
+    let horas_trabajadas: number | null = null;
+    if (hora_salida) {
+      const [h_i, m_i] = hora_ingreso.split(':').map(Number);
+      const [h_s, m_s] = hora_salida.split(':').map(Number);
+      const horas = (h_s + m_s / 60) - (h_i + m_i / 60);
+      horas_trabajadas = horas > 0 ? parseFloat(horas.toFixed(2)) : 0;
+    }
+
+    const [anio, mes, dia] = dto.fecha.split('-').map(Number);
+    const fecha_obj = new Date(anio, mes - 1, dia);
+
+    const registro = this.asistenciaRepositorio.create({
+      becario_id: becario.id,
+      tipo,
+      fecha: fecha_obj,
+      hora_ingreso,
+      hora_salida: hora_salida || undefined,
+      horas_trabajadas: horas_trabajadas ?? undefined,
+      dentro_de_radio: true,
+      dentro_de_horario: true,
+      minutos_retraso: 0,
+      confirmado_organizador: true,
+      es_registro_manual: true,
+      motivo_contingencia: dto.motivo_contingencia || dto.motivoContingencia || 'Registro manual administrativo (contingencia sin megas/olvido)',
+      lugar_practica_id: dto.lugar_practica_id ?? dto.lugarPracticaId ?? null,
+      evento_id: dto.evento_id ?? dto.eventoId ?? null,
+    });
+
+    const guardado = await this.asistenciaRepositorio.save(registro);
+
+    if (this.tiempoRealGateway) {
+      if (typeof (this.tiempoRealGateway as any).notificarAsistenciaActualizada === 'function') {
+        (this.tiempoRealGateway as any).notificarAsistenciaActualizada({ accion: 'manual', registro: guardado });
+      }
+      if (typeof this.tiempoRealGateway.notificarAsistencia === 'function') {
+        this.tiempoRealGateway.notificarAsistencia({ accion: 'manual', registro: guardado });
+      }
+    }
+
+    return Object.assign(guardado, {
+      registro: guardado,
+      mensaje: 'Asistencia manual registrada satisfactoriamente.',
+    });
+  }
+
+  async obtenerPorUsuario(usuario_id?: number, becario_id?: number): Promise<RegistroAsistencia[]> {
+    let id_becario = becario_id;
+    if (!id_becario && usuario_id) {
+      const becario = await this.becarioRepositorio.findOne({
+        where: [{ usuario_id }, { id: usuario_id }],
+      });
+      if (becario) {
+        id_becario = becario.id;
+      } else {
+        id_becario = usuario_id;
+      }
+    }
+    if (!id_becario) {
+      return [];
+    }
     return this.asistenciaRepositorio.find({
+      where: { becario_id: id_becario },
       relations: { becario: { usuario: true } },
       order: { fecha: 'DESC', created_at: 'DESC' },
     });
+  }
+
+  async obtenerTodos(opciones?: {
+    tipo?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+    becario_id?: number;
+  }): Promise<RegistroAsistencia[]> {
+    const qb = this.asistenciaRepositorio
+      .createQueryBuilder('asistencia')
+      .leftJoinAndSelect('asistencia.becario', 'becario')
+      .leftJoinAndSelect('becario.usuario', 'usuario');
+
+    if (opciones?.becario_id) {
+      qb.andWhere('asistencia.becario_id = :bId', { bId: opciones.becario_id });
+    }
+    if (opciones?.tipo && opciones.tipo !== 'todas') {
+      qb.andWhere('asistencia.tipo = :tipo', { tipo: opciones.tipo });
+    }
+    if (opciones?.fecha_inicio) {
+      qb.andWhere('asistencia.fecha >= :inicio', { inicio: opciones.fecha_inicio });
+    }
+    if (opciones?.fecha_fin) {
+      qb.andWhere('asistencia.fecha <= :fin', { fin: opciones.fecha_fin });
+    }
+
+    qb.orderBy('asistencia.fecha', 'DESC').addOrderBy('asistencia.created_at', 'DESC');
+    return qb.getMany();
+  }
+
+  private calcularMultaEscuelaLideres(minutos: number): { monto_bs: number; tramo: string } {
+    if (minutos <= 10) {
+      return { monto_bs: 10, tramo: 'de 1 a 10 minutos (Bs 10)' };
+    }
+    if (minutos <= 30) {
+      return { monto_bs: 20, tramo: 'de 11 a 30 minutos (Bs 20)' };
+    }
+    if (minutos <= 60) {
+      return { monto_bs: 30, tramo: 'de 31 a 60 minutos (Bs 30)' };
+    }
+    return { monto_bs: 50, tramo: 'más de 60 minutos (Bs 50)' };
+  }
+
+  async obtenerHorasMensuales(): Promise<
+    Array<{
+      becario_id: number;
+      usuario_id: number;
+      nombre: string;
+      correo: string;
+      carrera: string;
+      mes_actual: string;
+      horas_mes_actual: number;
+      total_horas: number;
+      meses: Record<string, number>;
+    }>
+  > {
+    const becarios = await this.becarioRepositorio.find({
+      relations: {
+        usuario: true,
+        registros_asistencia: true,
+      },
+      order: { id: 'ASC' },
+    });
+
+    const ahora = new Date();
+    const anio_actual = ahora.getFullYear();
+    const mes_actual_num = String(ahora.getMonth() + 1).padStart(2, '0');
+    const clave_mes_actual = `${anio_actual}-${mes_actual_num}`;
+
+    return becarios.map((becario) => {
+      const meses: Record<string, number> = {};
+      let total_horas_acumuladas = 0;
+
+      for (const registro of becario.registros_asistencia || []) {
+        if (!registro.horas_trabajadas || !registro.fecha) continue;
+        const fecha_str = typeof registro.fecha === 'string'
+          ? (registro.fecha as string).substring(0, 7)
+          : (registro.fecha as Date).toISOString().substring(0, 7);
+        const horas = Number(registro.horas_trabajadas) || 0;
+        meses[fecha_str] = Number(((meses[fecha_str] || 0) + horas).toFixed(2));
+        total_horas_acumuladas = Number((total_horas_acumuladas + horas).toFixed(2));
+      }
+
+      const total_mes_actual = meses[clave_mes_actual] || 0;
+
+      return {
+        becario_id: becario.id,
+        usuario_id: becario.usuario_id || 0,
+        nombre: becario.usuario?.nombre || becario.nombre || '',
+        correo: becario.usuario?.correo || '',
+        carrera: becario.carrera,
+        mes_actual: clave_mes_actual,
+        horas_mes_actual: total_mes_actual,
+        total_horas: total_horas_acumuladas,
+        meses,
+      };
+    });
+  }
+
+  async rectificarHoraYJustificar(
+    id: number,
+    dto: RectificarAsistenciaDto,
+    usuario_id?: number,
+  ): Promise<RegistroAsistencia> {
+    const registro = await this.asistenciaRepositorio.findOne({
+      where: { id },
+      relations: { becario: { usuario: true } },
+    });
+
+    if (!registro) {
+      throw new NotFoundException(`Registro de asistencia #${id} no encontrado`);
+    }
+
+    // 1. Rectificar hora si se proporciona
+    if (dto.hora_ingreso_nueva && dto.hora_ingreso_nueva.trim().length > 0) {
+      registro.hora_ingreso = dto.hora_ingreso_nueva.trim();
+    }
+
+    // 2. Anulación o recálculo de minutos de retraso
+    if (dto.anular_multa !== false) {
+      registro.minutos_retraso = 0;
+      registro.dentro_de_horario = true;
+    }
+
+    // 3. Documentar en el registro el motivo administrativo
+    registro.motivo_contingencia = `Rectificación Administrativa: ${dto.motivo_justificacion}`;
+    registro.confirmado_organizador = true;
+
+    // 4. Condonar / anular multa asociada si existiese
+    if (dto.anular_multa !== false && this.multaRepositorio) {
+      try {
+        const multas = await this.multaRepositorio.find({
+          where: { asistencia_id: registro.id },
+        });
+        for (const m of multas) {
+          m.monto_bs = 0;
+          m.minutos_retraso = 0;
+          m.motivo = `Anulada por Justificación Administrativa: ${dto.motivo_justificacion}`;
+          await this.multaRepositorio.save(m);
+        }
+      } catch {
+        // En caso de que no haya tabla o relación de multas
+      }
+    }
+
+    // 5. Crear justificación institucional aprobada si crear_justificacion es true
+    if (dto.crear_justificacion !== false && this.justificacionRepositorio) {
+      try {
+        let tipo_incidencia = TipoIncidencia.ASISTENCIA_PRACTICAS;
+        if (registro.tipo === TipoAsistencia.ESCUELA_LIDERES) {
+          tipo_incidencia = TipoIncidencia.ESCUELA_LIDERES;
+        }
+
+        const nueva_justificacion = this.justificacionRepositorio.create({
+          becario_id: registro.becario_id,
+          tipo_incidencia,
+          referencia_id: registro.id,
+          fecha_incidencia: registro.fecha instanceof Date ? registro.fecha : new Date(registro.fecha),
+          motivo: 'Rectificación de Llegada y Justificación por Administración',
+          descripcion: dto.motivo_justificacion,
+          estado: EstadoJustificacion.APROBADA,
+          observacion_supervisor: 'Retraso rectificado y justificado formalmente por la Administración',
+          fecha_resolucion: new Date(),
+          supervisor_id: usuario_id || null,
+        });
+        await this.justificacionRepositorio.save(nueva_justificacion);
+      } catch {
+        // Tolerancia si el repositorio de justificaciones no está en el contexto actual
+      }
+    }
+
+    const guardado = await this.asistenciaRepositorio.save(registro);
+
+    this.tiempoRealGateway?.notificarAsistencia({
+      accion: 'rectificar',
+      asistencia: guardado,
+    });
+
+    return guardado;
   }
 }
 

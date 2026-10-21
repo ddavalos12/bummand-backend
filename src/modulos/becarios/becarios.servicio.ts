@@ -1,7 +1,9 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException, ForbiddenException, HttpStatus } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException, ForbiddenException, HttpStatus, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Becario } from './entidades/becario.entidad';
+import { HorarioApoyo } from './entidades/horario-apoyo.entidad';
+import { ConfiguracionInstitucional } from './entidades/configuracion-institucional.entidad';
 import { Usuario, Rol, EstadoUsuario } from '../usuarios/entidades/usuario.entidad';
 import { CrearBecarioDto } from './dtos/crear-becario.dto';
 import { ActualizarBecarioDto } from './dtos/actualizar-becario.dto';
@@ -18,7 +20,16 @@ export class BecariosServicio {
     private readonly becarioRepositorio: Repository<Becario>,
     @InjectRepository(Usuario)
     private readonly usuarioRepositorio: Repository<Usuario>,
+    @Optional()
+    @InjectRepository(HorarioApoyo)
+    private readonly horarioRepositorio?: Repository<HorarioApoyo>,
+    @Optional()
+    @InjectRepository(ConfiguracionInstitucional)
+    private readonly configuracionRepositorio?: Repository<ConfiguracionInstitucional>,
   ) {}
+
+  private confirmacion_datos_requerida = false;
+  private fecha_ultima_orden_confirmacion: Date | null = null;
 
   async validarSupervisor(supervisor_id: number): Promise<void> {
     const supervisor = await this.usuarioRepositorio.findOne({ where: { id: supervisor_id } });
@@ -54,6 +65,7 @@ export class BecariosServicio {
     const usuarioGuardado = await this.usuarioRepositorio.save(nuevoUsuario);
 
     const nuevoBecario = this.becarioRepositorio.create({
+      nombre: dto.nombre,
       ci: dto.ci || null,
       carrera: dto.carrera,
       universidad: dto.universidad,
@@ -106,8 +118,6 @@ export class BecariosServicio {
       relations: { usuario: true, supervisor: true, lugar_practica: true, iglesia: true },
     });
   }
-
-  private confirmacion_datos_requerida = false;
 
   async asignarSupervisor(id: number, supervisor_id: number): Promise<Becario> {
     await this.validarSupervisor(supervisor_id);
@@ -192,17 +202,111 @@ export class BecariosServicio {
     return this.becarioRepositorio.save(becario);
   }
 
-  async ordenConfirmacionDatos(activa: boolean): Promise<{ mensaje: string; confirmacion_datos_requerida: boolean }> {
+  private async obtenerConfiguracion(): Promise<ConfiguracionInstitucional | null> {
+    if (!this.configuracionRepositorio) return null;
+    try {
+      let config = await this.configuracionRepositorio.findOne({ where: { id: 1 } });
+      if (!config) {
+        config = this.configuracionRepositorio.create({
+          id: 1,
+          confirmacion_datos_activa: false,
+          fecha_ultima_orden_confirmacion: null,
+          emitida_por_usuario_id: null,
+        });
+        config = await this.configuracionRepositorio.save(config);
+      }
+      return config;
+    } catch {
+      return null;
+    }
+  }
+
+  async calcularEstadoOrdenGlobal(): Promise<{
+    confirmacion_activa: boolean;
+    fecha_ultima_solicitud: string | null;
+    puede_solicitar: boolean;
+    dias_restantes: number;
+    segundos_restantes: number;
+  }> {
+    const COOLDOWN_CONFIRMACION_MS = 7 * 24 * 60 * 60 * 1000;
+    const config = await this.obtenerConfiguracion();
+    const ahora_ms = Date.now();
+    let puede_solicitar = true;
+    let dias_restantes = 0;
+    let segundos_restantes = 0;
+    const fecha_ultima = config?.fecha_ultima_orden_confirmacion ?? this.fecha_ultima_orden_confirmacion;
+
+    if (fecha_ultima) {
+      const ultima_ms = new Date(fecha_ultima).getTime();
+      const tiempo_transcurrido_ms = ahora_ms - ultima_ms;
+
+      if (tiempo_transcurrido_ms < COOLDOWN_CONFIRMACION_MS) {
+        puede_solicitar = false;
+        const restante_ms = COOLDOWN_CONFIRMACION_MS - tiempo_transcurrido_ms;
+        segundos_restantes = Math.ceil(restante_ms / 1000);
+        dias_restantes = Math.ceil(restante_ms / (24 * 60 * 60 * 1000));
+      }
+    }
+
+    const confirmacion_activa = config
+      ? Boolean(config.confirmacion_datos_activa)
+      : this.confirmacion_datos_requerida;
+
+    return {
+      confirmacion_activa,
+      fecha_ultima_solicitud: fecha_ultima ? new Date(fecha_ultima).toISOString() : null,
+      puede_solicitar,
+      dias_restantes,
+      segundos_restantes,
+    };
+  }
+
+  async ordenConfirmacionDatos(activa: boolean = true, admin_id?: number): Promise<{
+    mensaje: string;
+    confirmacion_datos_requerida: boolean;
+    fecha_ultima_solicitud?: string;
+    puede_solicitar?: boolean;
+    dias_restantes?: number;
+  }> {
+    if (activa) {
+      const estado = await this.calcularEstadoOrdenGlobal();
+      if (!estado.puede_solicitar) {
+        throw new BadRequestException(
+          `No es posible emitir una nueva orden. Período de enfriamiento institucional activo: restan ${estado.dias_restantes} día(s).`,
+        );
+      }
+    }
+
+    const ahora = new Date();
     this.confirmacion_datos_requerida = activa;
     if (activa) {
-      // Al emitir la orden periódica, se resetea la bandera para exigir confirmación
+      this.fecha_ultima_orden_confirmacion = ahora;
+    }
+
+    const config = await this.obtenerConfiguracion();
+    if (config) {
+      config.confirmacion_datos_activa = activa;
+      if (activa) {
+        config.fecha_ultima_orden_confirmacion = ahora;
+        if (admin_id) config.emitida_por_usuario_id = admin_id;
+      }
+      try {
+        await this.configuracionRepositorio!.save(config);
+      } catch {}
+    }
+
+    if (activa) {
       await this.becarioRepositorio.update({}, { datos_confirmados: false });
     }
+
     return {
       mensaje: activa
-        ? 'Orden de confirmación periódica de datos activada'
-        : 'Orden de confirmación periódica de datos desactivada',
-      confirmacion_datos_requerida: this.confirmacion_datos_requerida,
+        ? 'Orden institucional de verificación de datos activada exitosamente.'
+        : 'Orden de verificación de datos desactivada.',
+      confirmacion_datos_requerida: activa,
+      fecha_ultima_solicitud: ahora.toISOString(),
+      puede_solicitar: !activa,
+      dias_restantes: activa ? 7 : 0,
     };
   }
 
@@ -211,16 +315,23 @@ export class BecariosServicio {
     datos_confirmados: boolean;
     datos_validados: boolean;
     debe_confirmar: boolean;
+    fecha_ultima_solicitud: string | null;
   }> {
+    const config = await this.obtenerConfiguracion();
     const becario = await this.becarioRepositorio.findOne({ where: { usuario_id } });
     const datos_confirmados = becario ? Boolean(becario.datos_confirmados) : false;
     const datos_validados = becario ? Boolean(becario.datos_validados) : false;
+    const confirmacion_datos_requerida = config
+      ? Boolean(config.confirmacion_datos_activa)
+      : this.confirmacion_datos_requerida;
+    const fecha_ultima = config?.fecha_ultima_orden_confirmacion ?? this.fecha_ultima_orden_confirmacion;
 
     return {
-      confirmacion_datos_requerida: this.confirmacion_datos_requerida,
+      confirmacion_datos_requerida,
       datos_confirmados,
       datos_validados,
-      debe_confirmar: this.confirmacion_datos_requerida && !datos_confirmados,
+      debe_confirmar: confirmacion_datos_requerida && !datos_confirmados,
+      fecha_ultima_solicitud: fecha_ultima ? new Date(fecha_ultima).toISOString() : null,
     };
   }
 
@@ -263,6 +374,61 @@ export class BecariosServicio {
     }
 
     return { mensaje: 'Becario desactivado correctamente' };
+  }
+
+  async obtenerHorarios(becario_id: number): Promise<HorarioApoyo[]> {
+    if (!this.horarioRepositorio) return [];
+    return this.horarioRepositorio.find({
+      where: { becario_id },
+      order: { dia_semana: 'ASC' },
+    });
+  }
+
+  async guardarHorarios(
+    becario_id: number,
+    datos: {
+      lugar_practica_id?: number;
+      dias: Array<{
+        dia_semana: number;
+        hora_inicio: string;
+        hora_fin: string;
+        horas_diarias?: number;
+        turno?: string;
+        activo?: boolean;
+      }>;
+    },
+  ): Promise<HorarioApoyo[]> {
+    const becario = await this.becarioRepositorio.findOne({ where: { id: becario_id } });
+    if (!becario) {
+      throw new NotFoundException(`Becario con ID ${becario_id} no encontrado`);
+    }
+
+    if (datos.lugar_practica_id) {
+      becario.lugar_practica_id = datos.lugar_practica_id;
+      await this.becarioRepositorio.save(becario);
+    }
+
+    if (!this.horarioRepositorio) return [];
+
+    await this.horarioRepositorio.delete({ becario_id });
+
+    if (!datos.dias || datos.dias.length === 0) {
+      return [];
+    }
+
+    const nuevos = datos.dias.map((d) =>
+      this.horarioRepositorio!.create({
+        becario_id,
+        dia_semana: d.dia_semana,
+        hora_inicio: d.hora_inicio,
+        hora_fin: d.hora_fin,
+        horas_diarias: d.horas_diarias || 4.0,
+        turno: d.turno || 'personalizado',
+        activo: d.activo !== undefined ? d.activo : true,
+      }),
+    );
+
+    return this.horarioRepositorio.save(nuevos);
   }
 }
 

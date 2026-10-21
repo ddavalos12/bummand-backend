@@ -13,6 +13,8 @@ import { ParadaTransporte, PARADAS_OFICIALES_DEFECTO } from '../modulos/pasajes/
 import { Evento, TipoEvento, EstadoEvento } from '../modulos/eventos/entidades/evento.entidad';
 import { HorarioApoyo } from '../modulos/becarios/entidades/horario-apoyo.entidad';
 import { AsignacionPractica } from '../modulos/becarios/entidades/asignacion-practica.entidad';
+import { PreguntaBienestar } from '../modulos/evaluaciones/entidades/pregunta-bienestar.entidad';
+import { PREGUNTAS_BIENESTAR_DEFECTO } from '../modulos/evaluaciones/constantes/preguntas-bienestar.constantes';
 import { hashearContrasena } from '../utilidades/hash.utilidad';
 import {
   ADMINISTRADORES_SEMILLA,
@@ -55,6 +57,9 @@ export class SemillaServicio implements OnModuleInit {
     @Optional()
     @InjectRepository(Evento)
     private readonly evento_repo?: Repository<Evento>,
+    @Optional()
+    @InjectRepository(PreguntaBienestar)
+    private readonly pregunta_bienestar_repo?: Repository<PreguntaBienestar>,
   ) {}
 
   async onModuleInit() {
@@ -138,6 +143,26 @@ export class SemillaServicio implements OnModuleInit {
         });
         await this.evaluador_repo.save(evaluador_sup);
       }
+    }
+
+    let evaluador_becario = await this.evaluador_repo.findOne({ where: { tipo: TipoEvaluador.BECARIO } });
+    if (!evaluador_becario) {
+      evaluador_becario = this.evaluador_repo.create({
+        nombre: 'Autoevaluación Becario',
+        tipo: TipoEvaluador.BECARIO,
+        correo: 'becario@diaconia.bo',
+      });
+      await this.evaluador_repo.save(evaluador_becario);
+    }
+
+    let evaluador_social = await this.evaluador_repo.findOne({ where: { tipo: TipoEvaluador.TRABAJADOR_SOCIAL } });
+    if (!evaluador_social) {
+      evaluador_social = this.evaluador_repo.create({
+        nombre: 'Trabajador Social Diaconía',
+        tipo: TipoEvaluador.TRABAJADOR_SOCIAL,
+        correo: 'social@diaconia.bo',
+      });
+      await this.evaluador_repo.save(evaluador_social);
     }
 
     // 3. Lugares de práctica institucionales (Sede Central y Red de Agencias Diaconía)
@@ -288,21 +313,25 @@ export class SemillaServicio implements OnModuleInit {
 
     const todos_usuarios_db = await this.usuario_repo.find();
     for (const u_db of todos_usuarios_db) {
-      if (u_db.rol === Rol.BECARIO && !correos_oficiales_becarios.has(u_db.correo)) {
-        this.logger.log(`Depurando usuario becario de prueba/no oficial: ${u_db.correo}`);
-        const bec = await this.becario_repo.findOne({ where: { usuario_id: u_db.id } });
-        if (bec) await this.becario_repo.remove(bec);
-        await this.usuario_repo.remove(u_db);
-      } else if (u_db.rol === Rol.SUPERVISOR && !correos_oficiales_supervisores.has(u_db.correo)) {
-        this.logger.log(`Depurando usuario supervisor de prueba: ${u_db.correo}`);
-        await this.usuario_repo.remove(u_db);
-      } else if (u_db.rol === Rol.ADMINISTRADOR && !correos_oficiales_admins.has(u_db.correo)) {
-        this.logger.log(`Depurando usuario administrador de prueba: ${u_db.correo}`);
-        await this.usuario_repo.remove(u_db);
+      try {
+        if (u_db.rol === Rol.BECARIO && !correos_oficiales_becarios.has(u_db.correo)) {
+          this.logger.log(`Depurando usuario becario de prueba/no oficial: ${u_db.correo}`);
+          const bec = await this.becario_repo.findOne({ where: { usuario_id: u_db.id } });
+          if (bec) await this.becario_repo.remove(bec);
+          await this.usuario_repo.remove(u_db);
+        } else if (u_db.rol === Rol.SUPERVISOR && !correos_oficiales_supervisores.has(u_db.correo)) {
+          this.logger.log(`Depurando usuario supervisor de prueba: ${u_db.correo}`);
+          await this.usuario_repo.remove(u_db);
+        } else if (u_db.rol === Rol.ADMINISTRADOR && !correos_oficiales_admins.has(u_db.correo)) {
+          this.logger.log(`Depurando usuario administrador de prueba: ${u_db.correo}`);
+          await this.usuario_repo.remove(u_db);
+        }
+      } catch (err: any) {
+        this.logger.warn(`No se pudo eliminar usuario obsoleto ${u_db.correo}: ${err.message}`);
       }
     }
 
-    // 6. Siembra de todos los Estudiantes / Becarios Institucionales (30 becarios oficiales)
+    // 6. Siembra de todos los Estudiantes / Becarios Institucionales (23 becarios oficiales)
     const supervisor_por_defecto = mapa_supervisores.get('angel.ali@bumand.bo');
 
     for (const b_semilla of BECARIOS_SEMILLA) {
@@ -312,7 +341,7 @@ export class SemillaServicio implements OnModuleInit {
         usuario_becario = this.usuario_repo.create({
           nombre: b_semilla.nombre,
           correo: b_semilla.correo,
-          contrasena_hash: await hashearContrasena(b_semilla.clave),
+          contrasena_hash: await hashearContrasena(b_semilla.clave || 'Bumand2026!'),
           rol: Rol.BECARIO,
           estado: EstadoUsuario.ACTIVO,
           correo_confirmado: true,
@@ -321,62 +350,77 @@ export class SemillaServicio implements OnModuleInit {
         this.logger.log(`Estudiante/Becario creado: ${b_semilla.correo} (${b_semilla.nombre})`);
       } else {
         usuario_becario.nombre = b_semilla.nombre;
-        usuario_becario.rol = Rol.BECARIO;
+        if (usuario_becario.rol !== Rol.ADMINISTRADOR) {
+          usuario_becario.rol = Rol.BECARIO;
+        }
         usuario_becario.estado = EstadoUsuario.ACTIVO;
         usuario_becario.correo_confirmado = true;
         usuario_becario = await this.usuario_repo.save(usuario_becario);
       }
 
       // b) Determinar supervisor institucional asignado
-      let supervisor_asignado = mapa_supervisores.get(b_semilla.supervisor_correo);
+      let supervisor_asignado = b_semilla.supervisor_correo
+        ? mapa_supervisores.get(b_semilla.supervisor_correo)
+        : null;
       if (!supervisor_asignado) {
         supervisor_asignado = supervisor_por_defecto;
       }
 
       // c) Determinar iglesia institucional asignada
-      let iglesia_asignada: Iglesia | null = mapa_iglesias.get(b_semilla.iglesia_nombre) ?? null;
+      let iglesia_asignada: Iglesia | null = b_semilla.iglesia_nombre
+        ? mapa_iglesias.get(b_semilla.iglesia_nombre) ?? null
+        : null;
       if (!iglesia_asignada) {
         iglesia_asignada = mapa_iglesias.get('Iglesia Central El Alto') ?? null;
       }
 
-      // d) Crear o sincronizar perfil de becario
+      // d) Crear o sincronizar perfil de becario con todos los campos reales
       let becario_existente = await this.becario_repo.findOne({
         where: [{ usuario_id: usuario_becario.id }, { ci: b_semilla.ci }],
       });
 
+      const datos_perfil = {
+        usuario_id: usuario_becario.id,
+        nombre: b_semilla.nombre,
+        ci: b_semilla.ci,
+        lugar_expedicion: b_semilla.lugar_expedicion || null,
+        estado_civil: b_semilla.estado_civil || null,
+        sexo: b_semilla.sexo || null,
+        ceti: b_semilla.ceti !== undefined ? b_semilla.ceti : null,
+        celular: b_semilla.celular || null,
+        fecha_nacimiento: b_semilla.fecha_nacimiento || null,
+        edad: b_semilla.edad !== undefined ? b_semilla.edad : null,
+        direccion: b_semilla.direccion || null,
+        ciudad: b_semilla.ciudad || null,
+        carrera: b_semilla.carrera,
+        universidad: b_semilla.universidad,
+        institucion: b_semilla.institucion || 'Diaconía FRIF-IFD',
+        unidad: b_semilla.unidad,
+        ubicacion: b_semilla.ubicacion || null,
+        fecha_ingreso: new Date('2026-01-15'),
+        lugar_practica_id: lugar_central ? lugar_central.id : null,
+        iglesia_id: iglesia_asignada ? iglesia_asignada.id : null,
+        supervisor_id: supervisor_asignado ? supervisor_asignado.id : null,
+        horario_semanal: b_semilla.horario_semanal || null,
+        datos_confirmados: true,
+        datos_validados: true,
+        fecha_ultima_confirmacion: new Date('2026-01-15'),
+        modalidad_carrera: b_semilla.modalidad_carrera || null,
+        tipo_beca: b_semilla.tipo_beca || null,
+        comentario_academico: b_semilla.comentario_academico || null,
+        comentario_iglesia: b_semilla.comentario_iglesia || null,
+      };
+
+      let becario_guardado: Becario;
       if (!becario_existente) {
         const nuevo_becario = this.becario_repo.create({
-          usuario_id: usuario_becario.id,
-          ci: b_semilla.ci,
-          carrera: b_semilla.carrera,
-          universidad: b_semilla.universidad,
-          institucion: b_semilla.institucion,
-          unidad: b_semilla.unidad,
-          fecha_ingreso: new Date('2026-01-15'),
-          lugar_practica_id: lugar_central ? lugar_central.id : null,
-          iglesia_id: iglesia_asignada ? iglesia_asignada.id : null,
-          supervisor_id: supervisor_asignado ? supervisor_asignado.id : null,
-          horario_semanal: b_semilla.horario_semanal,
-          datos_confirmados: true,
-          datos_validados: true,
-          fecha_ultima_confirmacion: new Date('2026-01-15'),
+          ...datos_perfil,
           usuario: usuario_becario,
         });
-        var becario_guardado = await this.becario_repo.save(nuevo_becario);
+        becario_guardado = await this.becario_repo.save(nuevo_becario);
       } else {
-        becario_existente.usuario_id = usuario_becario.id;
-        becario_existente.ci = b_semilla.ci;
-        becario_existente.carrera = b_semilla.carrera;
-        becario_existente.universidad = b_semilla.universidad;
-        becario_existente.institucion = b_semilla.institucion;
-        becario_existente.unidad = b_semilla.unidad;
-        becario_existente.lugar_practica_id = lugar_central ? lugar_central.id : null;
-        becario_existente.iglesia_id = iglesia_asignada ? iglesia_asignada.id : null;
-        becario_existente.supervisor_id = supervisor_asignado ? supervisor_asignado.id : null;
-        becario_existente.horario_semanal = b_semilla.horario_semanal;
-        becario_existente.datos_confirmados = true;
-        becario_existente.datos_validados = true;
-        var becario_guardado = await this.becario_repo.save(becario_existente);
+        Object.assign(becario_existente, datos_perfil);
+        becario_guardado = await this.becario_repo.save(becario_existente);
       }
 
       // f) Formalización de Horarios de Apoyo con Foreign Key íntegra becario_id
@@ -536,6 +580,17 @@ export class SemillaServicio implements OnModuleInit {
         });
         await this.evento_repo.save(evento_semilla);
         this.logger.log(`Evento semilla programado creado: "${titulo_evento_semilla}".`);
+      }
+    }
+
+    // 12. Cuestionario de Bienestar Universitario (26 preguntas canónicas)
+    if (this.pregunta_bienestar_repo) {
+      const cuenta_preguntas = await this.pregunta_bienestar_repo.count();
+      if (cuenta_preguntas === 0) {
+        for (const p of PREGUNTAS_BIENESTAR_DEFECTO) {
+          await this.pregunta_bienestar_repo.save(this.pregunta_bienestar_repo.create(p));
+        }
+        this.logger.log('Cuestionario de Bienestar Universitario (26 preguntas) sembrado con éxito.');
       }
     }
 
