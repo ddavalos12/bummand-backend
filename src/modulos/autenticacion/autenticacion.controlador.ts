@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { InicioSesionDto } from './dtos/inicio-sesion.dto';
 import { ConfirmarCorreoDto } from './dtos/confirmar-correo.dto';
@@ -75,6 +75,19 @@ export class AutenticacionControlador {
   })
   confirmarCorreo(@Body() dto: ConfirmarCorreoDto) {
     return this.autenticacionServicio.confirmarCorreo(dto);
+  }
+
+  @Get('verificar-ci/:ci')
+  @ApiOperation({
+    summary: 'Verificar existencia y estado de registro de un becario por su C.I.',
+    description: 'Permite a la aplicación móvil comprobar en tiempo real si un C.I. está pre-registrado en la nómina oficial antes de proceder al formulario de credenciales.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Estado del C.I. en la nómina oficial.',
+  })
+  verificarCi(@Param('ci') ci: string) {
+    return this.autenticacionServicio.verificarCi(ci);
   }
 
   @Post('registro')

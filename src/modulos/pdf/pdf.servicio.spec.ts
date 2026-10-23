@@ -90,4 +90,151 @@ describe('PdfServicio', () => {
       expect(html).toContain('Líder comprometido');
     });
   });
+
+  describe('parsearMes', () => {
+    it('debe parsear formato YYYY-MM correctamente', () => {
+      const res = servicio.parsearMes('2026-10');
+      expect(res.anio).toBe(2026);
+      expect(res.mes_num).toBe(10);
+      expect(res.fecha_inicio).toBe('2026-10-01');
+      expect(res.fecha_fin).toBe('2026-10-31');
+      expect(res.mes_nombre).toBe('Octubre 2026');
+    });
+
+    it('debe parsear nombre de mes en español', () => {
+      const res = servicio.parsearMes('Septiembre 2026');
+      expect(res.anio).toBe(2026);
+      expect(res.mes_num).toBe(9);
+      expect(res.fecha_inicio).toBe('2026-09-01');
+      expect(res.fecha_fin).toBe('2026-09-30');
+      expect(res.mes_nombre).toBe('Septiembre 2026');
+    });
+  });
+
+  describe('generarExpedienteRecorridosEstudianteHtml', () => {
+    it('debe generar HTML completo del expediente mensual de recorridos con cálculo exacto del 80% y firmas', () => {
+      const html = servicio.generarExpedienteRecorridosEstudianteHtml({
+        nombre_estudiante: 'Carlos Oscar Luna Lizarraga',
+        ci_estudiante: '9943280 LP',
+        carrera_estudiante: 'Economía',
+        universidad_estudiante: 'UMSA',
+        sede_estudiante: 'Oficina Central Diaconía',
+        supervisor_nombre: 'Lic. Angel Javier Ali Paz',
+        mes_nombre: 'Octubre 2026',
+        items: [
+          {
+            numero: 1,
+            fecha: '2026-10-02',
+            dia_semana: 'Viernes',
+            tramo: 'Ida',
+            origen: 'Ceja El Alto',
+            destino: 'San Francisco',
+            calles_declaradas: 'Av. 6 de Marzo, Autopista',
+            medio_transporte: 'Minibús Interciudad',
+            tipo_actividad: 'Prácticas',
+            apoyo_realizado: 'Conciliación de cartera',
+            tarifa: 3.5,
+          },
+        ],
+        total_bruto: 3.5,
+        total_devolucion: 2.8,
+        total_tramos: 1,
+        tramos_ida: 1,
+        tramos_vuelta: 0,
+        dias_unicos: 1,
+      });
+
+      expect(html).toContain('Expediente Mensual Oficial de Recorridos y Liquidación de Pasajes (80%)');
+      expect(html).toContain('Carlos Oscar Luna Lizarraga');
+      expect(html).toContain('9943280 LP');
+      expect(html).toContain('Economía');
+      expect(html).toContain('Ceja El Alto');
+      expect(html).toContain('San Francisco');
+      expect(html).toContain('MONTO REEMBOLSO OFICIAL BUMAND (80% EN CENTAVOS)');
+      expect(html).toContain('Bs 2.80');
+      expect(html).toContain('Firma del Estudiante Becario');
+      expect(html).toContain('Supervisor Institucional');
+      expect(html).toContain('Visto Bueno y Liquidación · Fundación Diaconía FRIF-IFD');
+    });
+  });
+
+  describe('generarAsistenciaMensualEstudianteHtml', () => {
+    it('debe generar HTML completo del kárdex mensual de asistencia de un solo estudiante', () => {
+      const html = servicio.generarAsistenciaMensualEstudianteHtml({
+        nombre_estudiante: 'Adai Belen Huayta Cardozo',
+        ci_estudiante: '13696496 LP',
+        carrera_estudiante: 'Estadística',
+        universidad_estudiante: 'UMSA',
+        sede_estudiante: 'Sede Central Blq. A',
+        supervisor_nombre: 'Lic. Angel Javier Ali Paz',
+        mes_nombre: 'Octubre 2026',
+        items: [
+          {
+            numero: 1,
+            fecha: '2026-10-02',
+            dia_semana: 'Viernes',
+            tipo: 'Escuela de Líderes',
+            sede: 'Auditorio Central',
+            hora_prevista: '14:30',
+            hora_ingreso: '14:25',
+            hora_salida: '17:00',
+            retraso_m: 0,
+            horas: 2.5,
+            geocerca: 'Conforme (22m GPS)',
+            estado: 'Puntual Conforme',
+            es_retraso: false,
+          },
+        ],
+        total_dias: 1,
+        horas_totales: 2.5,
+        meta_horas: 40.0,
+        pct_avance: 6,
+        asistencias_conformes: 1,
+        pct_puntualidad: '100.0',
+        total_retrasos: 0,
+        minutos_totales_retraso: 0,
+        horas_practicas: '0.0',
+        horas_lideres: '2.5',
+        horas_servicio: '0.0',
+      });
+
+      expect(html).toContain('Kárdex Oficial Individual de Asistencia y Puntualidad Mensual');
+      expect(html).toContain('Adai Belen Huayta Cardozo');
+      expect(html).toContain('13696496 LP');
+      expect(html).toContain('Estadística');
+      expect(html).toContain('Escuela de Líderes');
+      expect(html).toContain('TOTAL HORAS ACREDITADAS EN EL MES');
+      expect(html).toContain('Firma del Estudiante Becario');
+      expect(html).toContain('Supervisor Tutor Institucional');
+      expect(html).toContain('Auditoría y Certificación de Asistencia · Diaconía IFD');
+    });
+  });
+
+  describe('generación binaria con Puppeteer', () => {
+    it('debe generar el buffer PDF válido del expediente de recorridos mensual', async () => {
+      const resultado = await servicio.generarExpedienteRecorridosEstudiantePdf({
+        becario_id: 7,
+        mes: '2026-10',
+      });
+
+      expect(resultado).toBeDefined();
+      expect(resultado.bufer).toBeInstanceOf(Buffer);
+      expect(resultado.bufer.length).toBeGreaterThan(0);
+      expect(resultado.nombre_archivo).toContain('Expediente_Recorridos_');
+      expect(resultado.mes_nombre).toBe('Octubre 2026');
+    });
+
+    it('debe generar el buffer PDF válido del kárdex de asistencia mensual', async () => {
+      const resultado = await servicio.generarAsistenciaMensualEstudiantePdf({
+        becario_id: 1,
+        mes: '2026-10',
+      });
+
+      expect(resultado).toBeDefined();
+      expect(resultado.bufer).toBeInstanceOf(Buffer);
+      expect(resultado.bufer.length).toBeGreaterThan(0);
+      expect(resultado.nombre_archivo).toContain('Asistencia_Mensual_');
+      expect(resultado.mes_nombre).toBe('Octubre 2026');
+    });
+  });
 });

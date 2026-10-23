@@ -11,6 +11,8 @@ import { ModuloEvaluacion } from '../modulos/evaluaciones/entidades/modulo-evalu
 import { PeriodoEvaluacion } from '../modulos/evaluaciones/entidades/periodo-evaluacion.entidad';
 import { Evaluador } from '../modulos/evaluaciones/entidades/evaluador.entidad';
 import { PreguntaBienestar } from '../modulos/evaluaciones/entidades/pregunta-bienestar.entidad';
+import { Cuestionario } from '../modulos/evaluaciones/entidades/cuestionario.entidad';
+import { PreguntaCuestionario } from '../modulos/evaluaciones/entidades/pregunta-cuestionario.entidad';
 import { TarifaTransporte } from '../modulos/pasajes/entidades/tarifa-transporte.entidad';
 import { ParadaTransporte } from '../modulos/pasajes/entidades/parada-transporte.entidad';
 import { Evento } from '../modulos/eventos/entidades/evento.entidad';
@@ -28,6 +30,8 @@ import { Evento } from '../modulos/eventos/entidades/evento.entidad';
       PeriodoEvaluacion,
       Evaluador,
       PreguntaBienestar,
+      Cuestionario,
+      PreguntaCuestionario,
       TarifaTransporte,
       ParadaTransporte,
       Evento,

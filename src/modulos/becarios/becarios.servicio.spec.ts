@@ -170,4 +170,35 @@ describe('BecariosServicio', () => {
       expect(becario_repo.save).toHaveBeenCalled();
     });
   });
+
+  describe('Creación de becario (Pre-nómina y auto-registro)', () => {
+    it('debe registrar un becario en pre-nómina sin credenciales (usuario_id null)', async () => {
+      becario_repo.findOne.mockResolvedValue(null);
+
+      const resultado = await servicio.crear({
+        ci: '9107373',
+        nombre: 'Adai Belen Huayta',
+        carrera: 'Ingeniería de Sistemas',
+        universidad: 'UMSA',
+      });
+
+      expect(resultado.ci).toBe('9107373');
+      expect(resultado.usuario_id).toBeNull();
+      expect(usuario_repo.create).not.toHaveBeenCalled();
+      expect(becario_repo.save).toHaveBeenCalled();
+    });
+
+    it('debe rechazar la creación si el C.I. ya está registrado', async () => {
+      becario_repo.findOne.mockResolvedValue({ id: 1, ci: '9107373' });
+
+      await expect(
+        servicio.crear({
+          ci: '9107373',
+          nombre: 'Adai Belen Huayta',
+          carrera: 'Ingeniería de Sistemas',
+          universidad: 'UMSA',
+        }),
+      ).rejects.toThrow('Ya existe un becario registrado con el C.I. 9107373');
+    });
+  });
 });

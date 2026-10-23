@@ -45,38 +45,58 @@ export class BecariosServicio {
   }
 
   async crear(dto: CrearBecarioDto): Promise<Becario> {
-    const correoExistente = await this.usuarioRepositorio.findOne({ where: { correo: dto.correo } });
-    if (correoExistente) {
-      throw new ConflictException('Ya existe un usuario con ese correo');
+    const ci_limpio = dto.ci?.trim();
+    if (!ci_limpio) {
+      throw new BadRequestException('El número de carnet de identidad (C.I.) es obligatorio');
+    }
+
+    const becarioExistente = await this.becarioRepositorio.findOne({
+      where: { ci: ci_limpio },
+    });
+    if (becarioExistente) {
+      throw new ConflictException(`Ya existe un becario registrado con el C.I. ${ci_limpio}`);
     }
 
     if (dto.supervisor_id) {
       await this.validarSupervisor(dto.supervisor_id);
     }
 
-    const nuevoUsuario = this.usuarioRepositorio.create({
-      nombre: dto.nombre,
-      correo: dto.correo,
-      contrasena_hash: await hashearContrasena(dto.contrasena),
-      rol: Rol.BECARIO,
-      estado: EstadoUsuario.ACTIVO,
-    });
+    let usuarioGuardado: Usuario | null = null;
+    if (dto.correo && dto.contrasena) {
+      const correo_limpio = dto.correo.trim().toLowerCase();
+      const correoExistente = await this.usuarioRepositorio.findOne({ where: { correo: correo_limpio } });
+      if (correoExistente) {
+        throw new ConflictException('Ya existe un usuario con ese correo');
+      }
 
-    const usuarioGuardado = await this.usuarioRepositorio.save(nuevoUsuario);
+      const nuevoUsuario = this.usuarioRepositorio.create({
+        nombre: dto.nombre,
+        correo: correo_limpio,
+        contrasena_hash: await hashearContrasena(dto.contrasena),
+        rol: Rol.BECARIO,
+        estado: EstadoUsuario.ACTIVO,
+        correo_confirmado: true,
+      });
+
+      usuarioGuardado = await this.usuarioRepositorio.save(nuevoUsuario);
+    }
+
+    const fecha_ingreso_final = dto.fecha_ingreso ? new Date(dto.fecha_ingreso) : new Date();
 
     const nuevoBecario = this.becarioRepositorio.create({
       nombre: dto.nombre,
-      ci: dto.ci || null,
+      ci: ci_limpio,
       carrera: dto.carrera,
       universidad: dto.universidad,
       institucion: dto.institucion || null,
       unidad: dto.unidad || null,
       horario_semanal: dto.horario_semanal || null,
-      fecha_ingreso: new Date(dto.fecha_ingreso),
+      fecha_ingreso: fecha_ingreso_final,
       iglesia: dto.iglesia_id ? ({ id: dto.iglesia_id } as Iglesia) : null,
       lugar_practica: dto.lugar_practica_id ? ({ id: dto.lugar_practica_id } as LugarPractica) : null,
       supervisor: dto.supervisor_id ? ({ id: dto.supervisor_id } as Usuario) : null,
       usuario: usuarioGuardado,
+      usuario_id: usuarioGuardado ? usuarioGuardado.id : null,
     });
 
     return this.becarioRepositorio.save(nuevoBecario);

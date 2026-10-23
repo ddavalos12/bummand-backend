@@ -3,6 +3,16 @@ import { IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString, MinLength, MaxLeng
 
 export class CrearBecarioDto {
   @ApiProperty({
+    example: '10028341',
+    description: 'Cédula de identidad (C.I.) del becario registrada por la administración',
+    maxLength: 20,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(20)
+  ci: string;
+
+  @ApiProperty({
     example: 'Nilda Churata Quispe',
     description: 'Nombre completo del becario',
     maxLength: 150,
@@ -12,24 +22,25 @@ export class CrearBecarioDto {
   @MaxLength(150)
   nombre: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'nilda.churata@diaconia.bo',
-    description: 'Correo electrónico del becario',
+    description: 'Correo electrónico del becario (opcional en alta inicial, el becario puede definirlo desde la app)',
     maxLength: 150,
   })
+  @IsOptional()
   @IsEmail()
-  @IsNotEmpty()
   @MaxLength(150)
-  correo: string;
+  correo?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'ClaveSegura123*',
-    description: 'Contraseña para la cuenta del becario',
+    description: 'Contraseña para la cuenta del becario (opcional si el becario se registra desde el móvil)',
     minLength: 6,
   })
+  @IsOptional()
   @IsString()
   @MinLength(6)
-  contrasena: string;
+  contrasena?: string;
 
   @ApiProperty({
     example: 'Ingeniería de Sistemas',
@@ -95,23 +106,13 @@ export class CrearBecarioDto {
   @MaxLength(150)
   unidad?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '2026-02-01',
     description: 'Fecha de ingreso al programa BUMAND (formato YYYY-MM-DD)',
   })
-  @IsDateString()
-  @IsNotEmpty()
-  fecha_ingreso: string;
-
-  @ApiPropertyOptional({
-    example: '10028341 LP',
-    description: 'Cédula de identidad del becario',
-    maxLength: 20,
-  })
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  ci?: string;
+  @IsDateString()
+  fecha_ingreso?: string;
 
   @ApiPropertyOptional({
     example: { lun: '08:00-12:00', mar: '', mie: '08:00-12:00', jue: '', vie: '08:00-14:00', sab: '', dom: '' },

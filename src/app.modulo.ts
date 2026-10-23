@@ -21,6 +21,8 @@ import { Evaluador } from './modulos/evaluaciones/entidades/evaluador.entidad';
 import { Evaluacion } from './modulos/evaluaciones/entidades/evaluacion.entidad';
 import { EvaluacionPastor } from './modulos/evaluaciones/entidades/evaluacion-pastor.entidad';
 import { PreguntaBienestar } from './modulos/evaluaciones/entidades/pregunta-bienestar.entidad';
+import { Cuestionario } from './modulos/evaluaciones/entidades/cuestionario.entidad';
+import { PreguntaCuestionario } from './modulos/evaluaciones/entidades/pregunta-cuestionario.entidad';
 import { CasoSeguimientoPastoral } from './modulos/evaluaciones/entidades/caso-seguimiento-pastoral.entidad';
 import { AprobacionPracticas } from './modulos/practicas/entidades/aprobacion-practicas.entidad';
 import { Notificacion } from './modulos/notificaciones/entidades/notificacion.entidad';
@@ -84,6 +86,8 @@ import { RefrigeriosModulo } from './modulos/refrigerios/refrigerios.modulo';
         Evaluacion,
         EvaluacionPastor,
         PreguntaBienestar,
+        Cuestionario,
+        PreguntaCuestionario,
         CasoSeguimientoPastoral,
         AprobacionPracticas,
         Notificacion,

@@ -86,6 +86,56 @@ export class AutenticacionServicio {
     };
   }
 
+  async verificarCi(ci: string) {
+    const ci_solicitado = (ci || '').trim();
+    if (!ci_solicitado) {
+      throw new BadRequestException('El número de carnet de identidad (C.I.) es obligatorio');
+    }
+
+    const ci_digitos = ci_solicitado.replace(/[^0-9]/g, '');
+
+    const becarios_registrados = await this.becarioRepositorio.find({
+      relations: { usuario: true },
+    });
+
+    const becario_coincidente = becarios_registrados.find((b) => {
+      if (!b.ci) return false;
+      const ci_actual_limpio = b.ci.trim().toLowerCase();
+      const ci_actual_digitos = b.ci.replace(/[^0-9]/g, '');
+      return (
+        ci_actual_limpio === ci_solicitado.toLowerCase() ||
+        (ci_digitos.length >= 5 && ci_actual_digitos === ci_digitos)
+      );
+    });
+
+    if (!becario_coincidente) {
+      return {
+        existe: false,
+        ya_registrado: false,
+        mensaje: `El C.I. ${ci_solicitado} no figura en la nómina oficial de becarios cargada por la administración.`,
+      };
+    }
+
+    if (becario_coincidente.usuario_id && becario_coincidente.usuario) {
+      return {
+        existe: true,
+        ya_registrado: true,
+        nombre: becario_coincidente.nombre,
+        correo: becario_coincidente.usuario.correo,
+        mensaje: `El becario con C.I. ${becario_coincidente.ci} ya cuenta con una cuenta activa (${becario_coincidente.usuario.correo}). Inicie sesión.`,
+      };
+    }
+
+    return {
+      existe: true,
+      ya_registrado: false,
+      nombre: becario_coincidente.nombre,
+      carrera: becario_coincidente.carrera,
+      universidad: becario_coincidente.universidad,
+      mensaje: 'Becario verificado en nómina institucional. Listo para crear credenciales.',
+    };
+  }
+
   async registrarBecario(dto: RegistroBecarioDto) {
     const ci_solicitado = (dto.ci || '').trim();
     if (!ci_solicitado) {

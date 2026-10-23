@@ -7,6 +7,8 @@ import { PeriodoEvaluacion, EstadoPeriodo } from './entidades/periodo-evaluacion
 import { Evaluador, TipoEvaluador } from './entidades/evaluador.entidad';
 import { EvaluacionPastor } from './entidades/evaluacion-pastor.entidad';
 import { PreguntaBienestar } from './entidades/pregunta-bienestar.entidad';
+import { Cuestionario } from './entidades/cuestionario.entidad';
+import { PreguntaCuestionario } from './entidades/pregunta-cuestionario.entidad';
 import {
   CasoSeguimientoPastoral,
   EstadoCasoPastoral,
@@ -28,6 +30,10 @@ import { ActualizarPeriodoEvaluacionDto } from './dtos/actualizar-periodo-evalua
 import { ReceptorAcademicaDto } from './dtos/receptor-academica.dto';
 import { ReceptorMentorQrDto } from './dtos/receptor-mentor-qr.dto';
 import { ReceptorSocioeconomicaDto } from './dtos/receptor-socioeconomica.dto';
+import { CrearCuestionarioDto } from './dtos/crear-cuestionario.dto';
+import { ActualizarCuestionarioDto } from './dtos/actualizar-cuestionario.dto';
+import { CrearPreguntaCuestionarioDto } from './dtos/crear-pregunta-cuestionario.dto';
+import { ActualizarPreguntaCuestionarioDto } from './dtos/actualizar-pregunta-cuestionario.dto';
 import { SolicitarCodigoTutorDto, VerificarCodigoTutorDto } from './dtos/verificacion-tutor.dto';
 import { BibliaServicio } from '../biblia/biblia.servicio';
 import { Becario } from '../becarios/entidades/becario.entidad';
@@ -111,6 +117,12 @@ export class EvaluacionesServicio {
     @Optional()
     @InjectRepository(PreguntaBienestar)
     private readonly pregunta_bienestar_repo?: Repository<PreguntaBienestar>,
+    @Optional()
+    @InjectRepository(Cuestionario)
+    private readonly cuestionario_repo?: Repository<Cuestionario>,
+    @Optional()
+    @InjectRepository(PreguntaCuestionario)
+    private readonly pregunta_cuestionario_repo?: Repository<PreguntaCuestionario>,
     @Optional()
     @InjectRepository(CasoSeguimientoPastoral)
     private readonly caso_pastoral_repo?: Repository<CasoSeguimientoPastoral>,
@@ -1021,15 +1033,12 @@ export class EvaluacionesServicio {
 
     if (this.notificaciones_servicio) {
       const destinatarios_ids = new Set<number>();
-      if (supervisor_usuario?.id) {
-        destinatarios_ids.add(supervisor_usuario.id);
-      }
       if (this.usuario_repo) {
-        const supervisores_y_admins = await this.usuario_repo.find({
-          where: [{ rol: Rol.SUPERVISOR }, { rol: Rol.ADMINISTRADOR }],
+        const administradores = await this.usuario_repo.find({
+          where: { rol: Rol.ADMINISTRADOR },
         });
-        for (const u of supervisores_y_admins) {
-          destinatarios_ids.add(u.id);
+        for (const admin of administradores) {
+          destinatarios_ids.add(admin.id);
         }
       }
 
@@ -1047,10 +1056,11 @@ export class EvaluacionesServicio {
     }
 
     this.tiempo_real_gateway?.notificarCodigoTutor({
+      destinatario_rol: Rol.ADMINISTRADOR,
       becario_id: becario_id_clave,
       becario_nombre,
-      supervisor_nombre,
-      supervisor_correo,
+      supervisor_nombre: 'Administración',
+      supervisor_correo: 'admin@bumand.bo',
       codigo,
       mensaje: texto_notificacion,
       fecha_envio: new Date().toISOString(),
@@ -1060,10 +1070,10 @@ export class EvaluacionesServicio {
       enviado: true,
       becario_id: becario_id_clave,
       becario_nombre,
-      supervisor_nombre,
-      supervisor_correo,
+      supervisor_nombre: 'Administración',
+      supervisor_correo: 'admin@bumand.bo',
       expira_en_segundos: 600,
-      mensaje: `Se envió una notificación con el código de 6 dígitos a la pantalla del supervisor (${supervisor_nombre}).`,
+      mensaje: `Se envió una notificación con el código de 6 dígitos a la pantalla de los administradores.`,
     };
   }
 
@@ -1092,7 +1102,7 @@ export class EvaluacionesServicio {
       }
 
       throw new BadRequestException(
-        'El código ingresado es incorrecto o ha expirado. Revisa la notificación en la pantalla del supervisor o solicita un nuevo código.',
+        'El código ingresado es incorrecto o ha expirado. Revisa la notificación en la pantalla de administración o solicita un nuevo código.',
       );
     }
 
@@ -1104,7 +1114,7 @@ export class EvaluacionesServicio {
         });
         if (
           usuario &&
-          (usuario.rol === Rol.SUPERVISOR || usuario.rol === Rol.ADMINISTRADOR) &&
+          usuario.rol === Rol.ADMINISTRADOR &&
           (await compararContrasena(dto.contrasena, usuario.contrasena_hash))
         ) {
           return {
@@ -1371,6 +1381,372 @@ export class EvaluacionesServicio {
     caso.notas_seguimiento = notas;
 
     return this.caso_pastoral_repo.save(caso);
+  }
+
+  // ==============================================================
+  // GESTIÓN DINÁMICA DE CUESTIONARIOS Y EVALUACIONES (ADMINISTRADOR)
+  // ==============================================================
+
+  async listarCuestionarios(): Promise<Cuestionario[]> {
+    if (!this.cuestionario_repo) {
+      throw new BadRequestException('Repositorio de cuestionarios no disponible');
+    }
+    const cuestionarios = await this.cuestionario_repo.find({
+      relations: { preguntas: true, modulo: true },
+      order: { id: 'ASC' },
+    });
+
+    if (cuestionarios.length === 0) {
+      await this.sembrarCuestionariosBase();
+      return this.cuestionario_repo.find({
+        relations: { preguntas: true, modulo: true },
+        order: { id: 'ASC' },
+      });
+    }
+
+    return cuestionarios;
+  }
+
+  async obtenerCuestionarioPorId(id: number): Promise<Cuestionario> {
+    if (!this.cuestionario_repo) {
+      throw new BadRequestException('Repositorio de cuestionarios no disponible');
+    }
+    const cuestionario = await this.cuestionario_repo.findOne({
+      where: { id },
+      relations: { preguntas: true, modulo: true },
+      order: {
+        preguntas: {
+          numero_orden: 'ASC',
+        },
+      },
+    });
+    if (!cuestionario) {
+      throw new NotFoundException(`Cuestionario con ID ${id} no encontrado`);
+    }
+    return cuestionario;
+  }
+
+  async crearCuestionario(dto: CrearCuestionarioDto): Promise<Cuestionario> {
+    if (!this.cuestionario_repo) {
+      throw new BadRequestException('Repositorio de cuestionarios no disponible');
+    }
+    const existente = await this.cuestionario_repo.findOne({ where: { codigo: dto.codigo } });
+    if (existente) {
+      throw new BadRequestException(`Ya existe un cuestionario con el código "${dto.codigo}"`);
+    }
+    const nuevo = this.cuestionario_repo.create({
+      codigo: dto.codigo,
+      titulo: dto.titulo,
+      descripcion: dto.descripcion,
+      tipo_evaluador: dto.tipo_evaluador || 'general',
+      modulo_id: dto.modulo_id ?? null,
+      activo: dto.activo ?? true,
+    });
+    return this.cuestionario_repo.save(nuevo);
+  }
+
+  async actualizarCuestionario(id: number, dto: ActualizarCuestionarioDto): Promise<Cuestionario> {
+    const cuestionario = await this.obtenerCuestionarioPorId(id);
+    if (dto.codigo && dto.codigo !== cuestionario.codigo) {
+      const duplicado = await this.cuestionario_repo?.findOne({ where: { codigo: dto.codigo } });
+      if (duplicado) {
+        throw new BadRequestException(`Ya existe otro cuestionario con el código "${dto.codigo}"`);
+      }
+    }
+    Object.assign(cuestionario, dto);
+    return this.cuestionario_repo!.save(cuestionario);
+  }
+
+  async eliminarCuestionario(id: number): Promise<{ mensaje: string }> {
+    const cuestionario = await this.obtenerCuestionarioPorId(id);
+    await this.cuestionario_repo!.remove(cuestionario);
+    return { mensaje: `Cuestionario "${cuestionario.titulo}" eliminado con éxito` };
+  }
+
+  async agregarPreguntaCuestionario(
+    cuestionario_id: number,
+    dto: CrearPreguntaCuestionarioDto,
+  ): Promise<PreguntaCuestionario> {
+    if (!this.pregunta_cuestionario_repo) {
+      throw new BadRequestException('Repositorio de preguntas no disponible');
+    }
+    await this.obtenerCuestionarioPorId(cuestionario_id);
+    const nueva_pregunta = this.pregunta_cuestionario_repo.create({
+      cuestionario_id,
+      numero_orden: dto.numero_orden,
+      seccion: dto.seccion || 'General',
+      titulo: dto.titulo || `Pregunta ${dto.numero_orden}`,
+      enunciado: dto.enunciado,
+      tipo_pregunta: dto.tipo_pregunta || 'likert',
+      opciones: dto.opciones || [],
+      peso_puntos: dto.peso_puntos ?? 1.0,
+      obligatoria: dto.obligatoria ?? true,
+      activa: dto.activa ?? true,
+    });
+    return this.pregunta_cuestionario_repo.save(nueva_pregunta);
+  }
+
+  async actualizarPreguntaCuestionario(
+    id: number,
+    dto: ActualizarPreguntaCuestionarioDto,
+  ): Promise<PreguntaCuestionario> {
+    if (!this.pregunta_cuestionario_repo) {
+      throw new BadRequestException('Repositorio de preguntas no disponible');
+    }
+    const pregunta = await this.pregunta_cuestionario_repo.findOne({ where: { id } });
+    if (!pregunta) {
+      throw new NotFoundException(`Pregunta con ID ${id} no encontrada`);
+    }
+    Object.assign(pregunta, dto);
+    return this.pregunta_cuestionario_repo.save(pregunta);
+  }
+
+  async eliminarPreguntaCuestionario(id: number): Promise<{ mensaje: string }> {
+    if (!this.pregunta_cuestionario_repo) {
+      throw new BadRequestException('Repositorio de preguntas no disponible');
+    }
+    const pregunta = await this.pregunta_cuestionario_repo.findOne({ where: { id } });
+    if (!pregunta) {
+      throw new NotFoundException(`Pregunta con ID ${id} no encontrada`);
+    }
+    await this.pregunta_cuestionario_repo.remove(pregunta);
+    return { mensaje: 'Pregunta eliminada exitosamente del cuestionario' };
+  }
+
+  async sembrarCuestionariosBase(): Promise<void> {
+    if (!this.cuestionario_repo || !this.pregunta_cuestionario_repo) return;
+
+    // 1. Cuestionario de Bienestar Universitario (Módulo 5)
+    let c_bienestar = await this.cuestionario_repo.findOne({
+      where: { codigo: 'BIENESTAR_ESTUDIANTIL' },
+    });
+    if (!c_bienestar) {
+      c_bienestar = await this.cuestionario_repo.save(
+        this.cuestionario_repo.create({
+          codigo: 'BIENESTAR_ESTUDIANTIL',
+          titulo: 'Cuestionario de Bienestar Universitario',
+          descripcion:
+            'Instrumento de seguimiento integral psicosocial, espiritual y académico para estudiantes becarios BUMAND.',
+          tipo_evaluador: 'becario',
+          modulo_id: 5,
+          activo: true,
+        }),
+      );
+
+      for (const p of PREGUNTAS_BIENESTAR_DEFECTO) {
+        await this.pregunta_cuestionario_repo.save(
+          this.pregunta_cuestionario_repo.create({
+            cuestionario_id: c_bienestar.id,
+            numero_orden: p.numero_orden,
+            seccion: p.categoria || 'Bienestar Integral',
+            titulo: p.titulo,
+            enunciado: p.enunciado,
+            tipo_pregunta: 'likert',
+            opciones: p.opciones as any,
+            peso_puntos: 1.0,
+            obligatoria: true,
+            activa: true,
+          }),
+        );
+      }
+    }
+
+    // 2. Formulario F-03 Evaluación Pastoral (Módulo 1)
+    let c_pastoral = await this.cuestionario_repo.findOne({
+      where: { codigo: 'F03_PASTORAL' },
+    });
+    if (!c_pastoral) {
+      c_pastoral = await this.cuestionario_repo.save(
+        this.cuestionario_repo.create({
+          codigo: 'F03_PASTORAL',
+          titulo: 'Formulario F-03: Evaluación Pastoral y Vida Eclesial',
+          descripcion:
+            'Evaluación cualitativa y cuantitativa emitida por el pastor de la iglesia local sobre liderazgo y testimonio.',
+          tipo_evaluador: 'pastor',
+          modulo_id: 1,
+          activo: true,
+        }),
+      );
+
+      const preguntas_pastoral = [
+        {
+          numero_orden: 1,
+          seccion: 'Vida Espiritual y Devocional',
+          titulo: 'Consistencia en la oración y lectura bíblica',
+          enunciado: '¿El becario demuestra madurez y constancia en su vida devocional diaria y comunitaria?',
+          tipo_pregunta: 'likert',
+          opciones: [
+            { inciso: 'A', texto: 'Sobresaliente / Modelo para la congregación', puntaje: 100 },
+            { inciso: 'B', texto: 'Constante y comprometido', puntaje: 85 },
+            { inciso: 'C', texto: 'Regular / Requiere acompañamiento', puntaje: 65 },
+            { inciso: 'D', texto: 'Intermitente o ausente', puntaje: 40 },
+          ],
+        },
+        {
+          numero_orden: 2,
+          seccion: 'Asistencia y Participación en Cultos',
+          titulo: 'Puntualidad y asistencia a cultos dominicales y reuniones',
+          enunciado: '¿Asiste puntualmente y participa activamente en los cultos semanales y actividades convocadas?',
+          tipo_pregunta: 'likert',
+          opciones: [
+            { inciso: 'A', texto: 'Asistencia 100% puntual y activa', puntaje: 100 },
+            { inciso: 'B', texto: 'Asistencia regular con justificaciones válidas', puntaje: 85 },
+            { inciso: 'C', texto: 'Inasistencias esporádicas sin aviso', puntaje: 60 },
+            { inciso: 'D', texto: 'Falta constante a las reuniones eclesiales', puntaje: 30 },
+          ],
+        },
+        {
+          numero_orden: 3,
+          seccion: 'Liderazgo y Servicio Diaconal',
+          titulo: 'Responsabilidad en ministerios y servicio congregacional',
+          enunciado: '¿Ejerce liderazgo con vocación de servicio diaconal, puntualidad y buen testimonio?',
+          tipo_pregunta: 'likert',
+          opciones: [
+            { inciso: 'A', texto: 'Liderazgo activo y propositivo', puntaje: 100 },
+            { inciso: 'B', texto: 'Cumple fielmente con sus asignaciones', puntaje: 85 },
+            { inciso: 'C', texto: 'Participación pasiva en los ministerios', puntaje: 60 },
+            { inciso: 'D', texto: 'Sin involucramiento en ministerios', puntaje: 25 },
+          ],
+        },
+      ];
+
+      for (const pp of preguntas_pastoral) {
+        await this.pregunta_cuestionario_repo.save(
+          this.pregunta_cuestionario_repo.create({
+            cuestionario_id: c_pastoral.id,
+            numero_orden: pp.numero_orden,
+            seccion: pp.seccion,
+            titulo: pp.titulo,
+            enunciado: pp.enunciado,
+            tipo_pregunta: pp.tipo_pregunta,
+            opciones: pp.opciones as any,
+            peso_puntos: 1.0,
+            obligatoria: true,
+            activa: true,
+          }),
+        );
+      }
+    }
+
+    // 3. Rúbrica de Prácticas Preprofesionales / Mentor (Módulo 3)
+    let c_mentor = await this.cuestionario_repo.findOne({
+      where: { codigo: 'MENTOR_PRACTICAS' },
+    });
+    if (!c_mentor) {
+      c_mentor = await this.cuestionario_repo.save(
+        this.cuestionario_repo.create({
+          codigo: 'MENTOR_PRACTICAS',
+          titulo: 'Rúbrica de Evaluación de Prácticas y Tutoría Institucional',
+          descripcion:
+            'Evaluación de desempeño, puntualidad, ética y competencias profesionales por el tutor/mentor de Diaconía.',
+          tipo_evaluador: 'supervisor',
+          modulo_id: 3,
+          activo: true,
+        }),
+      );
+
+      const criterios_mentor = [
+        {
+          numero_orden: 1,
+          seccion: 'Desempeño y Calidad Técnica',
+          titulo: 'Calidad en las labores asignadas en sede',
+          enunciado: '¿El becario demuestra solvencia técnica y calidad en las tareas de su unidad?',
+          tipo_pregunta: 'likert',
+          opciones: [
+            { inciso: '5', texto: 'Excelente / Supera expectativas', puntaje: 100 },
+            { inciso: '4', texto: 'Muy Bueno / Cumplimiento óptimo', puntaje: 85 },
+            { inciso: '3', texto: 'Bueno / Cumple el estándar básico', puntaje: 70 },
+            { inciso: '2', texto: 'Aceptable con observaciones', puntaje: 55 },
+            { inciso: '1', texto: 'Deficiente / No cumple', puntaje: 30 },
+          ],
+        },
+        {
+          numero_orden: 2,
+          seccion: 'Puntualidad y Compromiso',
+          titulo: 'Cumplimiento de horario de apoyo institucional',
+          enunciado: '¿Registra sus marcaciones a tiempo y cumple la carga horaria comprometida?',
+          tipo_pregunta: 'likert',
+          opciones: [
+            { inciso: '5', texto: 'Puntualidad intachable (0 retrasos)', puntaje: 100 },
+            { inciso: '4', texto: 'Puntual con retrasos justificados', puntaje: 85 },
+            { inciso: '3', texto: 'Retrasos menores esporádicos', puntaje: 70 },
+            { inciso: '2', texto: 'Inasistencias o retrasos frecuentes', puntaje: 50 },
+            { inciso: '1', texto: 'Incumplimiento grave de horario', puntaje: 20 },
+          ],
+        },
+      ];
+
+      for (const cm of criterios_mentor) {
+        await this.pregunta_cuestionario_repo.save(
+          this.pregunta_cuestionario_repo.create({
+            cuestionario_id: c_mentor.id,
+            numero_orden: cm.numero_orden,
+            seccion: cm.seccion,
+            titulo: cm.titulo,
+            enunciado: cm.enunciado,
+            tipo_pregunta: cm.tipo_pregunta,
+            opciones: cm.opciones as any,
+            peso_puntos: 1.0,
+            obligatoria: true,
+            activa: true,
+          }),
+        );
+      }
+    }
+
+    // 4. Escuela de Líderes CETI (Módulo 4)
+    let c_lideres = await this.cuestionario_repo.findOne({
+      where: { codigo: 'ESCUELA_LIDERES_CETI' },
+    });
+    if (!c_lideres) {
+      c_lideres = await this.cuestionario_repo.save(
+        this.cuestionario_repo.create({
+          codigo: 'ESCUELA_LIDERES_CETI',
+          titulo: 'Escuela de Líderes: Formación Teológica y Servicio CETI',
+          descripcion:
+            'Catálogo de las 12 tareas teológicas, ponderación individual y baremo de asistencia presencial de los viernes.',
+          tipo_evaluador: 'facilitador',
+          modulo_id: 4,
+          activo: true,
+        }),
+      );
+
+      const tareas_ceti = [
+        { numero: 1, tema: 'Liderazgo Servidor y Mayordomía Cristiana', ponderacion: 8.33 },
+        { numero: 2, tema: 'Misión Integral y Vocación Diaconal', ponderacion: 8.33 },
+        { numero: 3, tema: 'Ética Profesional en el Ámbito Financiero y Social', ponderacion: 8.33 },
+        { numero: 4, tema: 'Acompañamiento a Grupos Vulnerables', ponderacion: 8.33 },
+        { numero: 5, tema: 'Resolución de Conflictos en la Comunidad Eclesial', ponderacion: 8.33 },
+        { numero: 6, tema: 'Diseño y Planificación de Proyectos de Servicio', ponderacion: 8.33 },
+        { numero: 7, tema: 'Oración, Intercesión y Vida Devocional Comunitaria', ponderacion: 8.33 },
+        { numero: 8, tema: 'Comunicación Asertiva y Testimonio Universitario', ponderacion: 8.33 },
+        { numero: 9, tema: 'Finanzas Personales Bíblicas y Responsabilidad', ponderacion: 8.33 },
+        { numero: 10, tema: 'Salud Mental y Manejo del Estrés en Época Académica', ponderacion: 8.33 },
+        { numero: 11, tema: 'Discipulado Generacional y Mentoría a Nuevos Becarios', ponderacion: 8.33 },
+        { numero: 12, tema: 'Evaluación Integral de Impacto Comunitario', ponderacion: 8.37 },
+      ];
+
+      for (const t of tareas_ceti) {
+        await this.pregunta_cuestionario_repo.save(
+          this.pregunta_cuestionario_repo.create({
+            cuestionario_id: c_lideres.id,
+            numero_orden: t.numero,
+            seccion: 'Tareas Teológicas Semestrales CETI',
+            titulo: t.tema,
+            enunciado: `Presentación y aprobación de informe práctico sobre "${t.tema}".`,
+            tipo_pregunta: 'escala_numerica',
+            opciones: [
+              { inciso: 'Aprobado', texto: 'Tarea presentada con solvencia y aplicabilidad práctica', puntaje: 100 },
+              { inciso: 'Regular', texto: 'Presentación parcial con observaciones teológicas', puntaje: 70 },
+              { inciso: 'No Presentado', texto: 'Incumplimiento de entrega en la fecha convocada', puntaje: 0 },
+            ],
+            peso_puntos: t.ponderacion,
+            obligatoria: true,
+            activa: true,
+          }),
+        );
+      }
+    }
   }
 }
 

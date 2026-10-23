@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Patch, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Patch, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { EvaluacionesServicio } from './evaluaciones.servicio';
 import { CrearEvaluacionDto } from './dtos/crear-evaluacion.dto';
@@ -6,12 +6,18 @@ import { GuardarFormularioF03Dto } from './dtos/guardar-formulario-f03.dto';
 import { CrearPeriodoEvaluacionDto } from './dtos/crear-periodo-evaluacion.dto';
 import { ActualizarPeriodoEvaluacionDto } from './dtos/actualizar-periodo-evaluacion.dto';
 import { CambiarEstadoPeriodoDto } from './dtos/cambiar-estado-periodo.dto';
+import { CrearCuestionarioDto } from './dtos/crear-cuestionario.dto';
+import { ActualizarCuestionarioDto } from './dtos/actualizar-cuestionario.dto';
+import { CrearPreguntaCuestionarioDto } from './dtos/crear-pregunta-cuestionario.dto';
+import { ActualizarPreguntaCuestionarioDto } from './dtos/actualizar-pregunta-cuestionario.dto';
 import { EstadoEvaluacion, Evaluacion } from './entidades/evaluacion.entidad';
 import { ModuloEvaluacion } from './entidades/modulo-evaluacion.entidad';
 import { PeriodoEvaluacion, EstadoPeriodo } from './entidades/periodo-evaluacion.entidad';
 import { Evaluador } from './entidades/evaluador.entidad';
 import { EvaluacionPastor } from './entidades/evaluacion-pastor.entidad';
 import { PreguntaBienestar } from './entidades/pregunta-bienestar.entidad';
+import { Cuestionario } from './entidades/cuestionario.entidad';
+import { PreguntaCuestionario } from './entidades/pregunta-cuestionario.entidad';
 import { ReceptorAcademicaDto } from './dtos/receptor-academica.dto';
 import { ReceptorMentorQrDto } from './dtos/receptor-mentor-qr.dto';
 import { ReceptorSocioeconomicaDto } from './dtos/receptor-socioeconomica.dto';
@@ -32,10 +38,10 @@ export class EvaluacionesControlador {
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('tutor/solicitar-codigo')
   @ApiOperation({
-    summary: 'Solicitar código OTP de 6 dígitos para verificación del Supervisor/Tutor',
-    description: 'Genera un código temporal de 6 dígitos y lo envía inmediatamente como notificación a la pantalla del Supervisor asignado.',
+    summary: 'Solicitar código OTP de 6 dígitos para autorización de administración',
+    description: 'Genera un código temporal de 6 dígitos y lo envía inmediatamente como notificación a la pantalla de los administradores.',
   })
-  @ApiResponse({ status: 201, description: 'Código generado y notificado a la pantalla del supervisor.' })
+  @ApiResponse({ status: 201, description: 'Código generado y notificado a la pantalla de los administradores.' })
   solicitarCodigoTutor(
     @Body() dto: SolicitarCodigoTutorDto,
     @UsuarioActual() usuario: Usuario,
@@ -46,10 +52,10 @@ export class EvaluacionesControlador {
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('tutor/verificar-codigo')
   @ApiOperation({
-    summary: 'Verificar identidad del Supervisor/Tutor mediante código de notificación o credenciales',
-    description: 'Valida el código de 6 dígitos enviado a la pantalla del supervisor o sus credenciales institucionales para desbloquear el formulario de evaluación.',
+    summary: 'Verificar código de autorización de administración',
+    description: 'Valida el código de 6 dígitos enviado a la pantalla de los administradores para desbloquear el formulario de evaluación.',
   })
-  @ApiResponse({ status: 200, description: 'Identidad del supervisor verificada con éxito.' })
+  @ApiResponse({ status: 200, description: 'Código de autorización verificado con éxito.' })
   verificarCodigoTutor(@Body() dto: VerificarCodigoTutorDto) {
     return this.evaluaciones_servicio.verificarCodigoTutor(dto);
   }
@@ -456,5 +462,121 @@ export class EvaluacionesControlador {
   @ApiResponse({ status: 200, description: 'Catálogo de evaluadores.', type: [Evaluador] })
   listarEvaluadores() {
     return this.evaluaciones_servicio.listarEvaluadores();
+  }
+
+  // ==============================================================
+  // GESTIÓN DINÁMICA DE CUESTIONARIOS Y EVALUACIONES
+  // ==============================================================
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('cuestionarios')
+  @ApiOperation({
+    summary: 'Listar todos los cuestionarios e instrumentos evaluativos',
+    description: 'Retorna los cuestionarios registrados con sus preguntas y metadatos.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de cuestionarios.', type: [Cuestionario] })
+  listarCuestionarios(): Promise<Cuestionario[]> {
+    return this.evaluaciones_servicio.listarCuestionarios();
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('cuestionarios/:id')
+  @ApiOperation({
+    summary: 'Obtener cuestionario por ID con sus preguntas ordenadas',
+    description: 'Retorna la configuración completa del cuestionario y sus reactivos ordenados.',
+  })
+  @ApiParam({ name: 'id', description: 'ID del cuestionario', type: Number })
+  @ApiResponse({ status: 200, description: 'Detalle del cuestionario.', type: Cuestionario })
+  obtenerCuestionario(@Param('id', ParseIntPipe) id: number): Promise<Cuestionario> {
+    return this.evaluaciones_servicio.obtenerCuestionarioPorId(id);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Post('cuestionarios')
+  @ApiOperation({
+    summary: 'Crear un nuevo cuestionario o instrumento evaluativo',
+    description: 'Permite al administrador dar de alta un nuevo formulario o rúbrica de evaluación.',
+  })
+  @ApiResponse({ status: 201, description: 'Cuestionario creado exitosamente.', type: Cuestionario })
+  crearCuestionario(@Body() dto: CrearCuestionarioDto): Promise<Cuestionario> {
+    return this.evaluaciones_servicio.crearCuestionario(dto);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Put('cuestionarios/:id')
+  @ApiOperation({
+    summary: 'Actualizar metadatos de un cuestionario',
+    description: 'Modifica título, código, descripción o módulo asociado.',
+  })
+  @ApiParam({ name: 'id', description: 'ID del cuestionario', type: Number })
+  @ApiResponse({ status: 200, description: 'Cuestionario actualizado.', type: Cuestionario })
+  actualizarCuestionario(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ActualizarCuestionarioDto,
+  ): Promise<Cuestionario> {
+    return this.evaluaciones_servicio.actualizarCuestionario(id, dto);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Delete('cuestionarios/:id')
+  @ApiOperation({
+    summary: 'Eliminar un cuestionario',
+    description: 'Remueve un cuestionario y en cascada todas sus preguntas asociadas.',
+  })
+  @ApiParam({ name: 'id', description: 'ID del cuestionario', type: Number })
+  eliminarCuestionario(@Param('id', ParseIntPipe) id: number): Promise<{ mensaje: string }> {
+    return this.evaluaciones_servicio.eliminarCuestionario(id);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Post('cuestionarios/:id/preguntas')
+  @ApiOperation({
+    summary: 'Agregar pregunta o criterio a un cuestionario',
+    description: 'Añade un nuevo reactivo o criterio al cuestionario especificado.',
+  })
+  @ApiParam({ name: 'id', description: 'ID del cuestionario', type: Number })
+  @ApiResponse({ status: 201, description: 'Pregunta agregada con éxito.', type: PreguntaCuestionario })
+  agregarPregunta(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CrearPreguntaCuestionarioDto,
+  ): Promise<PreguntaCuestionario> {
+    return this.evaluaciones_servicio.agregarPreguntaCuestionario(id, dto);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Put('preguntas/:id')
+  @ApiOperation({
+    summary: 'Actualizar una pregunta existente',
+    description: 'Modifica enunciado, tipo, opciones jsonb o peso de una pregunta.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la pregunta', type: Number })
+  @ApiResponse({ status: 200, description: 'Pregunta actualizada.', type: PreguntaCuestionario })
+  actualizarPregunta(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ActualizarPreguntaCuestionarioDto,
+  ): Promise<PreguntaCuestionario> {
+    return this.evaluaciones_servicio.actualizarPreguntaCuestionario(id, dto);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Delete('preguntas/:id')
+  @ApiOperation({
+    summary: 'Eliminar una pregunta de un cuestionario',
+    description: 'Remueve un reactivo o criterio específico.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la pregunta', type: Number })
+  eliminarPregunta(@Param('id', ParseIntPipe) id: number): Promise<{ mensaje: string }> {
+    return this.evaluaciones_servicio.eliminarPreguntaCuestionario(id);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Post('cuestionarios/sembrar')
+  @ApiOperation({
+    summary: 'Sembrar cuestionarios base del sistema',
+    description: 'Inicializa los cuestionarios reglamentarios (Bienestar, F-03, Mentor) si faltan en la base de datos.',
+  })
+  async sembrarCuestionarios(): Promise<{ mensaje: string }> {
+    await this.evaluaciones_servicio.sembrarCuestionariosBase();
+    return { mensaje: 'Cuestionarios e instrumentos base sembrados exitosamente.' };
   }
 }

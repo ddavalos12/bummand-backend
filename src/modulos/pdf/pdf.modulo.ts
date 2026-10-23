@@ -8,6 +8,8 @@ import { Evento } from '../eventos/entidades/evento.entidad';
 import { AsistenciaEvento } from '../eventos/entidades/asistencia-evento.entidad';
 import { RegistroAsistencia } from '../asistencia/entidades/registro-asistencia.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
+import { SolicitudPasajes } from '../pasajes/entidades/solicitud-pasaje.entidad';
+import { Recorrido } from '../pasajes/entidades/recorrido.entidad';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { Becario } from '../becarios/entidades/becario.entidad';
       AsistenciaEvento,
       RegistroAsistencia,
       Becario,
+      SolicitudPasajes,
+      Recorrido,
     ]),
     EvaluacionesModulo,
   ],

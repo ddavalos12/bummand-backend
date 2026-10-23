@@ -209,4 +209,44 @@ describe('AutenticacionServicio', () => {
       ).rejects.toThrow(ConflictException);
     });
   });
+
+  describe('verificarCi', () => {
+    it('debe indicar que el CI existe y está disponible para registro', async () => {
+      becarioRepo.find.mockResolvedValue([
+        { id: 1, ci: '13696496', nombre: 'Adai Belen Huayta', usuario_id: null, carrera: 'Ingeniería', universidad: 'UMSA' },
+      ]);
+
+      const res = await servicio.verificarCi('13696496');
+      expect(res.existe).toBe(true);
+      expect(res.ya_registrado).toBe(false);
+      expect(res.nombre).toBe('Adai Belen Huayta');
+    });
+
+    it('debe indicar que el CI no figura en la nómina oficial', async () => {
+      becarioRepo.find.mockResolvedValue([
+        { id: 1, ci: '13696496', nombre: 'Adai Belen Huayta', usuario_id: null },
+      ]);
+
+      const res = await servicio.verificarCi('9999999');
+      expect(res.existe).toBe(false);
+      expect(res.ya_registrado).toBe(false);
+    });
+
+    it('debe indicar si el becario ya cuenta con usuario activo', async () => {
+      becarioRepo.find.mockResolvedValue([
+        {
+          id: 1,
+          ci: '13696496',
+          nombre: 'Adai Belen Huayta',
+          usuario_id: 10,
+          usuario: { correo: 'adaibelen@gmail.com' },
+        },
+      ]);
+
+      const res = await servicio.verificarCi('13696496');
+      expect(res.existe).toBe(true);
+      expect(res.ya_registrado).toBe(true);
+      expect(res.correo).toBe('adaibelen@gmail.com');
+    });
+  });
 });

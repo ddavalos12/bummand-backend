@@ -203,4 +203,77 @@ export class PdfControlador {
 
     respuesta.end(buffer);
   }
+
+  @Get('recorridos-estudiante/:becario_id')
+  @ApiOperation({
+    summary: 'Exportar a PDF el expediente mensual de recorridos de un estudiante con Puppeteer',
+    description: 'Genera el expediente oficial de recorridos y solicitud de pasajes mensual de un solo estudiante, con detalle de tramos, calles declaradas, cálculo exacto del 80% y firmas.',
+  })
+  @ApiParam({ name: 'becario_id', description: 'ID del becario o estudiante', type: Number, example: 1 })
+  @ApiQuery({ name: 'mes', required: false, description: 'Mes del expediente (YYYY-MM o texto, ej. 2026-10)', example: '2026-10' })
+  @ApiQuery({ name: 'solicitud_id', required: false, description: 'ID opcional de solicitud de pasaje específica' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({
+    status: 200,
+    description: 'Archivo binario del expediente de recorridos en PDF descargado.',
+    schema: {
+      type: 'string',
+      format: 'binary',
+    },
+  })
+  async exportarRecorridosEstudiante(
+    @Param('becario_id', ParseIntPipe) becario_id: number,
+    @Query('mes') mes: string | undefined,
+    @Query('solicitud_id') solicitud_id: number | undefined,
+    @Res() respuesta: Response,
+  ) {
+    const resultado = await this.pdf_servicio.generarExpedienteRecorridosEstudiantePdf({
+      becario_id,
+      mes,
+      solicitud_id: solicitud_id ? Number(solicitud_id) : undefined,
+    });
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${resultado.nombre_archivo}`,
+      'Content-Length': resultado.bufer.length,
+    });
+
+    respuesta.end(resultado.bufer);
+  }
+
+  @Get('asistencia-estudiante/:becario_id')
+  @ApiOperation({
+    summary: 'Exportar a PDF el kárdex de asistencia mensual de un estudiante con Puppeteer',
+    description: 'Genera el kárdex oficial de asistencia mensual de un solo estudiante, con detalle de jornadas, geocercas GPS, tolerancia horaria, minutos de retraso y firmas.',
+  })
+  @ApiParam({ name: 'becario_id', description: 'ID del becario o estudiante', type: Number, example: 1 })
+  @ApiQuery({ name: 'mes', required: false, description: 'Mes de asistencia (YYYY-MM o texto, ej. 2026-10)', example: '2026-10' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({
+    status: 200,
+    description: 'Archivo binario de la asistencia mensual en PDF descargado.',
+    schema: {
+      type: 'string',
+      format: 'binary',
+    },
+  })
+  async exportarAsistenciaEstudiante(
+    @Param('becario_id', ParseIntPipe) becario_id: number,
+    @Query('mes') mes: string | undefined,
+    @Res() respuesta: Response,
+  ) {
+    const resultado = await this.pdf_servicio.generarAsistenciaMensualEstudiantePdf({
+      becario_id,
+      mes,
+    });
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${resultado.nombre_archivo}`,
+      'Content-Length': resultado.bufer.length,
+    });
+
+    respuesta.end(resultado.bufer);
+  }
 }
