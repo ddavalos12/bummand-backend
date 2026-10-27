@@ -35,6 +35,14 @@ import { ActualizarCuestionarioDto } from './dtos/actualizar-cuestionario.dto';
 import { CrearPreguntaCuestionarioDto } from './dtos/crear-pregunta-cuestionario.dto';
 import { ActualizarPreguntaCuestionarioDto } from './dtos/actualizar-pregunta-cuestionario.dto';
 import { SolicitarCodigoTutorDto, VerificarCodigoTutorDto } from './dtos/verificacion-tutor.dto';
+import { GuardarNotasEstudianteDto } from './dtos/guardar-notas-estudiante.dto';
+import { PreEvaluarSupervisorDto, AccionPreEvaluacion } from './dtos/pre-evaluar-supervisor.dto';
+import { ConvalidarAdministracionDto, AccionConvalidacion } from './dtos/convalidar-administracion.dto';
+import {
+  DocumentoSemestralBecario,
+  TipoDocumentoSemestral,
+  EstadoDocumentoSemestral,
+} from '../becarios/entidades/documento-semestral-becario.entidad';
 import { BibliaServicio } from '../biblia/biblia.servicio';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { Usuario, Rol } from '../usuarios/entidades/usuario.entidad';
@@ -100,7 +108,13 @@ export interface ResultadoCalificacionTotal {
 export class EvaluacionesServicio {
   private readonly codigos_tutor = new Map<
     number,
-    { codigo: string; expira: number; supervisor_nombre: string; supervisor_correo: string }
+    {
+      codigo: string;
+      expira: number;
+      supervisor_id?: number;
+      supervisor_nombre: string;
+      supervisor_correo: string;
+    }
   >();
 
   constructor(
@@ -131,6 +145,9 @@ export class EvaluacionesServicio {
     @Optional()
     @InjectRepository(Becario)
     private readonly becario_repo?: Repository<Becario>,
+    @Optional()
+    @InjectRepository(DocumentoSemestralBecario)
+    private readonly documento_semestral_repo?: Repository<DocumentoSemestralBecario>,
     @Optional()
     @InjectRepository(Usuario)
     private readonly usuario_repo?: Repository<Usuario>,
@@ -593,6 +610,367 @@ export class EvaluacionesServicio {
     return this.evaluacion_repo.save(evaluacion);
   }
 
+  async registrarNotasEstudiante(dto: GuardarNotasEstudianteDto, usuario?: Usuario): Promise<Evaluacion> {
+    const becario = await this.becario_repo?.findOne({
+      where: { id: dto.becario_id },
+      relations: { supervisor: true },
+    });
+
+    if (!becario && this.becario_repo) {
+      throw new NotFoundException(`No se encontró el becario con ID ${dto.becario_id}`);
+    }
+
+    if (this.documento_semestral_repo) {
+      await this.documento_semestral_repo.delete({
+        becario_id: dto.becario_id,
+        periodo_id: dto.periodo_id,
+        tipo_documento: TipoDocumentoSemestral.KARDEX,
+      });
+      await this.documento_semestral_repo.save(
+        this.documento_semestral_repo.create({
+          becario_id: dto.becario_id,
+          periodo_id: dto.periodo_id,
+          tipo_documento: TipoDocumentoSemestral.KARDEX,
+          url_archivo: dto.archivo_kardex_url,
+          nombre_archivo: dto.nombre_archivo_kardex,
+          tamano_archivo: dto.tamano_archivo_kardex || null,
+          estado: EstadoDocumentoSemestral.EN_REVISION,
+        }),
+      );
+
+      await this.documento_semestral_repo.delete({
+        becario_id: dto.becario_id,
+        periodo_id: dto.periodo_id,
+        tipo_documento: TipoDocumentoSemestral.PROGRAMACION_NUEVA,
+      });
+      await this.documento_semestral_repo.save(
+        this.documento_semestral_repo.create({
+          becario_id: dto.becario_id,
+          periodo_id: dto.periodo_id,
+          tipo_documento: TipoDocumentoSemestral.PROGRAMACION_NUEVA,
+          url_archivo: dto.archivo_programacion_url,
+          nombre_archivo: dto.nombre_archivo_programacion,
+          tamano_archivo: dto.tamano_archivo_programacion || null,
+          estado: EstadoDocumentoSemestral.EN_REVISION,
+        }),
+      );
+
+      if (dto.archivo_carnet_url && dto.nombre_archivo_carnet) {
+        await this.documento_semestral_repo.delete({
+          becario_id: dto.becario_id,
+          periodo_id: dto.periodo_id,
+          tipo_documento: TipoDocumentoSemestral.CARNET_IDENTIDAD,
+        });
+        await this.documento_semestral_repo.save(
+          this.documento_semestral_repo.create({
+            becario_id: dto.becario_id,
+            periodo_id: dto.periodo_id,
+            tipo_documento: TipoDocumentoSemestral.CARNET_IDENTIDAD,
+            url_archivo: dto.archivo_carnet_url,
+            nombre_archivo: dto.nombre_archivo_carnet,
+            tamano_archivo: dto.tamano_archivo_carnet || null,
+            estado: EstadoDocumentoSemestral.EN_REVISION,
+          }),
+        );
+
+        if (becario && this.becario_repo) {
+          becario.url_carnet = dto.archivo_carnet_url;
+          await this.becario_repo.save(becario);
+        }
+      }
+
+      if (becario && this.becario_repo) {
+        becario.url_kardex = dto.archivo_kardex_url;
+        await this.becario_repo.save(becario);
+      }
+    }
+
+    const suma_notas = dto.materias.reduce((acc, m) => acc + Number(m.nota || 0), 0);
+    const promedio = dto.materias.length > 0 ? Number((suma_notas / dto.materias.length).toFixed(2)) : 0;
+    const puntaje = promedio >= 75 ? Math.min(Math.round(promedio), 100) : Math.round((promedio / 75) * 100);
+
+    let evaluador_id = 1;
+    if (this.evaluador_repo?.findOne) {
+      let evaluador = await this.evaluador_repo.findOne({ where: { tipo: TipoEvaluador.BECARIO } });
+      if (!evaluador && this.evaluador_repo.create && this.evaluador_repo.save) {
+        evaluador = this.evaluador_repo.create({
+          nombre: 'Autoevaluación Becario',
+          tipo: TipoEvaluador.BECARIO,
+          correo: 'becario@diaconia.bo',
+        });
+        evaluador = await this.evaluador_repo.save(evaluador);
+      }
+      if (evaluador) evaluador_id = evaluador.id;
+    }
+
+    let evaluacion = await this.evaluacion_repo.findOne({
+      where: { becario_id: dto.becario_id, periodo_id: dto.periodo_id, modulo_id: 2 },
+    });
+
+    const datos_formulario = {
+      materias: dto.materias.map((m, idx) => ({
+        id: m.id || idx + 1,
+        nombre: m.nombre,
+        sigla: m.sigla || '',
+        nota: Number(m.nota),
+        estado: Number(m.nota) >= 51 ? 'aprobado' : 'reprobado',
+        editado_por_supervisor: false,
+        nota_original_estudiante: Number(m.nota),
+      })),
+      promedio_calculado: promedio,
+      documentos: {
+        kardex_url: dto.archivo_kardex_url,
+        kardex_nombre: dto.nombre_archivo_kardex,
+        tamano_kardex: dto.tamano_archivo_kardex || null,
+        programacion_url: dto.archivo_programacion_url,
+        programacion_nombre: dto.nombre_archivo_programacion,
+        tamano_programacion: dto.tamano_archivo_programacion || null,
+        carnet_renovado_url: dto.archivo_carnet_url || null,
+        carnet_renovado_nombre: dto.nombre_archivo_carnet || null,
+      },
+      observaciones_estudiante: dto.observaciones || '',
+      fecha_envio_estudiante: new Date().toISOString(),
+    };
+
+    if (!evaluacion) {
+      evaluacion = this.evaluacion_repo.create({
+        becario_id: dto.becario_id,
+        periodo_id: dto.periodo_id,
+        modulo_id: 2,
+        evaluador_id,
+        puntaje,
+        estado: EstadoEvaluacion.EN_REVISION_SUPERVISOR,
+        observaciones: dto.observaciones || `Notas declaradas por el estudiante (${promedio} pts). En espera de pre-evaluación del supervisor.`,
+        promedio_academico: promedio,
+        archivo_record_academico: dto.archivo_kardex_url,
+        archivo_historial_academico: dto.archivo_programacion_url,
+        datos_formulario,
+        fecha_evaluacion: new Date(),
+      });
+    } else {
+      evaluacion.puntaje = puntaje;
+      evaluacion.estado = EstadoEvaluacion.EN_REVISION_SUPERVISOR;
+      evaluacion.observaciones = dto.observaciones || `Notas declaradas por el estudiante (${promedio} pts). En espera de pre-evaluación del supervisor.`;
+      evaluacion.promedio_academico = promedio;
+      evaluacion.archivo_record_academico = dto.archivo_kardex_url;
+      evaluacion.archivo_historial_academico = dto.archivo_programacion_url;
+      evaluacion.datos_formulario = datos_formulario;
+      evaluacion.fecha_evaluacion = new Date();
+    }
+
+    const evaluacion_guardada = await this.evaluacion_repo.save(evaluacion);
+
+    if (becario?.supervisor_id && this.notificaciones_servicio) {
+      try {
+        await this.notificaciones_servicio.crear({
+          usuario_id: becario.supervisor_id,
+          tipo: 'evaluacion_pendiente',
+          mensaje: `El becario ${becario.nombre || 'estudiante'} ha presentado sus calificaciones y documentos semestrales para su pre-evaluación.`,
+        });
+      } catch (e) {
+        // Envio no bloqueante
+      }
+    }
+
+    return evaluacion_guardada;
+  }
+
+  async preEvaluarSupervisor(evaluacion_id: number, dto: PreEvaluarSupervisorDto, supervisor_usuario?: Usuario): Promise<Evaluacion> {
+    const evaluacion = await this.evaluacion_repo.findOne({
+      where: { id: evaluacion_id },
+      relations: { becario: true },
+    });
+
+    if (!evaluacion) {
+      throw new NotFoundException(`No se encontró la evaluación con ID ${evaluacion_id}`);
+    }
+
+    if (dto.accion === AccionPreEvaluacion.OBSERVAR) {
+      evaluacion.estado = EstadoEvaluacion.OBSERVADO;
+      evaluacion.observaciones = dto.observaciones_supervisor || 'Evaluación académica observada por el supervisor.';
+      const form_actual = (evaluacion.datos_formulario as Record<string, any>) || {};
+      evaluacion.datos_formulario = {
+        ...form_actual,
+        pre_evaluacion: {
+          supervisor_id: supervisor_usuario?.id ?? null,
+          supervisor_nombre: supervisor_usuario?.nombre ?? 'Supervisor',
+          fecha_pre_evaluacion: new Date().toISOString(),
+          observaciones: dto.observaciones_supervisor || '',
+          resultado: 'observado',
+        },
+      };
+      return this.evaluacion_repo.save(evaluacion);
+    }
+
+    const suma_notas = dto.materias.reduce((acc, m) => acc + Number(m.nota || 0), 0);
+    const promedio = dto.materias.length > 0 ? Number((suma_notas / dto.materias.length).toFixed(2)) : 0;
+    const puntaje = promedio >= 75 ? Math.min(Math.round(promedio), 100) : Math.round((promedio / 75) * 100);
+
+    const form_actual = (evaluacion.datos_formulario as Record<string, any>) || {};
+    evaluacion.datos_formulario = {
+      ...form_actual,
+      materias: dto.materias.map((m, idx) => ({
+        id: m.id || idx + 1,
+        nombre: m.nombre,
+        sigla: m.sigla || '',
+        nota: Number(m.nota),
+        estado: Number(m.nota) >= 51 ? 'aprobado' : 'reprobado',
+        editado_por_supervisor: Boolean(m.editado_por_supervisor),
+        nota_original_estudiante: m.nota_original_estudiante !== undefined ? Number(m.nota_original_estudiante) : Number(m.nota),
+      })),
+      promedio_calculado: promedio,
+      pre_evaluacion: {
+        supervisor_id: supervisor_usuario?.id ?? null,
+        supervisor_nombre: supervisor_usuario?.nombre ?? 'Supervisor',
+        fecha_pre_evaluacion: new Date().toISOString(),
+        observaciones: dto.observaciones_supervisor || '',
+        resultado: 'aprobado',
+      },
+    };
+
+    evaluacion.promedio_academico = promedio;
+    evaluacion.puntaje = puntaje;
+    evaluacion.estado = EstadoEvaluacion.PRE_EVALUADO;
+    evaluacion.observaciones = dto.observaciones_supervisor || `Pre-evaluación completada por supervisor. Promedio: ${promedio} pts. Enviado a Administración.`;
+
+    const guardada = await this.evaluacion_repo.save(evaluacion);
+
+    if (evaluacion.becario?.usuario_id && this.notificaciones_servicio) {
+      try {
+        await this.notificaciones_servicio.crear({
+          usuario_id: evaluacion.becario.usuario_id,
+          tipo: 'evaluacion_pendiente',
+          mensaje: `Tu supervisor ha revisado y remitido tus notas (Promedio: ${promedio} pts) a Administración.`,
+        });
+      } catch (e) {
+        // Envio no bloqueante
+      }
+    }
+
+    return guardada;
+  }
+
+  async convalidarEvaluacionAcademica(evaluacion_id: number, dto: ConvalidarAdministracionDto, admin_usuario?: Usuario): Promise<Evaluacion> {
+    const evaluacion = await this.evaluacion_repo.findOne({
+      where: { id: evaluacion_id },
+      relations: { becario: true },
+    });
+
+    if (!evaluacion) {
+      throw new NotFoundException(`No se encontró la evaluación con ID ${evaluacion_id}`);
+    }
+
+    if (dto.accion === AccionConvalidacion.OBSERVAR) {
+      evaluacion.estado = EstadoEvaluacion.OBSERVADO;
+      evaluacion.observaciones = dto.observaciones_administracion || 'Evaluación observada por Administración.';
+      return this.evaluacion_repo.save(evaluacion);
+    }
+
+    evaluacion.estado = EstadoEvaluacion.COMPLETADO;
+    const form_actual = (evaluacion.datos_formulario as Record<string, any>) || {};
+    evaluacion.datos_formulario = {
+      ...form_actual,
+      convalidacion_administracion: {
+        admin_id: admin_usuario?.id ?? null,
+        admin_nombre: admin_usuario?.nombre ?? 'Administración Central',
+        fecha_convalidacion: new Date().toISOString(),
+        observaciones: dto.observaciones_administracion || 'Calificaciones y documentos convalidados oficialmente.',
+      },
+    };
+
+    if (dto.observaciones_administracion) {
+      evaluacion.observaciones = dto.observaciones_administracion;
+    }
+
+    if (this.documento_semestral_repo && evaluacion.becario_id && evaluacion.periodo_id) {
+      await this.documento_semestral_repo.update(
+        { becario_id: evaluacion.becario_id, periodo_id: evaluacion.periodo_id },
+        { estado: EstadoDocumentoSemestral.CONVALIDADO },
+      );
+    }
+
+    const guardada = await this.evaluacion_repo.save(evaluacion);
+
+    if (evaluacion.becario?.usuario_id && this.notificaciones_servicio) {
+      try {
+        await this.notificaciones_servicio.crear({
+          usuario_id: evaluacion.becario.usuario_id,
+          tipo: 'evaluacion_pendiente',
+          mensaje: `Administración ha convalidado tu récord semestral con promedio de ${evaluacion.promedio_academico} pts.`,
+        });
+      } catch (e) {
+        // Envio no bloqueante
+      }
+    }
+
+    return guardada;
+  }
+
+  async obtenerEvaluacionAcademicaBecario(becario_id: number, periodo_id: number) {
+    const evaluacion = await this.evaluacion_repo.findOne({
+      where: { becario_id, periodo_id, modulo_id: 2 },
+      relations: { becario: true, periodo: true },
+    });
+
+    let documentos: DocumentoSemestralBecario[] = [];
+    if (this.documento_semestral_repo) {
+      documentos = await this.documento_semestral_repo.find({
+        where: { becario_id, periodo_id },
+        order: { created_at: 'ASC' },
+      });
+    }
+
+    return {
+      evaluacion,
+      documentos,
+    };
+  }
+
+  async obtenerPendientesSupervisor(supervisor_usuario_id: number, periodo_id?: number) {
+    const becarios =
+      (await this.becario_repo?.find({
+        where: { supervisor_id: supervisor_usuario_id },
+      })) || [];
+
+    if (becarios.length === 0) return [];
+
+    const becario_ids = becarios.map((b) => b.id);
+    const query = this.evaluacion_repo
+      .createQueryBuilder('evaluacion')
+      .leftJoinAndSelect('evaluacion.becario', 'becario')
+      .leftJoinAndSelect('evaluacion.periodo', 'periodo')
+      .where('evaluacion.becario_id IN (:...becario_ids)', { becario_ids })
+      .andWhere('evaluacion.modulo_id = 2');
+
+    if (periodo_id) {
+      query.andWhere('evaluacion.periodo_id = :periodo_id', { periodo_id });
+    }
+
+    return query.orderBy('evaluacion.created_at', 'DESC').getMany();
+  }
+
+  async obtenerPendientesAdministracion(periodo_id?: number) {
+    const query = this.evaluacion_repo
+      .createQueryBuilder('evaluacion')
+      .leftJoinAndSelect('evaluacion.becario', 'becario')
+      .leftJoinAndSelect('evaluacion.periodo', 'periodo')
+      .where('evaluacion.modulo_id = 2')
+      .andWhere('evaluacion.estado IN (:...estados)', {
+        estados: [
+          EstadoEvaluacion.EN_REVISION_SUPERVISOR,
+          EstadoEvaluacion.PRE_EVALUADO,
+          EstadoEvaluacion.COMPLETADO,
+          EstadoEvaluacion.OBSERVADO,
+        ],
+      });
+
+    if (periodo_id) {
+      query.andWhere('evaluacion.periodo_id = :periodo_id', { periodo_id });
+    }
+
+    return query.orderBy('evaluacion.created_at', 'DESC').getMany();
+  }
+
   async obtenerCuestionarioBienestar(): Promise<PreguntaBienestar[]> {
     if (this.pregunta_bienestar_repo) {
       let preguntas = await this.pregunta_bienestar_repo.find({
@@ -980,6 +1358,7 @@ export class EvaluacionesServicio {
     enviado: boolean;
     becario_id: number;
     becario_nombre: string;
+    supervisor_id?: number;
     supervisor_nombre: string;
     supervisor_correo: string;
     expira_en_segundos: number;
@@ -1005,7 +1384,13 @@ export class EvaluacionesServicio {
     const becario_id_clave = becario?.id || referencia_id;
     const becario_nombre = becario?.usuario?.nombre || usuario_actual?.nombre || 'María Catunta Laime';
 
+    // Obtener el supervisor ESPECÍFICO del becario
     let supervisor_usuario: Usuario | null = becario?.supervisor || null;
+    if (!supervisor_usuario && becario?.supervisor_id && this.usuario_repo) {
+      supervisor_usuario = await this.usuario_repo.findOne({
+        where: { id: becario.supervisor_id },
+      });
+    }
     if (!supervisor_usuario && this.usuario_repo) {
       supervisor_usuario = await this.usuario_repo.findOne({
         where: { rol: Rol.SUPERVISOR },
@@ -1013,6 +1398,7 @@ export class EvaluacionesServicio {
       });
     }
 
+    const supervisor_id = supervisor_usuario?.id;
     const supervisor_nombre = supervisor_usuario?.nombre || 'Angel Javier Ali Paz';
     const supervisor_correo = supervisor_usuario?.correo || 'angel.ali@bumand.bo';
 
@@ -1022,6 +1408,7 @@ export class EvaluacionesServicio {
     const registro_codigo = {
       codigo,
       expira,
+      supervisor_id,
       supervisor_nombre,
       supervisor_correo,
     };
@@ -1031,36 +1418,28 @@ export class EvaluacionesServicio {
 
     const texto_notificacion = `🔐 Código de autorización para evaluar a ${becario_nombre} (Módulo 03 - Pasantías): ${codigo}. Válido por 10 minutos.`;
 
-    if (this.notificaciones_servicio) {
-      const destinatarios_ids = new Set<number>();
-      if (this.usuario_repo) {
-        const administradores = await this.usuario_repo.find({
-          where: { rol: Rol.ADMINISTRADOR },
+    // AHORA: Enviar ÚNICAMENTE al supervisor específico del becario (ya no a los administradores ni a todos los supervisores)
+    if (this.notificaciones_servicio && supervisor_id) {
+      try {
+        await this.notificaciones_servicio.crear({
+          usuario_id: supervisor_id,
+          tipo: 'evaluacion_codigo_tutor',
+          mensaje: texto_notificacion,
         });
-        for (const admin of administradores) {
-          destinatarios_ids.add(admin.id);
-        }
-      }
-
-      for (const uid of destinatarios_ids) {
-        try {
-          await this.notificaciones_servicio.crear({
-            usuario_id: uid,
-            tipo: 'evaluacion_codigo_tutor',
-            mensaje: texto_notificacion,
-          });
-        } catch {
-          // Continuar si algún destinatario no puede recibir la notificación
-        }
+      } catch {
+        // Continuar si falla la persistencia
       }
     }
 
+    // Notificación en tiempo real dirigida exclusivamente al supervisor específico
     this.tiempo_real_gateway?.notificarCodigoTutor({
-      destinatario_rol: Rol.ADMINISTRADOR,
+      destinatario_rol: Rol.SUPERVISOR,
+      destinatario_usuario_id: supervisor_id,
+      supervisor_id,
       becario_id: becario_id_clave,
       becario_nombre,
-      supervisor_nombre: 'Administración',
-      supervisor_correo: 'admin@bumand.bo',
+      supervisor_nombre,
+      supervisor_correo,
       codigo,
       mensaje: texto_notificacion,
       fecha_envio: new Date().toISOString(),
@@ -1070,10 +1449,11 @@ export class EvaluacionesServicio {
       enviado: true,
       becario_id: becario_id_clave,
       becario_nombre,
-      supervisor_nombre: 'Administración',
-      supervisor_correo: 'admin@bumand.bo',
+      supervisor_id,
+      supervisor_nombre,
+      supervisor_correo,
       expira_en_segundos: 600,
-      mensaje: `Se envió una notificación con el código de 6 dígitos a la pantalla de los administradores.`,
+      mensaje: `Se envió una notificación con el código de 6 dígitos a la pantalla de su supervisor específico (${supervisor_nombre}).`,
     };
   }
 
@@ -1102,7 +1482,7 @@ export class EvaluacionesServicio {
       }
 
       throw new BadRequestException(
-        'El código ingresado es incorrecto o ha expirado. Revisa la notificación en la pantalla de administración o solicita un nuevo código.',
+        'El código ingresado es incorrecto o ha expirado. Revisa la notificación en la pantalla de su supervisor específico o solicita un nuevo código.',
       );
     }
 
@@ -1114,7 +1494,7 @@ export class EvaluacionesServicio {
         });
         if (
           usuario &&
-          usuario.rol === Rol.ADMINISTRADOR &&
+          (usuario.rol === Rol.SUPERVISOR || usuario.rol === Rol.ADMINISTRADOR) &&
           (await compararContrasena(dto.contrasena, usuario.contrasena_hash))
         ) {
           return {
@@ -1133,7 +1513,7 @@ export class EvaluacionesServicio {
     }
 
     throw new BadRequestException(
-      'Debes ingresar el código de 6 dígitos enviado por notificación o las credenciales del supervisor.',
+      'Debes ingresar el código de 6 dígitos enviado por notificación a su supervisor o las credenciales del supervisor.',
     );
   }
 

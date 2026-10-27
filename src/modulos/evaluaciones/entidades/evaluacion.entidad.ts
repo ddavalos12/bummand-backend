@@ -7,7 +7,11 @@ import { EvaluacionPastor } from './evaluacion-pastor.entidad';
 
 export enum EstadoEvaluacion {
   PENDIENTE = 'pendiente',
+  BORRADOR = 'borrador',
+  EN_REVISION_SUPERVISOR = 'en_revision_supervisor',
+  PRE_EVALUADO = 'pre_evaluado',
   COMPLETADO = 'completado',
+  OBSERVADO = 'observado',
 }
 
 @Entity('evaluaciones')

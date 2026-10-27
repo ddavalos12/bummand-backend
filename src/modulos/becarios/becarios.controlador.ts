@@ -186,7 +186,13 @@ export class BecariosControlador {
   @ApiOperation({
     summary: 'Obtener grilla horaria asignada a un becario',
   })
-  obtenerHorarios(@Param('id', ParseIntPipe) id: number) {
+  async obtenerHorarios(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() usuarioAutenticado: Usuario,
+  ) {
+    if (usuarioAutenticado.rol === Rol.SUPERVISOR) {
+      await this.becariosServicio.obtener(id, usuarioAutenticado);
+    }
     return this.becariosServicio.obtenerHorarios(id);
   }
 
@@ -195,7 +201,7 @@ export class BecariosControlador {
   @ApiOperation({
     summary: 'Guardar o actualizar la grilla horaria de práctica institucional de un becario',
   })
-  guardarHorarios(
+  async guardarHorarios(
     @Param('id', ParseIntPipe) id: number,
     @Body()
     dto: {
@@ -209,7 +215,11 @@ export class BecariosControlador {
         activo?: boolean;
       }>;
     },
+    @UsuarioActual() usuarioAutenticado: Usuario,
   ) {
+    if (usuarioAutenticado.rol === Rol.SUPERVISOR) {
+      await this.becariosServicio.obtener(id, usuarioAutenticado);
+    }
     return this.becariosServicio.guardarHorarios(id, dto);
   }
 

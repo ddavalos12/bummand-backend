@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { Evaluacion } from './evaluacion.entidad';
+import { DocumentoSemestralBecario } from '../../becarios/entidades/documento-semestral-becario.entidad';
 
 export enum EstadoPeriodo {
   ABIERTO = 'abierto',
@@ -40,4 +41,7 @@ export class PeriodoEvaluacion {
 
   @OneToMany(() => Evaluacion, (evaluacion) => evaluacion.periodo)
   evaluaciones: Evaluacion[];
+
+  @OneToMany(() => DocumentoSemestralBecario, (doc) => doc.periodo)
+  documentos_semestrales: DocumentoSemestralBecario[];
 }

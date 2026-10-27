@@ -11,6 +11,7 @@ import { PreguntaBienestar } from './entidades/pregunta-bienestar.entidad';
 import { CasoSeguimientoPastoral } from './entidades/caso-seguimiento-pastoral.entidad';
 import { Cuestionario } from './entidades/cuestionario.entidad';
 import { PreguntaCuestionario } from './entidades/pregunta-cuestionario.entidad';
+import { DocumentoSemestralBecario } from '../becarios/entidades/documento-semestral-becario.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { Usuario } from '../usuarios/entidades/usuario.entidad';
 import { BibliaModulo } from '../biblia/biblia.modulo';
@@ -29,6 +30,7 @@ import { TiempoRealModulo } from '../tiempo-real/tiempo-real.modulo';
       CasoSeguimientoPastoral,
       Cuestionario,
       PreguntaCuestionario,
+      DocumentoSemestralBecario,
       Becario,
       Usuario,
     ]),

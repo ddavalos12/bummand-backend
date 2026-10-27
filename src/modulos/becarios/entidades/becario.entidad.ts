@@ -9,6 +9,7 @@ import { AprobacionPracticas } from '../../practicas/entidades/aprobacion-practi
 import { ReporteGenerado } from '../../pdf/entidades/reporte-generado.entidad';
 import { HorarioApoyo } from './horario-apoyo.entidad';
 import { AsignacionPractica } from './asignacion-practica.entidad';
+import { DocumentoSemestralBecario } from './documento-semestral-becario.entidad';
 
 @Entity('becarios')
 export class Becario {
@@ -102,6 +103,12 @@ export class Becario {
   @Column({ name: 'comentario_iglesia', type: 'text', nullable: true })
   comentario_iglesia: string | null;
 
+  @Column({ name: 'url_carnet', type: 'text', nullable: true })
+  url_carnet: string | null;
+
+  @Column({ name: 'url_kardex', type: 'text', nullable: true })
+  url_kardex: string | null;
+
   @OneToOne(() => Usuario, (usuario) => usuario.becario, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'usuario_id' })
   usuario: Usuario | null;
@@ -138,4 +145,7 @@ export class Becario {
 
   @OneToMany(() => AsignacionPractica, (asignacion) => asignacion.becario)
   asignaciones_practica: AsignacionPractica[];
+
+  @OneToMany(() => DocumentoSemestralBecario, (documento) => documento.becario)
+  documentos_semestrales: DocumentoSemestralBecario[];
 }

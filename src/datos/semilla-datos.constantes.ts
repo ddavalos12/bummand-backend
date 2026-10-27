@@ -61,12 +61,6 @@ export interface IglesiaSemilla {
 
 export const ADMINISTRADORES_SEMILLA: AdministradorSemilla[] = [
   {
-    "nombre": "Daniel Davalos Quiñonez",
-    "correo": "daniel234.davalos@gmail.com",
-    "clave": "Bumand2026!",
-    "cargo": "Administrador de Sistemas e Infraestructura BUMAND"
-  },
-  {
     "nombre": "Coordinación General BUMAND",
     "correo": "coordinacion@bumand.bo",
     "clave": "Bumand2026!",

@@ -86,6 +86,14 @@ export class BecariosServicio {
     const nuevoBecario = this.becarioRepositorio.create({
       nombre: dto.nombre,
       ci: ci_limpio,
+      lugar_expedicion: dto.lugar_expedicion || null,
+      celular: dto.celular || null,
+      estado_civil: dto.estado_civil || null,
+      sexo: dto.sexo || null,
+      fecha_nacimiento: dto.fecha_nacimiento || null,
+      direccion: dto.direccion || null,
+      ciudad: dto.ciudad || null,
+      ceti: dto.ceti || null,
       carrera: dto.carrera,
       universidad: dto.universidad,
       institucion: dto.institucion || null,
@@ -97,6 +105,8 @@ export class BecariosServicio {
       supervisor: dto.supervisor_id ? ({ id: dto.supervisor_id } as Usuario) : null,
       usuario: usuarioGuardado,
       usuario_id: usuarioGuardado ? usuarioGuardado.id : null,
+      url_carnet: dto.url_carnet || null,
+      url_kardex: dto.url_kardex || null,
     });
 
     return this.becarioRepositorio.save(nuevoBecario);
@@ -199,12 +209,23 @@ export class BecariosServicio {
     }
 
     // Actualizar becario
+    if (dto.nombre !== undefined) becario.nombre = dto.nombre;
     if (dto.carrera !== undefined) becario.carrera = dto.carrera;
     if (dto.universidad !== undefined) becario.universidad = dto.universidad;
     if (dto.institucion !== undefined) becario.institucion = dto.institucion || null;
     if (dto.unidad !== undefined) becario.unidad = dto.unidad || null;
     if (dto.ci !== undefined) becario.ci = dto.ci || null;
+    if (dto.lugar_expedicion !== undefined) becario.lugar_expedicion = dto.lugar_expedicion || null;
+    if (dto.celular !== undefined) becario.celular = dto.celular || null;
+    if (dto.estado_civil !== undefined) becario.estado_civil = dto.estado_civil || null;
+    if (dto.sexo !== undefined) becario.sexo = dto.sexo || null;
+    if (dto.fecha_nacimiento !== undefined) becario.fecha_nacimiento = dto.fecha_nacimiento || null;
+    if (dto.direccion !== undefined) becario.direccion = dto.direccion || null;
+    if (dto.ciudad !== undefined) becario.ciudad = dto.ciudad || null;
+    if (dto.ceti !== undefined) becario.ceti = dto.ceti || null;
     if (dto.horario_semanal !== undefined) becario.horario_semanal = dto.horario_semanal || null;
+    if (dto.url_carnet !== undefined) becario.url_carnet = dto.url_carnet || null;
+    if (dto.url_kardex !== undefined) becario.url_kardex = dto.url_kardex || null;
 
     if (dto.iglesia_id !== undefined) {
       becario.iglesia = dto.iglesia_id ? ({ id: dto.iglesia_id } as Iglesia) : null;

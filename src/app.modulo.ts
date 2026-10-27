@@ -9,6 +9,7 @@ import { Usuario } from './modulos/usuarios/entidades/usuario.entidad';
 import { Iglesia } from './modulos/iglesias/entidades/iglesia.entidad';
 import { LugarPractica } from './modulos/lugares-practica/entidades/lugar-practica.entidad';
 import { Becario } from './modulos/becarios/entidades/becario.entidad';
+import { DocumentoSemestralBecario } from './modulos/becarios/entidades/documento-semestral-becario.entidad';
 import { HorarioApoyo } from './modulos/becarios/entidades/horario-apoyo.entidad';
 import { AsignacionPractica } from './modulos/becarios/entidades/asignacion-practica.entidad';
 import { ConfiguracionInstitucional } from './modulos/becarios/entidades/configuracion-institucional.entidad';
@@ -74,6 +75,7 @@ import { RefrigeriosModulo } from './modulos/refrigerios/refrigerios.modulo';
         Iglesia,
         LugarPractica,
         Becario,
+        DocumentoSemestralBecario,
         HorarioApoyo,
         AsignacionPractica,
         ConfiguracionInstitucional,

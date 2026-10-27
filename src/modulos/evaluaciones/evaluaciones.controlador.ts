@@ -19,6 +19,9 @@ import { PreguntaBienestar } from './entidades/pregunta-bienestar.entidad';
 import { Cuestionario } from './entidades/cuestionario.entidad';
 import { PreguntaCuestionario } from './entidades/pregunta-cuestionario.entidad';
 import { ReceptorAcademicaDto } from './dtos/receptor-academica.dto';
+import { GuardarNotasEstudianteDto } from './dtos/guardar-notas-estudiante.dto';
+import { PreEvaluarSupervisorDto } from './dtos/pre-evaluar-supervisor.dto';
+import { ConvalidarAdministracionDto } from './dtos/convalidar-administracion.dto';
 import { ReceptorMentorQrDto } from './dtos/receptor-mentor-qr.dto';
 import { ReceptorSocioeconomicaDto } from './dtos/receptor-socioeconomica.dto';
 import { SolicitarCodigoTutorDto, VerificarCodigoTutorDto } from './dtos/verificacion-tutor.dto';
@@ -38,10 +41,10 @@ export class EvaluacionesControlador {
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('tutor/solicitar-codigo')
   @ApiOperation({
-    summary: 'Solicitar código OTP de 6 dígitos para autorización de administración',
-    description: 'Genera un código temporal de 6 dígitos y lo envía inmediatamente como notificación a la pantalla de los administradores.',
+    summary: 'Solicitar código OTP de 6 dígitos para autorización del supervisor específico',
+    description: 'Genera un código temporal de 6 dígitos y lo envía inmediatamente como notificación a la pantalla del supervisor específico asignado al becario.',
   })
-  @ApiResponse({ status: 201, description: 'Código generado y notificado a la pantalla de los administradores.' })
+  @ApiResponse({ status: 201, description: 'Código generado y notificado a la pantalla del supervisor específico.' })
   solicitarCodigoTutor(
     @Body() dto: SolicitarCodigoTutorDto,
     @UsuarioActual() usuario: Usuario,
@@ -52,10 +55,10 @@ export class EvaluacionesControlador {
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('tutor/verificar-codigo')
   @ApiOperation({
-    summary: 'Verificar código de autorización de administración',
-    description: 'Valida el código de 6 dígitos enviado a la pantalla de los administradores para desbloquear el formulario de evaluación.',
+    summary: 'Verificar código de autorización del supervisor específico',
+    description: 'Valida el código de 6 dígitos enviado a la pantalla del supervisor específico para desbloquear el formulario de evaluación.',
   })
-  @ApiResponse({ status: 200, description: 'Código de autorización verificado con éxito.' })
+  @ApiResponse({ status: 200, description: 'Código de autorización del supervisor verificado con éxito.' })
   verificarCodigoTutor(@Body() dto: VerificarCodigoTutorDto) {
     return this.evaluaciones_servicio.verificarCodigoTutor(dto);
   }
@@ -69,6 +72,83 @@ export class EvaluacionesControlador {
   @ApiResponse({ status: 201, description: 'Autoevaluación académica procesada con éxito.', type: Evaluacion })
   procesarReceptorAcademica(@Body() dto: ReceptorAcademicaDto): Promise<Evaluacion> {
     return this.evaluaciones_servicio.procesarReceptorAcademica(dto);
+  }
+
+  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Post('academica/estudiante')
+  @ApiOperation({
+    summary: 'Registro semestral de asignaturas, notas y documentos por el estudiante',
+    description: 'Permite al becario ingresar manualmente sus materias, notas, kárdex, programación y carnet para pre-evaluación.',
+  })
+  @ApiResponse({ status: 201, description: 'Calificaciones registradas y enviadas a pre-evaluación.', type: Evaluacion })
+  registrarNotasEstudiante(
+    @Body() dto: GuardarNotasEstudianteDto,
+    @UsuarioActual() usuario: Usuario,
+  ): Promise<Evaluacion> {
+    return this.evaluaciones_servicio.registrarNotasEstudiante(dto, usuario);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Put('academica/:id/pre-evaluacion')
+  @ApiOperation({
+    summary: 'Pre-evaluación y edición de calificaciones por el supervisor',
+    description: 'Permite al supervisor revisar, editar o ratificar notas antes de aprobar la pre-evaluación hacia administración.',
+  })
+  @ApiResponse({ status: 200, description: 'Pre-evaluación procesada con éxito.', type: Evaluacion })
+  preEvaluarSupervisor(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: PreEvaluarSupervisorDto,
+    @UsuarioActual() usuario: Usuario,
+  ): Promise<Evaluacion> {
+    return this.evaluaciones_servicio.preEvaluarSupervisor(id, dto, usuario);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Put('academica/:id/convalidar')
+  @ApiOperation({
+    summary: 'Convalidación definitiva de calificaciones por administración',
+    description: 'Administración convalida oficialmente el récord académico y se asienta en la sábana semestral.',
+  })
+  @ApiResponse({ status: 200, description: 'Calificaciones convalidadas con éxito.', type: Evaluacion })
+  convalidarEvaluacionAcademica(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ConvalidarAdministracionDto,
+    @UsuarioActual() usuario: Usuario,
+  ): Promise<Evaluacion> {
+    return this.evaluaciones_servicio.convalidarEvaluacionAcademica(id, dto, usuario);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('academica/becario/:becarioId/periodo/:periodoId')
+  @ApiOperation({
+    summary: 'Consultar registro académico y documentos de un becario por periodo',
+  })
+  obtenerEvaluacionAcademicaBecario(
+    @Param('becarioId', ParseIntPipe) becarioId: number,
+    @Param('periodoId', ParseIntPipe) periodoId: number,
+  ) {
+    return this.evaluaciones_servicio.obtenerEvaluacionAcademicaBecario(becarioId, periodoId);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('academica/pendientes-supervisor')
+  @ApiOperation({
+    summary: 'Listar evaluaciones académicas asignadas al supervisor para pre-evaluación',
+  })
+  obtenerPendientesSupervisor(
+    @UsuarioActual() usuario: Usuario,
+    @Query('periodo_id') periodo_id?: number,
+  ) {
+    return this.evaluaciones_servicio.obtenerPendientesSupervisor(usuario.id, periodo_id ? Number(periodo_id) : undefined);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Get('academica/pendientes-administracion')
+  @ApiOperation({
+    summary: 'Listar evaluaciones académicas en proceso para administración',
+  })
+  obtenerPendientesAdministracion(@Query('periodo_id') periodo_id?: number) {
+    return this.evaluaciones_servicio.obtenerPendientesAdministracion(periodo_id ? Number(periodo_id) : undefined);
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)

@@ -115,10 +115,104 @@ export class CrearBecarioDto {
   fecha_ingreso?: string;
 
   @ApiPropertyOptional({
+    example: 'LP',
+    description: 'Extensión oficial del departamento emisor del C.I. según SEGIP Bolivia (LP, SC, CB, OR, PT, TJ, CH, BN, PA, QR)',
+    maxLength: 10,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  lugar_expedicion?: string;
+
+  @ApiPropertyOptional({
+    example: '71234567',
+    description: 'Número de teléfono celular de contacto',
+    maxLength: 30,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  celular?: string;
+
+  @ApiPropertyOptional({
+    example: 'Soltero(a)',
+    description: 'Estado civil del becario',
+    maxLength: 30,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  estado_civil?: string;
+
+  @ApiPropertyOptional({
+    example: 'F',
+    description: 'Sexo o género del becario (M o F)',
+    maxLength: 10,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  sexo?: string;
+
+  @ApiPropertyOptional({
+    example: '2003-05-14',
+    description: 'Fecha de nacimiento (formato YYYY-MM-DD)',
+    maxLength: 30,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  fecha_nacimiento?: string;
+
+  @ApiPropertyOptional({
+    example: 'Zona Villa Adela, Calle 4 #102',
+    description: 'Dirección o domicilio registrado',
+    maxLength: 255,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  direccion?: string;
+
+  @ApiPropertyOptional({
+    example: 'El Alto',
+    description: 'Ciudad de residencia',
+    maxLength: 80,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  ciudad?: string;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Nivel CETI cursado',
+  })
+  @IsOptional()
+  @IsNumber()
+  ceti?: number;
+
+  @ApiPropertyOptional({
     example: { lun: '08:00-12:00', mar: '', mie: '08:00-12:00', jue: '', vie: '08:00-14:00', sab: '', dom: '' },
     description: 'Matriz semanal de horarios asignados de prácticas (Lunes a Domingo)',
   })
   @IsOptional()
   @IsObject()
   horario_semanal?: Record<string, string>;
+
+  @ApiPropertyOptional({
+    example: 'data:application/pdf;base64,...',
+    description: 'URL o Data URL del Carnet de Identidad oficial del becario',
+  })
+  @IsOptional()
+  @IsString()
+  url_carnet?: string;
+
+  @ApiPropertyOptional({
+    example: 'data:application/pdf;base64,...',
+    description: 'URL o Data URL de la matrícula universitaria o kárdex de notas',
+  })
+  @IsOptional()
+  @IsString()
+  url_kardex?: string;
 }

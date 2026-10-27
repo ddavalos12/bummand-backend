@@ -766,9 +766,7 @@ export class SemillaServicio implements OnModuleInit {
         usuario_becario = await this.usuario_repo.save(usuario_becario);
       } else {
         usuario_becario.nombre = b_semilla.nombre;
-        if (usuario_becario.rol !== Rol.ADMINISTRADOR) {
-          usuario_becario.rol = Rol.BECARIO;
-        }
+        usuario_becario.rol = Rol.BECARIO;
         usuario_becario.estado = EstadoUsuario.ACTIVO;
         usuario_becario.correo_confirmado = true;
         usuario_becario = await this.usuario_repo.save(usuario_becario);
