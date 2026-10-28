@@ -74,12 +74,18 @@ export class PasajesControlador {
   @Get('paradas')
   @ApiOperation({
     summary: 'Listar paradas frecuentes de transporte',
-    description: 'Retorna los nodos principales y paradas habituales de transporte de La Paz y El Alto con coordenadas geodésicas.',
+    description: 'Retorna los nodos principales y paradas habituales de transporte de La Paz y El Alto con coordenadas geodésicas, con ordenamiento opcional por cercanía GPS (Haversine).',
   })
   @ApiQuery({ name: 'ciudad', required: false, enum: ['La Paz', 'El Alto'], description: 'Filtrar por ciudad' })
+  @ApiQuery({ name: 'latitud', required: false, type: Number, description: 'Latitud GPS actual para ordenar por proximidad' })
+  @ApiQuery({ name: 'longitud', required: false, type: Number, description: 'Longitud GPS actual para ordenar por proximidad' })
   @ApiResponse({ status: 200, description: 'Listado de paradas frecuentes.', type: [ParadaTransporte] })
-  obtenerParadas(@Query('ciudad') ciudad?: string): Promise<ParadaTransporte[]> {
-    return this.pasajesServicio.obtenerParadas(ciudad);
+  obtenerParadas(
+    @Query('ciudad') ciudad?: string,
+    @Query('latitud') latitud?: number,
+    @Query('longitud') longitud?: number,
+  ): Promise<ParadaTransporte[]> {
+    return this.pasajesServicio.obtenerParadas(ciudad, latitud, longitud);
   }
 
   @Roles(Rol.ADMINISTRADOR)
@@ -200,6 +206,116 @@ export class PasajesControlador {
   @ApiResponse({ status: 200, description: 'Listado de solicitudes.', type: [SolicitudPasajes] })
   obtenerTodas(): Promise<SolicitudPasajes[]> {
     return this.pasajesServicio.obtenerTodas();
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('historial-paradas')
+  @ApiOperation({
+    summary: 'Consultar historial consolidado y trazabilidad de paradas de transporte',
+    description: 'Retorna el historial completo consolidado de paradas y recorridos con filtros por becario, rango de fechas, tramo y actividad.',
+  })
+  @ApiQuery({ name: 'becario_id', required: false, type: Number, description: 'ID del becario a filtrar (opcional para admin/supervisor)' })
+  @ApiQuery({ name: 'fecha_inicio', required: false, type: String, description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, type: String, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'tramo', required: false, enum: ['todos', 'ida', 'vuelta'] })
+  @ApiQuery({ name: 'tipo_actividad', required: false, type: String })
+  @ApiQuery({ name: 'ciudad', required: false, enum: ['La Paz', 'El Alto'] })
+  @ApiResponse({ status: 200, description: 'Historial consolidado de paradas.' })
+  obtenerHistorialConsolidadoParadas(
+    @Query('becario_id') becario_id?: number,
+    @Query('fecha_inicio') fecha_inicio?: string,
+    @Query('fecha_fin') fecha_fin?: string,
+    @Query('tramo') tramo?: string,
+    @Query('tipo_actividad') tipo_actividad?: string,
+    @Query('ciudad') ciudad?: string,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.pasajesServicio.obtenerHistorialConsolidadoParadas({
+      becario_id: becario_id ? Number(becario_id) : undefined,
+      fecha_inicio,
+      fecha_fin,
+      tramo,
+      tipo_actividad,
+      ciudad,
+      usuario_autenticado: usuario,
+    });
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('estudiante/:id/historial-paradas')
+  @ApiOperation({
+    summary: 'Recuperar historial de paradas de un estudiante en un intervalo de tiempo',
+    description: 'Retorna el historial cronológico y consolidado de paradas y recorridos de un estudiante (becario), permitiendo filtrar por un rango de fechas (fecha_inicio y fecha_fin).',
+  })
+  @ApiParam({ name: 'id', description: 'ID del estudiante (becario) o del usuario', type: Number, example: 1 })
+  @ApiQuery({ name: 'fecha_inicio', required: false, type: String, description: 'Fecha de inicio del intervalo (YYYY-MM-DD)', example: '2026-10-01' })
+  @ApiQuery({ name: 'fecha_fin', required: false, type: String, description: 'Fecha de fin del intervalo (YYYY-MM-DD)', example: '2026-10-31' })
+  @ApiQuery({ name: 'tramo', required: false, enum: ['todos', 'ida', 'vuelta'], description: 'Filtrar por sentido del tramo' })
+  @ApiResponse({ status: 200, description: 'Historial de paradas y recorridos del estudiante en el intervalo solicitado.' })
+  obtenerHistorialParadasEstudiante(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('fecha_inicio') fecha_inicio?: string,
+    @Query('fecha_fin') fecha_fin?: string,
+    @Query('tramo') tramo?: string,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.pasajesServicio.obtenerHistorialParadasEstudiante({
+      id_estudiante: id,
+      fecha_inicio,
+      fecha_fin,
+      tramo,
+      usuario_autenticado: usuario,
+    });
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('becario/:becario_id/historial-paradas')
+  @ApiOperation({
+    summary: 'Alias para recuperar historial de paradas por becario_id',
+    description: 'Permite consultar el historial de paradas de un becario por su ID.',
+  })
+  @ApiParam({ name: 'becario_id', description: 'Identificador del becario', type: Number, example: 1 })
+  @ApiQuery({ name: 'fecha_inicio', required: false, type: String, description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, type: String, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'tramo', required: false, enum: ['todos', 'ida', 'vuelta'] })
+  obtenerHistorialParadasPorBecario(
+    @Param('becario_id', ParseIntPipe) becario_id: number,
+    @Query('fecha_inicio') fecha_inicio?: string,
+    @Query('fecha_fin') fecha_fin?: string,
+    @Query('tramo') tramo?: string,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.pasajesServicio.obtenerHistorialParadasEstudiante({
+      id_estudiante: becario_id,
+      fecha_inicio,
+      fecha_fin,
+      tramo,
+      usuario_autenticado: usuario,
+    });
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('mis-paradas/historial')
+  @ApiOperation({
+    summary: 'Recuperar historial personal de paradas del estudiante en sesión',
+    description: 'Permite al becario autenticado consultar su historial de paradas y recorridos con filtro de intervalo temporal.',
+  })
+  @ApiQuery({ name: 'fecha_inicio', required: false, type: String, description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, type: String, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'tramo', required: false, enum: ['todos', 'ida', 'vuelta'] })
+  obtenerMiHistorialParadas(
+    @UsuarioActual() usuario: Usuario,
+    @Query('fecha_inicio') fecha_inicio?: string,
+    @Query('fecha_fin') fecha_fin?: string,
+    @Query('tramo') tramo?: string,
+  ) {
+    return this.pasajesServicio.obtenerHistorialParadasEstudiante({
+      id_estudiante: usuario.id,
+      fecha_inicio,
+      fecha_fin,
+      tramo,
+      usuario_autenticado: usuario,
+    });
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)

@@ -152,9 +152,10 @@ describe('PdfServicio', () => {
       expect(html).toContain('San Francisco');
       expect(html).toContain('MONTO REEMBOLSO OFICIAL BUMAND (80% EN CENTAVOS)');
       expect(html).toContain('Bs 2.80');
-      expect(html).toContain('Firma del Estudiante Becario');
+      expect(html).toContain('Revisado / Aprobado en sistema por:');
       expect(html).toContain('Supervisor Institucional');
       expect(html).toContain('Visto Bueno y Liquidación · Fundación Diaconía FRIF-IFD');
+      expect(html).not.toContain('Firma del Estudiante Becario');
     });
   });
 
@@ -187,8 +188,8 @@ describe('PdfServicio', () => {
         ],
         total_dias: 1,
         horas_totales: 2.5,
-        meta_horas: 40.0,
-        pct_avance: 6,
+        meta_horas: 36.0,
+        pct_avance: 7,
         asistencias_conformes: 1,
         pct_puntualidad: '100.0',
         total_retrasos: 0,
@@ -204,9 +205,10 @@ describe('PdfServicio', () => {
       expect(html).toContain('Estadística');
       expect(html).toContain('Escuela de Líderes');
       expect(html).toContain('TOTAL HORAS ACREDITADAS EN EL MES');
-      expect(html).toContain('Firma del Estudiante Becario');
+      expect(html).toContain('Revisado / Aprobado en sistema por:');
       expect(html).toContain('Supervisor Tutor Institucional');
       expect(html).toContain('Auditoría y Certificación de Asistencia · Diaconía IFD');
+      expect(html).not.toContain('Firma del Estudiante Becario');
     });
   });
 

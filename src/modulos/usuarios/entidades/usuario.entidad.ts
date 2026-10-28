@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne, OneToMany } from 'typeorm';
 import { Becario } from '../../becarios/entidades/becario.entidad';
 import { Notificacion } from '../../notificaciones/entidades/notificacion.entidad';
+import { CorreoUsuario } from './correo-usuario.entidad';
 
 export enum Rol {
   BECARIO = 'becario',
@@ -23,6 +24,9 @@ export class Usuario {
 
   @Column({ type: 'varchar', length: 150, unique: true })
   correo: string;
+
+  @Column({ name: 'correo_alternativo', type: 'varchar', length: 150, unique: true, nullable: true })
+  correo_alternativo: string | null;
 
   @Column({ name: 'contrasena_hash', type: 'varchar', length: 255 })
   contrasena_hash: string;
@@ -81,5 +85,8 @@ export class Usuario {
 
   @OneToMany(() => Notificacion, (notificacion) => notificacion.usuario)
   notificaciones: Notificacion[];
+
+  @OneToMany(() => CorreoUsuario, (correo) => correo.usuario, { cascade: true, eager: true })
+  correos_adicionales: CorreoUsuario[];
 }
 

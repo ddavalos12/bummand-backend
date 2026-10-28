@@ -171,9 +171,11 @@ export class AutenticacionServicio {
     }
 
     const correo_limpio = dto.correo.trim().toLowerCase();
-    const usuario_existente = await this.usuarioRepositorio.findOne({
-      where: { correo: correo_limpio },
-    });
+    const usuario_existente =
+      (await this.usuarioRepositorio.findOne({
+        where: { correo: correo_limpio },
+      })) ||
+      (await this.usuariosServicio.obtenerPorCorreoConRelaciones(correo_limpio));
 
     if (usuario_existente) {
       throw new ConflictException(

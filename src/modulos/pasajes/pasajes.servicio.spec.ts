@@ -18,10 +18,20 @@ describe('PasajesServicio', () => {
       find: jest.fn(),
     };
 
+    const qb_mock: any = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
+
     recorrido_repo = {
       create: jest.fn().mockImplementation((datos) => ({ ...datos, id: 10 })),
       save: jest.fn().mockImplementation((datos) => Promise.resolve({ ...datos })),
       find: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(qb_mock),
     };
 
     const modulo: TestingModule = await Test.createTestingModule({
@@ -295,6 +305,32 @@ describe('PasajesServicio', () => {
       const una = await servicio.obtenerPorId(1);
       expect(una.recorridos[0].calles_declaradas).toBe('Av. Busch, Plaza Villarroel');
       expect(una.recorridos[0].medio_transporte).toBe('Mi Teleférico');
+    });
+  });
+
+  describe('Historial de paradas por estudiante en intervalo de tiempo', () => {
+    it('debe recuperar el historial de paradas, secuencia y métricas consolidadas', async () => {
+      const resultado = await servicio.obtenerHistorialParadasEstudiante({
+        id_estudiante: 1,
+        fecha_inicio: '2026-10-01',
+        fecha_fin: '2026-10-15',
+        tramo: 'todos',
+      });
+
+      expect(resultado).toBeDefined();
+      expect(resultado.becario).toBeDefined();
+      expect(resultado.intervalo.fecha_inicio).toBe('2026-10-01');
+      expect(resultado.intervalo.fecha_fin).toBe('2026-10-15');
+      expect(resultado.resumen.total_recorridos).toBeGreaterThan(0);
+      expect(resultado.resumen.paradas_unicas_frecuentes.length).toBeGreaterThan(0);
+      expect(resultado.historial.length).toBeGreaterThan(0);
+
+      // Verificar que cada registro contenga la secuencia de paradas
+      const primer_item = resultado.historial[0];
+      expect(primer_item.paradas_secuencia).toBeDefined();
+      expect(primer_item.paradas_secuencia.length).toBeGreaterThanOrEqual(2);
+      expect(primer_item.origen).toBeDefined();
+      expect(primer_item.destino).toBeDefined();
     });
   });
 });

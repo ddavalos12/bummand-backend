@@ -1490,7 +1490,7 @@ export class EvaluacionesServicio {
       const correo_limpio = dto.correo.trim().toLowerCase();
       if (this.usuario_repo) {
         const usuario = await this.usuario_repo.findOne({
-          where: { correo: correo_limpio },
+          where: [{ correo: correo_limpio }, { correo_alternativo: correo_limpio }],
         });
         if (
           usuario &&

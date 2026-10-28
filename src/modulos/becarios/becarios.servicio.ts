@@ -357,22 +357,26 @@ export class BecariosServicio {
     datos_validados: boolean;
     debe_confirmar: boolean;
     fecha_ultima_solicitud: string | null;
+    mes_actual: string;
   }> {
-    const config = await this.obtenerConfiguracion();
     const becario = await this.becarioRepositorio.findOne({ where: { usuario_id } });
-    const datos_confirmados = becario ? Boolean(becario.datos_confirmados) : false;
+    const ahora = new Date();
+    const mes_actual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
+
+    // Ciclo mensual automático institucional: si el mes actual no ha sido confirmado por el becario, debe confirmar
+    const confirmado_este_mes = becario?.ultimo_mes_datos_confirmados === mes_actual;
+    const datos_confirmados = becario ? (confirmado_este_mes || Boolean(becario.datos_confirmados && !becario.ultimo_mes_datos_confirmados)) : false;
     const datos_validados = becario ? Boolean(becario.datos_validados) : false;
-    const confirmacion_datos_requerida = config
-      ? Boolean(config.confirmacion_datos_activa)
-      : this.confirmacion_datos_requerida;
-    const fecha_ultima = config?.fecha_ultima_orden_confirmacion ?? this.fecha_ultima_orden_confirmacion;
+    const debe_confirmar = becario ? !confirmado_este_mes : false;
+    const fecha_ultima = becario?.fecha_ultima_confirmacion;
 
     return {
-      confirmacion_datos_requerida,
+      confirmacion_datos_requerida: true,
       datos_confirmados,
       datos_validados,
-      debe_confirmar: confirmacion_datos_requerida && !datos_confirmados,
+      debe_confirmar,
       fecha_ultima_solicitud: fecha_ultima ? new Date(fecha_ultima).toISOString() : null,
+      mes_actual,
     };
   }
 
@@ -383,9 +387,13 @@ export class BecariosServicio {
     });
     if (!becario) throw new NotFoundException('Becario no encontrado');
 
+    const ahora = new Date();
+    const mes_actual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
+
     becario.datos_validados = true;
     becario.datos_confirmados = true;
-    becario.fecha_ultima_confirmacion = new Date();
+    becario.ultimo_mes_datos_confirmados = mes_actual;
+    becario.fecha_ultima_confirmacion = ahora;
     return this.becarioRepositorio.save(becario);
   }
 
@@ -396,13 +404,41 @@ export class BecariosServicio {
     });
     if (!becario) throw new NotFoundException('Perfil de becario no encontrado');
 
+    const ahora = new Date();
+    const mes_actual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
+
     becario.datos_confirmados = true;
-    becario.fecha_ultima_confirmacion = new Date();
+    becario.ultimo_mes_datos_confirmados = mes_actual;
+    becario.fecha_ultima_confirmacion = ahora;
     const guardado = await this.becarioRepositorio.save(becario);
     return {
-      mensaje: 'Confirmación de datos registrada exitosamente',
+      mensaje: `Confirmación de datos registrada exitosamente para el ciclo ${mes_actual}`,
       becario: guardado,
     };
+  }
+
+  async actualizarConfiguracionPasajes(
+    id: number,
+    dto: {
+      modalidad_pasajes?: 'ida_y_vuelta' | 'solo_ida';
+      configuracion_pasajes_actividades?: {
+        practicas?: 'ida_y_vuelta' | 'solo_ida';
+        escuela_lideres?: 'ida_y_vuelta' | 'solo_ida';
+        acciones_servicio?: 'ida_y_vuelta' | 'solo_ida';
+      };
+    },
+  ): Promise<Becario> {
+    const becario = await this.becarioRepositorio.findOne({ where: { id } });
+    if (!becario) throw new NotFoundException(`Becario con ID ${id} no encontrado`);
+
+    if (dto.modalidad_pasajes !== undefined) {
+      becario.modalidad_pasajes = dto.modalidad_pasajes;
+    }
+    if (dto.configuracion_pasajes_actividades !== undefined) {
+      becario.configuracion_pasajes_actividades = dto.configuracion_pasajes_actividades;
+    }
+
+    return this.becarioRepositorio.save(becario);
   }
 
   async eliminar(id: number): Promise<{ mensaje: string }> {

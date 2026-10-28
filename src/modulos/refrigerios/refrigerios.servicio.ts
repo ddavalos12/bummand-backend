@@ -24,6 +24,8 @@ export interface PlanillaReposicionRefrigerio {
   };
   firmas_conformidad: Record<string, unknown>[];
   total_firmas: number;
+  registros_conformidad?: Record<string, unknown>[];
+  total_registros_conformidad?: number;
   estado_reposicion: 'LISTO_PARA_DESEMBOLSO';
   moneda: 'BOB (Bolivianos)';
   fecha_emision_planilla: string;
@@ -159,6 +161,8 @@ export class RefrigeriosServicio {
       },
       firmas_conformidad: firmas,
       total_firmas: firmas.length,
+      registros_conformidad: firmas,
+      total_registros_conformidad: firmas.length,
       estado_reposicion: 'LISTO_PARA_DESEMBOLSO',
       moneda: 'BOB (Bolivianos)',
       fecha_emision_planilla: new Date().toISOString(),

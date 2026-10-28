@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseGuards, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, ParseIntPipe, UseGuards, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { BecariosServicio } from './becarios.servicio';
 import { CrearBecarioDto } from './dtos/crear-becario.dto';
@@ -6,6 +6,7 @@ import { ActualizarBecarioDto } from './dtos/actualizar-becario.dto';
 import { AsignarSupervisorDto } from './dtos/asignar-supervisor.dto';
 import { OrdenConfirmacionDatosDto } from './dtos/orden-confirmacion-datos.dto';
 import { EstadoOrdenConfirmacionDto } from './dtos/estado-orden-confirmacion.dto';
+import { ActualizarConfiguracionPasajesDto } from './dtos/actualizar-configuracion-pasajes.dto';
 import { Becario } from './entidades/becario.entidad';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
@@ -163,6 +164,21 @@ export class BecariosControlador {
   @ApiResponse({ status: 200, description: 'Datos del becario validados.', type: Becario })
   validarDatos(@Param('id', ParseIntPipe) id: number): Promise<Becario> {
     return this.becariosServicio.validarDatos(id);
+  }
+
+  @Patch(':id/configuracion-pasajes')
+  @Roles(Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'Configurar modalidad de registro de pasajes para un becario',
+    description: 'Permite a la administración definir si el becario puede registrar Solo Ida o Ida y Vuelta de forma global o por actividad.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador del becario', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Configuración de pasajes actualizada.', type: Becario })
+  actualizarConfiguracionPasajes(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ActualizarConfiguracionPasajesDto,
+  ): Promise<Becario> {
+    return this.becariosServicio.actualizarConfiguracionPasajes(id, dto);
   }
 
   @Get(':id')

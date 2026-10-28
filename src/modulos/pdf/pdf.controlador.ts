@@ -18,7 +18,7 @@ export class PdfControlador {
   @Get('evaluacion/:id')
   @ApiOperation({
     summary: 'Generar y descargar informe de evaluación en PDF',
-    description: 'Renderiza mediante Puppeteer headless el informe institucional oficial (equivalente al formulario físico F-03) con firma de conformidad.',
+    description: 'Renderiza mediante Puppeteer headless el informe institucional oficial (equivalente al formulario físico F-03) con trazabilidad de conformidad en sistema.',
   })
   @ApiParam({ name: 'id', description: 'Identificador de la evaluación', type: Number, example: 1 })
   @ApiProduces('application/pdf')
@@ -52,8 +52,7 @@ export class PdfControlador {
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
             th, td { border: 1px solid #E3DCCB; padding: 10px; text-align: left; }
             th { background: #f9f9f9; }
-            .signature-box { margin-top: 50px; text-align: center; width: 300px; float: right; }
-            .signature-line { border-top: 1px solid #063A6B; margin-top: 50px; padding-top: 10px; }
+            .trazabilidad-box { margin-top: 40px; padding: 12px 16px; background: #f4f8fb; border: 1px solid #d9e6f2; border-radius: 6px; font-size: 12px; }
           </style>
         </head>
         <body>
@@ -78,11 +77,8 @@ export class PdfControlador {
             <p>${evaluacion.observaciones || 'Sin observaciones registradas.'}</p>
           </div>
 
-          <div class="signature-box">
-            <div class="signature-line">
-              <strong>Firma Digital de Conformidad</strong><br/>
-              Fecha: ${new Date().toLocaleDateString()}
-            </div>
+          <div class="trazabilidad-box">
+            <strong>Revisado / Aprobado en sistema por:</strong> ${evaluador_nombre} (${evaluador_tipo}) · Fecha y Hora de emisión: ${new Date().toLocaleString('es-BO')}
           </div>
         </body>
       </html>
@@ -130,7 +126,7 @@ export class PdfControlador {
   @Get('evaluacion-semestral')
   @ApiOperation({
     summary: 'Generar y descargar informe consolidado de evaluación semestral en PDF',
-    description: 'Genera el PDF oficial en formato apaisado (landscape) con las 14 columnas, observaciones cualitativas, rangos de aprobación y firmas de conformidad.',
+    description: 'Genera el PDF oficial en formato apaisado (landscape) con las 14 columnas, observaciones cualitativas, rangos de aprobación y trazabilidad de conformidad en sistema.',
   })
   @ApiQuery({ name: 'periodo', required: false, description: 'Periodo o gestión (ej. II-2025)' })
   @ApiProduces('application/pdf')
@@ -207,7 +203,7 @@ export class PdfControlador {
   @Get('recorridos-estudiante/:becario_id')
   @ApiOperation({
     summary: 'Exportar a PDF el expediente mensual de recorridos de un estudiante con Puppeteer',
-    description: 'Genera el expediente oficial de recorridos y solicitud de pasajes mensual de un solo estudiante, con detalle de tramos, calles declaradas, cálculo exacto del 80% y firmas.',
+    description: 'Genera el expediente oficial de recorridos y solicitud de pasajes mensual de un solo estudiante, con detalle de tramos, calles declaradas, cálculo exacto del 80% y trazabilidad en sistema.',
   })
   @ApiParam({ name: 'becario_id', description: 'ID del becario o estudiante', type: Number, example: 1 })
   @ApiQuery({ name: 'mes', required: false, description: 'Mes del expediente (YYYY-MM o texto, ej. 2026-10)', example: '2026-10' })
@@ -245,7 +241,7 @@ export class PdfControlador {
   @Get('asistencia-estudiante/:becario_id')
   @ApiOperation({
     summary: 'Exportar a PDF el kárdex de asistencia mensual de un estudiante con Puppeteer',
-    description: 'Genera el kárdex oficial de asistencia mensual de un solo estudiante, con detalle de jornadas, geocercas GPS, tolerancia horaria, minutos de retraso y firmas.',
+    description: 'Genera el kárdex oficial de asistencia mensual de un solo estudiante, con detalle de jornadas, geocercas GPS, tolerancia horaria, minutos de retraso y trazabilidad en sistema.',
   })
   @ApiParam({ name: 'becario_id', description: 'ID del becario o estudiante', type: Number, example: 1 })
   @ApiQuery({ name: 'mes', required: false, description: 'Mes de asistencia (YYYY-MM o texto, ej. 2026-10)', example: '2026-10' })

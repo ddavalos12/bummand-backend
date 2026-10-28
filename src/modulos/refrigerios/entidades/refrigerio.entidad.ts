@@ -58,7 +58,7 @@ export class Refrigerio {
   becario_nombre: string | null;
 
   @ApiPropertyOptional({
-    description: 'Firmas o registros de conformidad de los becarios que recibieron el refrigerio',
+    description: 'Registros de recepción y conformidad en sistema de los becarios que recibieron el refrigerio',
   })
   @Column({ name: 'firmas_conformidad', type: 'jsonb', nullable: true })
   firmas_conformidad: Record<string, unknown>[] | null;

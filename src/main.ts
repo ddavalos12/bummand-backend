@@ -53,7 +53,7 @@ async function bootstrap() {
     .addTag('Asistencia', 'Marcación de ingreso/salida con geolocalización Haversine y control anti-spoofing')
     .addTag('Pasajes', 'Declaración mensual de viáticos, liquidación del 80% en centavos y regla del día 24')
     .addTag('Evaluaciones', 'Matriz de evaluación 360° en 5 ejes, catálogo de módulos y formulario F-03')
-    .addTag('Prácticas', 'Aprobación y certificación de horas de práctica con firma digitalizada')
+    .addTag('Prácticas', 'Aprobación y convalidación institucional de horas de práctica en sistema')
     .addTag('Notificaciones', 'Bandeja de alertas reactivas, contador de no leídas y push')
     .addTag('Dashboard', 'Consolidado analítico de horas, presupuesto del 80% y rankings')
     .addTag('PDF', 'Generación headless de reportes oficiales certificados en PDF')

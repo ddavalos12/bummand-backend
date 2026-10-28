@@ -85,8 +85,8 @@ export class CrearRefrigerioDto {
   responsable_id: number;
 
   @ApiPropertyOptional({
-    description: 'Listado de firmas o nombres de conformidad de entrega',
-    example: [{ becario_id: 1, nombre: 'Nilda Churata', firmado: true }],
+    description: 'Listado de registros de recepción y conformidad de entrega en sistema',
+    example: [{ becario_id: 1, nombre: 'Nilda Churata', conforme: true }],
   })
   @IsOptional()
   firmas_conformidad?: Record<string, unknown>[];

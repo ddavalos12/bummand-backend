@@ -102,12 +102,12 @@ describe('AsistenciaServicio', () => {
       expect(resultado.advertencia).toContain('✓ Ingreso puntual — dentro del horario');
     });
 
-    it('debe registrar con retraso y calcular diff_minutos en Prácticas si marca posterior a la hora asignada', async () => {
+    it('debe registrar como horario semanal flexible (sin retraso) en Prácticas incluso si marca posterior a la hora referencial', async () => {
       const ahora = new Date();
       const dias = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'];
       const dia_clave = dias[ahora.getDay()];
 
-      // Simulamos que la hora prevista era hace 20 minutos
+      // Simulamos que la hora prevista referencial era hace 20 minutos
       const fecha_pasada = new Date(ahora.getTime() - 20 * 60000);
       const hora_pasada = `${String(fecha_pasada.getHours()).padStart(2, '0')}:${String(fecha_pasada.getMinutes()).padStart(2, '0')}`;
 
@@ -134,14 +134,13 @@ describe('AsistenciaServicio', () => {
         longitud: -68.150000,
       });
 
-      expect(resultado.registro.dentro_de_horario).toBe(false);
-      expect(resultado.registro.minutos_retraso).toBeGreaterThanOrEqual(19);
+      expect(resultado.registro.dentro_de_horario).toBe(true);
+      expect(resultado.registro.minutos_retraso).toBe(0);
       expect(resultado.registro.hora_prevista).toBe(hora_pasada);
-      expect(resultado.advertencia).toContain('⚠ Ingreso registrado con retraso');
-      expect(resultado.advertencia).toContain(`hora prevista ${hora_pasada}`);
+      expect(resultado.advertencia).toContain('✓ Ingreso puntual — dentro del horario flexible');
     });
 
-    it('debe indicar sin horario asignado si el día actual no tiene apoyo programado en Prácticas', async () => {
+    it('debe indicar horario semanal flexible (9h/sem · 36h/mes) si el día actual no tiene apoyo fijo en Prácticas', async () => {
       const becario_mock: Partial<Becario> = {
         id: 12,
         usuario_id: 12,
@@ -167,7 +166,7 @@ describe('AsistenciaServicio', () => {
 
       expect(resultado.registro.dentro_de_horario).toBe(true);
       expect(resultado.registro.minutos_retraso).toBe(0);
-      expect(resultado.advertencia).toBe('Sin horario de apoyo asignado para hoy');
+      expect(resultado.advertencia).toContain('Horario semanal flexible de prácticas (meta: 9h/sem · 36h/mes)');
     });
 
     it('debe validar la hora límite 14:30 para Escuela de Líderes', async () => {

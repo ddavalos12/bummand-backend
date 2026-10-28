@@ -14,6 +14,7 @@ export class PracticasServicio {
   async crear(dto: CrearAprobacionDto, supervisor_id: number): Promise<AprobacionPracticas> {
     const aprobacion = this.aprobacion_repo.create({
       ...dto,
+      firma_digital: dto.firma_digital ?? null,
       supervisor_id: dto.supervisor_id || supervisor_id,
     });
     return this.aprobacion_repo.save(aprobacion);

@@ -16,6 +16,8 @@ import { calcularDistanciaMetros } from '../../utilidades/geo.utilidad';
 import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
 
 const MARGEN_GPS_MAXIMO_M = 10;
+export const META_HORAS_SEMANAL = 9;
+export const META_HORAS_MENSUAL = 36;
 
 @Injectable()
 export class AsistenciaServicio {
@@ -105,41 +107,17 @@ export class AsistenciaServicio {
           dentro: true,
           minutos_retraso: 0,
           hora_prevista: null,
-          advertencia: 'Sin horario de apoyo asignado para hoy',
+          advertencia: `Horario semanal flexible de prácticas (meta: ${META_HORAS_SEMANAL}h/sem · ${META_HORAS_MENSUAL}h/mes)`,
         };
       }
 
       const hora_inicio = horario_dia.split('-')[0].trim();
-      const partes = hora_inicio.split(':');
-      if (partes.length < 2) {
-        return {
-          dentro: true,
-          minutos_retraso: 0,
-          hora_prevista: hora_inicio,
-        };
-      }
-
-      const h_prev = parseInt(partes[0], 10);
-      const m_prev = parseInt(partes[1], 10);
-      const limite = new Date(ahora);
-      limite.setHours(h_prev, m_prev, 0, 0);
-
-      if (ahora > limite) {
-        const diff_minutos = Math.round((ahora.getTime() - limite.getTime()) / 60000);
-        return {
-          dentro: false,
-          minutos_retraso: diff_minutos,
-          hora_prevista: hora_inicio,
-          advertencia: `⚠ Ingreso registrado con retraso de ${diff_minutos} min (hora prevista ${hora_inicio})`,
-        };
-      } else {
-        return {
-          dentro: true,
-          minutos_retraso: 0,
-          hora_prevista: hora_inicio,
-          advertencia: `✓ Ingreso puntual — dentro del horario (${hora_inicio})`,
-        };
-      }
+      return {
+        dentro: true,
+        minutos_retraso: 0,
+        hora_prevista: hora_inicio || null,
+        advertencia: `✓ Ingreso puntual — dentro del horario flexible (${hora_inicio} · meta ${META_HORAS_SEMANAL}h/sem)`,
+      };
     }
 
     return {
@@ -596,6 +574,11 @@ export class AsistenciaServicio {
       carrera: string;
       mes_actual: string;
       horas_mes_actual: number;
+      meta_horas: number;
+      meta_horas_semanal: number;
+      horas_excedentes: number;
+      porcentaje_cumplimiento: number;
+      estado_meta: 'meta_superada' | 'cumplido' | 'en_progreso' | 'en_riesgo';
       total_horas: number;
       meses: Record<string, number>;
     }>
@@ -627,7 +610,22 @@ export class AsistenciaServicio {
         total_horas_acumuladas = Number((total_horas_acumuladas + horas).toFixed(2));
       }
 
-      const total_mes_actual = meses[clave_mes_actual] || 0;
+      const horas_mes_actual = meses[clave_mes_actual] || 0;
+      const horas_excedentes = Math.max(
+        0,
+        parseFloat((horas_mes_actual - META_HORAS_MENSUAL).toFixed(2)),
+      );
+      const porcentaje_cumplimiento = Math.round(
+        (horas_mes_actual / META_HORAS_MENSUAL) * 100,
+      );
+      const estado_meta: 'meta_superada' | 'cumplido' | 'en_progreso' | 'en_riesgo' =
+        horas_mes_actual > META_HORAS_MENSUAL
+          ? 'meta_superada'
+          : horas_mes_actual === META_HORAS_MENSUAL
+          ? 'cumplido'
+          : horas_mes_actual >= 27
+          ? 'en_progreso'
+          : 'en_riesgo';
 
       return {
         becario_id: becario.id,
@@ -636,7 +634,12 @@ export class AsistenciaServicio {
         correo: becario.usuario?.correo || '',
         carrera: becario.carrera,
         mes_actual: clave_mes_actual,
-        horas_mes_actual: total_mes_actual,
+        horas_mes_actual,
+        meta_horas: META_HORAS_MENSUAL,
+        meta_horas_semanal: META_HORAS_SEMANAL,
+        horas_excedentes,
+        porcentaje_cumplimiento,
+        estado_meta,
         total_horas: total_horas_acumuladas,
         meses,
       };

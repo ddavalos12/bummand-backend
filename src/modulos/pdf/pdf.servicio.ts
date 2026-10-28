@@ -282,15 +282,8 @@ export class PdfServicio {
             </tbody>
           </table>
 
-          <div class="signatures">
-            <div class="sign-col">
-              <strong>Supervisor Institucional</strong><br/>
-              Control y Aprobación
-            </div>
-            <div class="sign-col">
-              <strong>Dirección BUMAND</strong><br/>
-              Conformidad y Archivo
-            </div>
+          <div class="meta-box" style="margin-top: 24px;">
+            <strong>Revisado / Aprobado en sistema por:</strong> Supervisor Institucional (${evento.creador?.nombre || 'Control y Aprobación'}) · Dirección BUMAND (Conformidad y Archivo) · Fecha y Hora de emisión: ${new Date().toLocaleString('es-BO')}
           </div>
 
           <div class="footer-note">
@@ -587,15 +580,8 @@ export class PdfServicio {
               </div>
             </div>
 
-            <div class="signatures">
-              <div class="sign-col">
-                <strong>Supervisor(a) de Evaluaciones</strong><br/>
-                Coordinación Académica BUMAND
-              </div>
-              <div class="sign-col">
-                <strong>Dirección Ejecutiva</strong><br/>
-                Programa de Becas BUMAND
-              </div>
+            <div style="margin-top: 20px; padding: 8px 12px; background-color: #eff4f6; border: 1px solid #cbd5dc; border-radius: 4px; font-size: 9px;">
+              <strong>Revisado / Aprobado en sistema por:</strong> Supervisor(a) de Evaluaciones (Coordinación Académica BUMAND) · Dirección Ejecutiva (Programa de Becas BUMAND) · Fecha y Hora de emisión: ${new Date().toLocaleDateString('es-BO')} ${new Date().toLocaleTimeString('es-BO')}
             </div>
 
             <div class="footer-note">
@@ -1011,18 +997,12 @@ export class PdfServicio {
             </tbody>
           </table>
 
-          <div class="firmas-row">
-            <div class="firma-col">
-              <div class="firma-linea">Lic. Coordinación Nacional BUMAND</div>
-              <div class="firma-cargo">Fundación Diaconía FRIF-IFD</div>
+          <div class="meta-box" style="margin-top: 14px;">
+            <div>
+              <strong>Revisado / Aprobado en sistema por:</strong> Lic. Coordinación Nacional BUMAND · Supervisor de Práctica Institucional · Auditoría y Control de Asistencia (Fundación Diaconía FRIF-IFD)
             </div>
-            <div class="firma-col">
-              <div class="firma-linea">Supervisor de Práctica Institucional</div>
-              <div class="firma-cargo">Agencia / Sede de Práctica</div>
-            </div>
-            <div class="firma-col">
-              <div class="firma-linea">Auditoría y Control de Asistencia</div>
-              <div class="firma-cargo">Programa de Becas Universitarias</div>
+            <div>
+              <strong>Fecha y Hora de emisión:</strong> ${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
 
@@ -1616,18 +1596,14 @@ export class PdfServicio {
             <strong>Declaración Jurada y Certificación Institucional:</strong> El suscrito estudiante becario declara bajo fe de juramento que la información de tramos, medios de locomoción, tarifas y calles consignada en el presente expediente corresponde fehacientemente a los desplazamientos efectuados para el cumplimiento estricto de sus actividades y servicio institucional. La liquidación de viáticos (80%) se efectúa en observancia a la directriz BUMAND y corte reglamentario a partir del día 24 de cada mes.
           </div>
 
-          <div class="firmas-row">
-            <div class="firma-col">
-              <div class="firma-linea">${datos.nombre_estudiante}</div>
-              <div class="firma-cargo">Firma del Estudiante Becario · C.I. ${datos.ci_estudiante}</div>
+          <div class="meta-box" style="margin-top: 12px;">
+            <div class="meta-col">
+              <div class="meta-item"><strong>Registrado en sistema por:</strong> ${datos.nombre_estudiante} (Estudiante Becario · C.I. ${datos.ci_estudiante})</div>
+              <div class="meta-item"><strong>Revisado / Aprobado en sistema por:</strong> ${datos.supervisor_nombre} (Supervisor Institucional · ${datos.sede_estudiante})</div>
             </div>
-            <div class="firma-col">
-              <div class="firma-linea">${datos.supervisor_nombre}</div>
-              <div class="firma-cargo">Supervisor Institucional · ${datos.sede_estudiante}</div>
-            </div>
-            <div class="firma-col">
-              <div class="firma-linea">Lic. Coordinación Nacional BUMAND</div>
-              <div class="firma-cargo">Visto Bueno y Liquidación · Fundación Diaconía FRIF-IFD</div>
+            <div class="meta-col">
+              <div class="meta-item"><strong>Convalidación Institucional:</strong> Lic. Coordinación Nacional BUMAND (Visto Bueno y Liquidación · Fundación Diaconía FRIF-IFD)</div>
+              <div class="meta-item"><strong>Fecha y Hora de emisión:</strong> ${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}</div>
             </div>
           </div>
 
@@ -1748,8 +1724,8 @@ export class PdfServicio {
 
     const total_dias = items_render.length;
     const horas_totales = items_render.reduce((acc, i) => acc + i.horas, 0);
-    const meta_horas = 40.0;
-    const pct_avance = Math.min(100, Math.round((horas_totales / meta_horas) * 100));
+    const meta_horas = 36.0;
+    const pct_avance = Math.round((horas_totales / meta_horas) * 100);
     const retrasos = items_render.filter((i) => i.es_retraso);
     const asistencias_conformes = total_dias - retrasos.length;
     const pct_puntualidad =
@@ -2189,7 +2165,13 @@ export class PdfServicio {
                   ${datos.horas_totales.toFixed(2)} h
                 </td>
                 <td colspan="2" style="text-align: center; font-size: 8.5px; color: #065F46; font-weight: bold;">
-                  META MENSUAL ALCANZADA (${datos.pct_avance}%)
+                  ${
+                    datos.horas_totales > datos.meta_horas
+                      ? `META SUPERADA (+${(datos.horas_totales - datos.meta_horas).toFixed(1)} h) (${datos.pct_avance}%)`
+                      : datos.horas_totales === datos.meta_horas
+                      ? `META MENSUAL ALCANZADA (${datos.pct_avance}%)`
+                      : `EN PROGRESO (${datos.pct_avance}%)`
+                  }
                 </td>
               </tr>
             </tfoot>
@@ -2207,18 +2189,14 @@ export class PdfServicio {
             </div>
           </div>
 
-          <div class="firmas-row">
-            <div class="firma-col">
-              <div class="firma-linea">${datos.nombre_estudiante}</div>
-              <div class="firma-cargo">Firma del Estudiante Becario · C.I. ${datos.ci_estudiante}</div>
+          <div class="meta-box" style="margin-top: 12px;">
+            <div class="meta-col">
+              <div class="meta-item"><strong>Acreditado en sistema para:</strong> ${datos.nombre_estudiante} (Estudiante Becario · C.I. ${datos.ci_estudiante})</div>
+              <div class="meta-item"><strong>Revisado / Aprobado en sistema por:</strong> ${datos.supervisor_nombre} (Supervisor Tutor Institucional · ${datos.sede_estudiante})</div>
             </div>
-            <div class="firma-col">
-              <div class="firma-linea">${datos.supervisor_nombre}</div>
-              <div class="firma-cargo">Supervisor Tutor Institucional · ${datos.sede_estudiante}</div>
-            </div>
-            <div class="firma-col">
-              <div class="firma-linea">Lic. Coordinación Nacional BUMAND</div>
-              <div class="firma-cargo">Auditoría y Certificación de Asistencia · Diaconía IFD</div>
+            <div class="meta-col">
+              <div class="meta-item"><strong>Convalidación Institucional:</strong> Lic. Coordinación Nacional BUMAND (Auditoría y Certificación de Asistencia · Diaconía IFD)</div>
+              <div class="meta-item"><strong>Fecha y Hora de emisión:</strong> ${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}</div>
             </div>
           </div>
 

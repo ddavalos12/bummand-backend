@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Body, Param, Put, UseGuards, Query, ParseIntPipe, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Patch,
+  Body,
+  Param,
+  Put,
+  UseGuards,
+  Query,
+  ParseIntPipe,
+  BadRequestException,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UsuariosServicio } from './usuarios.servicio';
 import { CrearUsuarioDto } from './dtos/crear-usuario.dto';
@@ -58,6 +71,111 @@ export class UsuariosControlador {
       throw new BadRequestException('Rol inválido');
     }
     return this.usuariosServicio.listar(rol as Rol);
+  }
+
+  @Get('mi-perfil/correos')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @ApiOperation({
+    summary: 'Listar correos del usuario autenticado',
+    description: 'Retorna el correo principal, correo alternativo y la lista de correos adicionales vinculados para inicio de sesión.',
+  })
+  listarMisCorreos(@UsuarioActual() usuarioAutenticado: Usuario) {
+    return this.usuariosServicio.listarCorreosUsuario(usuarioAutenticado.id);
+  }
+
+  @Post('mi-perfil/correos')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @ApiOperation({
+    summary: 'Agregar un correo alternativo para inicio de sesión',
+    description: 'Registra un nuevo correo adicional en correos_usuarios validando unicidad global.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        correo: { type: 'string', example: 'alternativo@gmail.com' },
+        etiqueta: { type: 'string', example: 'Personal' },
+      },
+      required: ['correo'],
+    },
+  })
+  agregarMiCorreo(
+    @UsuarioActual() usuarioAutenticado: Usuario,
+    @Body() cuerpo: { correo: string; etiqueta?: string },
+  ) {
+    if (!cuerpo || !cuerpo.correo) {
+      throw new BadRequestException('Debe especificar el correo electrónico a vincular.');
+    }
+    return this.usuariosServicio.agregarCorreoAlternativo(
+      usuarioAutenticado.id,
+      cuerpo.correo,
+      cuerpo.etiqueta,
+    );
+  }
+
+  @Delete('mi-perfil/correos/:correo_id')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @ApiOperation({
+    summary: 'Eliminar un correo alternativo vinculado',
+    description: 'Desvincula un correo adicional de la cuenta del usuario autenticado.',
+  })
+  eliminarMiCorreo(
+    @UsuarioActual() usuarioAutenticado: Usuario,
+    @Param('correo_id', ParseIntPipe) correo_id: number,
+  ) {
+    return this.usuariosServicio.eliminarCorreoAlternativo(
+      usuarioAutenticado.id,
+      correo_id,
+    );
+  }
+
+  @Patch('mi-perfil/correo-alternativo')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @ApiOperation({
+    summary: 'Actualizar correo alternativo del usuario autenticado',
+    description: 'Actualiza o limpia el correo alternativo del usuario autenticado y lo sincroniza en correos_usuarios.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        correo_alternativo: { type: 'string', nullable: true, example: 'mi.alternativo@gmail.com' },
+      },
+    },
+  })
+  actualizarMiCorreoAlternativo(
+    @UsuarioActual() usuarioAutenticado: Usuario,
+    @Body('correo_alternativo') correo_alternativo: string | null,
+  ) {
+    return this.usuariosServicio.actualizarCorreoAlternativo(
+      usuarioAutenticado.id,
+      correo_alternativo ?? null,
+    );
+  }
+
+  @Patch(':id/correo-alternativo')
+  @Roles(Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'Actualizar correo alternativo de un usuario (Administrador)',
+    description: 'Permite a un administrador asignar o modificar el correo alternativo de cualquier usuario institucional.',
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'ID del usuario' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        correo_alternativo: { type: 'string', nullable: true, example: 'supervisor.personal@gmail.com' },
+      },
+    },
+  })
+  actualizarCorreoAlternativoPorAdmin(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('correo_alternativo') correo_alternativo: string | null,
+  ) {
+    return this.usuariosServicio.actualizarCorreoAlternativo(
+      id,
+      correo_alternativo ?? null,
+    );
   }
 
   @Put(':id/estado')

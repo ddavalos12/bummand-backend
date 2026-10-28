@@ -91,6 +91,19 @@ export class Becario {
   @Column({ name: 'fecha_ultima_confirmacion', type: 'timestamp', nullable: true })
   fecha_ultima_confirmacion: Date | null;
 
+  @Column({ name: 'ultimo_mes_datos_confirmados', type: 'varchar', length: 7, nullable: true })
+  ultimo_mes_datos_confirmados: string | null;
+
+  @Column({ name: 'modalidad_pasajes', type: 'varchar', length: 20, default: 'ida_y_vuelta' })
+  modalidad_pasajes: 'ida_y_vuelta' | 'solo_ida';
+
+  @Column({ name: 'configuracion_pasajes_actividades', type: 'jsonb', nullable: true })
+  configuracion_pasajes_actividades: {
+    practicas?: 'ida_y_vuelta' | 'solo_ida';
+    escuela_lideres?: 'ida_y_vuelta' | 'solo_ida';
+    acciones_servicio?: 'ida_y_vuelta' | 'solo_ida';
+  } | null;
+
   @Column({ name: 'modalidad_carrera', type: 'varchar', length: 50, nullable: true })
   modalidad_carrera: string | null;
 

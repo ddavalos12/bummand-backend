@@ -20,7 +20,7 @@ export class PracticasControlador {
   @Post('aprobaciones')
   @ApiOperation({
     summary: 'Convalidar y certificar horas de práctica',
-    description: 'Registra la aprobación formal del mes de prácticas junto con la firma digitalizada manuscrita del supervisor.',
+    description: 'Registra la aprobación y convalidación formal en sistema del mes de prácticas por parte del supervisor.',
   })
   @ApiResponse({ status: 201, description: 'Horas certificadas con éxito.', type: AprobacionPracticas })
   crear(@Body() dto: CrearAprobacionDto, @UsuarioActual() usuario: Usuario) {
@@ -54,7 +54,7 @@ export class PracticasControlador {
   @Get('aprobaciones/:id')
   @ApiOperation({
     summary: 'Obtener certificación por ID',
-    description: 'Consulta los metadatos y la firma digital de una certificación específica.',
+    description: 'Consulta los metadatos y trazabilidad en sistema de una certificación específica.',
   })
   @ApiParam({ name: 'id', description: 'Identificador de la aprobación', type: Number, example: 1 })
   @ApiResponse({ status: 200, description: 'Detalle de la aprobación.', type: AprobacionPracticas })

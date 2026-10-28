@@ -19,8 +19,8 @@ export class AprobacionPracticas {
   @Column({ name: 'horas_aprobadas', type: 'decimal', precision: 6, scale: 2 })
   horas_aprobadas: number;
 
-  @Column({ name: 'firma_digital', type: 'text' })
-  firma_digital: string;
+  @Column({ name: 'firma_digital', type: 'text', nullable: true })
+  firma_digital: string | null;
 
   @Column({ type: 'text', nullable: true })
   observaciones: string;

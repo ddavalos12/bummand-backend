@@ -56,7 +56,7 @@ export class RefrigeriosControlador {
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
   @ApiOperation({
     summary: 'Obtener detalle de un refrigerio por ID',
-    description: 'Consulta los montos, raciones, firmas de conformidad y contexto del refrigerio.',
+    description: 'Consulta los montos, raciones, registros de conformidad en sistema y contexto del refrigerio.',
   })
   @ApiParam({ name: 'id', description: 'Identificador del refrigerio', type: Number, example: 1 })
   @ApiResponse({ status: 200, description: 'Detalle del refrigerio.', type: Refrigerio })
@@ -68,7 +68,7 @@ export class RefrigeriosControlador {
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
   @ApiOperation({
     summary: 'Actualizar rendición de refrigerio',
-    description: 'Modifica datos de raciones, costos o firmas de conformidad de un registro de refrigerio.',
+    description: 'Modifica datos de raciones, costos o registros de conformidad en sistema de un refrigerio.',
   })
   @ApiParam({ name: 'id', description: 'Identificador del refrigerio', type: Number, example: 1 })
   @ApiResponse({ status: 200, description: 'Refrigerio actualizado exitosamente.', type: Refrigerio })

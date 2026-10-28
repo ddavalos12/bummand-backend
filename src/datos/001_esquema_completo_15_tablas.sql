@@ -69,17 +69,30 @@ END $$;
 
 -- Tabla 01: usuarios
 CREATE TABLE IF NOT EXISTS usuarios (
-    id                SERIAL PRIMARY KEY,
-    nombre            VARCHAR(150)        NOT NULL,
-    correo            VARCHAR(150)        NOT NULL UNIQUE,
-    contrasena_hash   VARCHAR(255)        NOT NULL,
-    rol               rol_usuario         NOT NULL,
-    estado            estado_usuario      NOT NULL DEFAULT 'activo',
-    fcm_token         VARCHAR(255),
-    reset_codigo      VARCHAR(10),
-    reset_expira      TIMESTAMP,
-    created_at        TIMESTAMP           NOT NULL DEFAULT now()
+    id                  SERIAL PRIMARY KEY,
+    nombre              VARCHAR(150)        NOT NULL,
+    correo              VARCHAR(150)        NOT NULL UNIQUE,
+    correo_alternativo  VARCHAR(150)        UNIQUE,
+    contrasena_hash     VARCHAR(255)        NOT NULL,
+    rol                 rol_usuario         NOT NULL,
+    estado              estado_usuario      NOT NULL DEFAULT 'activo',
+    fcm_token           VARCHAR(255),
+    reset_codigo        VARCHAR(10),
+    reset_expira        TIMESTAMP,
+    created_at          TIMESTAMP           NOT NULL DEFAULT now()
 );
+
+-- Tabla 01b: correos_usuarios (Múltiples correos alternativos para inicio de sesión)
+CREATE TABLE IF NOT EXISTS correos_usuarios (
+    id                  SERIAL PRIMARY KEY,
+    usuario_id          INTEGER             NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    correo              VARCHAR(150)        NOT NULL UNIQUE,
+    etiqueta            VARCHAR(60),
+    created_at          TIMESTAMP           NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_correos_usuarios_correo_unico
+    ON correos_usuarios (correo);
 
 -- Tabla 02: iglesias
 CREATE TABLE IF NOT EXISTS iglesias (
@@ -294,7 +307,7 @@ CREATE TABLE IF NOT EXISTS preguntas_bienestar (
 );
 
 -- ---------------------------------------------------------------------------
--- 6. SUPERVISIÓN DE PRÁCTICAS Y FIRMA DIGITAL (Tabla 13)
+-- 6. SUPERVISIÓN Y CONVALIDACIÓN DE PRÁCTICAS (Tabla 13)
 -- ---------------------------------------------------------------------------
 
 -- Tabla 13: aprobaciones_practicas
@@ -304,7 +317,7 @@ CREATE TABLE IF NOT EXISTS aprobaciones_practicas (
     supervisor_id       INTEGER            NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
     periodo             VARCHAR(20)        NOT NULL,
     horas_aprobadas     DECIMAL(6,2)       NOT NULL,
-    firma_digital       TEXT               NOT NULL,
+    firma_digital       TEXT               NULL,
     observaciones       TEXT,
     created_at          TIMESTAMP          NOT NULL DEFAULT now()
 );

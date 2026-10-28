@@ -27,20 +27,20 @@ export class CrearAprobacionDto {
   periodo: string;
 
   @ApiProperty({
-    example: 120,
-    description: 'Total de horas cronológicas de práctica aprobadas y certificadas',
+    example: 36,
+    description: 'Total de horas cronológicas de práctica aprobadas y certificadas (meta mensual 36h)',
   })
   @IsNumber()
   @IsNotEmpty()
   horas_aprobadas: number;
 
-  @ApiProperty({
-    example: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...',
-    description: 'Firma digital manuscrita capturada en Canvas en formato Base64',
+  @ApiPropertyOptional({
+    example: 'CONVALIDADO-EN-SISTEMA',
+    description: 'Sello o código opcional de trazabilidad en sistema (compatibilidad histórica)',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  firma_digital: string;
+  firma_digital?: string;
 
   @ApiPropertyOptional({
     example: 'Cumplimiento sobresaliente del plan de trabajo en Seguridad Física',

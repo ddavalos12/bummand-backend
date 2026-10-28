@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Body, UseGuards, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Put, Body, UseGuards, HttpStatus, Optional } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CODIGOS_ERROR } from '../../nucleo/errores/codigos-error.constante';
 import { ExcepcionBumand } from '../../nucleo/errores/excepcion-bumand';
@@ -8,6 +8,7 @@ import { Usuario, Rol } from './entidades/usuario.entidad';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Becario } from '../becarios/entidades/becario.entidad';
+import { UsuariosServicio } from './usuarios.servicio';
 
 @ApiTags('Perfil')
 @ApiBearerAuth('JWT-auth')
@@ -19,11 +20,22 @@ export class PerfilControlador {
     private readonly becarioRepositorio: Repository<Becario>,
     @InjectRepository(Usuario)
     private readonly usuarioRepositorio: Repository<Usuario>,
+    @Optional()
+    private readonly usuariosServicio?: UsuariosServicio,
   ) {}
 
   @Get(['perfil', 'api/perfil'])
   @ApiOperation({ summary: 'Obtener perfil del usuario autenticado' })
   async obtenerPerfil(@UsuarioActual() usuarioAutenticado: Usuario) {
+    const usuario_db = await this.usuarioRepositorio.findOne({
+      where: { id: usuarioAutenticado.id },
+      relations: { correos_adicionales: true },
+    });
+    const correo_alternativo =
+      usuario_db?.correo_alternativo ?? usuarioAutenticado.correo_alternativo ?? null;
+    const correos_adicionales =
+      usuario_db?.correos_adicionales ?? usuarioAutenticado.correos_adicionales ?? [];
+
     if (usuarioAutenticado.rol === Rol.BECARIO) {
       const becario = await this.becarioRepositorio.findOne({
         where: { usuario: { id: usuarioAutenticado.id } },
@@ -35,8 +47,10 @@ export class PerfilControlador {
           becario_id: becario.id,
           usuario_id: usuarioAutenticado.id,
           ci: becario.ci,
-          nombre: usuarioAutenticado.nombre,
-          correo: usuarioAutenticado.correo,
+          nombre: usuario_db?.nombre || usuarioAutenticado.nombre,
+          correo: usuario_db?.correo || usuarioAutenticado.correo,
+          correo_alternativo,
+          correos_adicionales,
           rol: usuarioAutenticado.rol,
           carrera: becario.carrera,
           universidad: becario.universidad,
@@ -53,8 +67,10 @@ export class PerfilControlador {
     return {
       id: usuarioAutenticado.id,
       usuario_id: usuarioAutenticado.id,
-      nombre: usuarioAutenticado.nombre,
-      correo: usuarioAutenticado.correo,
+      nombre: usuario_db?.nombre || usuarioAutenticado.nombre,
+      correo: usuario_db?.correo || usuarioAutenticado.correo,
+      correo_alternativo,
+      correos_adicionales,
       rol: usuarioAutenticado.rol,
       lugarPractica: null,
       lugar_practica: null,
@@ -80,24 +96,30 @@ export class PerfilControlador {
           HttpStatus.FORBIDDEN,
         );
       }
+    }
 
-      const becario = await this.becarioRepositorio.findOne({
-        where: { usuario: { id: usuarioAutenticado.id } },
-        relations: { usuario: true },
-      });
-      if (becario) {
-        if (typeof datos.nombre === 'string') {
-          usuarioAutenticado.nombre = datos.nombre;
-          await this.usuarioRepositorio.save(usuarioAutenticado);
-        }
-        return this.obtenerPerfil(usuarioAutenticado);
+    if (typeof datos.nombre === 'string' && datos.nombre.trim() !== '') {
+      usuarioAutenticado.nombre = datos.nombre.trim();
+      await this.usuarioRepositorio.save(usuarioAutenticado);
+    }
+
+    if (datos.correo_alternativo !== undefined) {
+      const nuevo_correo_alt =
+        typeof datos.correo_alternativo === 'string' && datos.correo_alternativo.trim() !== ''
+          ? datos.correo_alternativo.trim().toLowerCase()
+          : null;
+
+      if (this.usuariosServicio) {
+        await this.usuariosServicio.actualizarCorreoAlternativo(
+          usuarioAutenticado.id,
+          nuevo_correo_alt,
+        );
+      } else {
+        usuarioAutenticado.correo_alternativo = nuevo_correo_alt;
+        await this.usuarioRepositorio.save(usuarioAutenticado);
       }
     }
 
-    if (typeof datos.nombre === 'string') {
-      usuarioAutenticado.nombre = datos.nombre;
-      await this.usuarioRepositorio.save(usuarioAutenticado);
-    }
     return this.obtenerPerfil(usuarioAutenticado);
   }
 }

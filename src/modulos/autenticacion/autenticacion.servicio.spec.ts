@@ -104,6 +104,33 @@ describe('AutenticacionServicio', () => {
     expect(resultado.usuario.becario_id).toBe(10);
   });
 
+  it('debe iniciar sesión exitosamente utilizando un correo alternativo vinculado al usuario', async () => {
+    const passwordHash = await hashearContrasena('Bumand2026!');
+    usuariosServicio.obtenerPorCorreoConRelaciones!.mockResolvedValue({
+      id: 3,
+      nombre: 'Nilda Churata Paye',
+      correo: 'nilda.churata@bumand.bo',
+      correo_alternativo: 'nildachuratapaye@gmail.com',
+      contrasena_hash: passwordHash,
+      rol: Rol.BECARIO,
+      estado: EstadoUsuario.ACTIVO,
+      becario: { id: 10 } as any,
+    } as any);
+
+    const resultado = await servicio.iniciarSesion({
+      correo: 'nildachuratapaye@gmail.com',
+      contrasena: 'Bumand2026!',
+    });
+
+    expect(usuariosServicio.obtenerPorCorreoConRelaciones).toHaveBeenCalledWith(
+      'nildachuratapaye@gmail.com',
+    );
+    expect(resultado.mensaje).toBe('Inicio de sesión exitoso');
+    expect(resultado.usuario.id).toBe(3);
+    expect(resultado.usuario.correo).toBe('nilda.churata@bumand.bo');
+    expect(resultado.usuario.becario_id).toBe(10);
+  });
+
   it('debe lanzar UnauthorizedException si las credenciales son erróneas', async () => {
     usuariosServicio.obtenerPorCorreoConRelaciones!.mockResolvedValue(null);
 
