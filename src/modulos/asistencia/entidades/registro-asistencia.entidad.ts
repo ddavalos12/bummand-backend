@@ -7,6 +7,13 @@ export enum TipoAsistencia {
   ACCIONES_SERVICIO = 'acciones_servicio',
 }
 
+export enum EstadoAprobacionAsistencia {
+  PENDIENTE = 'pendiente',
+  REVISADO_SUPERVISOR = 'revisado_supervisor',
+  APROBADO_ADMINISTRACION = 'aprobado_administracion',
+  OBSERVADO = 'observado',
+}
+
 @Entity('registros_asistencia')
 export class RegistroAsistencia {
   @PrimaryGeneratedColumn()
@@ -71,6 +78,32 @@ export class RegistroAsistencia {
 
   @Column({ name: 'evento_id', type: 'int', nullable: true })
   evento_id: number | null;
+
+  @Column({
+    name: 'estado_aprobacion',
+    type: 'varchar',
+    length: 30,
+    default: EstadoAprobacionAsistencia.PENDIENTE,
+  })
+  estado_aprobacion: EstadoAprobacionAsistencia;
+
+  @Column({ name: 'revisado_por_supervisor_id', type: 'int', nullable: true })
+  revisado_por_supervisor_id: number | null;
+
+  @Column({ name: 'fecha_revision_supervisor', type: 'timestamp', nullable: true })
+  fecha_revision_supervisor: Date | null;
+
+  @Column({ name: 'observacion_supervisor', type: 'text', nullable: true })
+  observacion_supervisor: string | null;
+
+  @Column({ name: 'aprobado_por_admin_id', type: 'int', nullable: true })
+  aprobado_por_admin_id: number | null;
+
+  @Column({ name: 'fecha_aprobacion_admin', type: 'timestamp', nullable: true })
+  fecha_aprobacion_admin: Date | null;
+
+  @Column({ name: 'observacion_admin', type: 'text', nullable: true })
+  observacion_admin: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;

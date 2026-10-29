@@ -23,6 +23,12 @@ describe('EvaluacionesControlador', () => {
       }),
       procesarReceptorMentorQr: jest.fn().mockResolvedValue({ exito: true, puntaje_vigesimal_20: 19 }),
       procesarReceptorSocioeconomica: jest.fn().mockResolvedValue({ exito: true, puntaje_20: 18 }),
+      obtenerBecariosAsignadosModulo3: jest.fn().mockResolvedValue([{ becario_id: 1, evaluado: true }]),
+      obtenerEvaluacionModulo3Becario: jest.fn().mockResolvedValue({ evaluado: true, evaluacion: { id: 1 } }),
+      subirDocumentoAcademico: jest.fn().mockResolvedValue({ id: 1, estado: 'en_revision_administracion' }),
+      obtenerTareasEscuelaLideres: jest.fn().mockResolvedValue({ tareas: [], resumen: { total: 12 } }),
+      entregarTareaEscuelaLideres: jest.fn().mockResolvedValue({ id: 1, estado: 'entregado' }),
+      revisarEntregaEscuelaLideres: jest.fn().mockResolvedValue({ entrega: { id: 1, estado: 'revisado' } }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -84,5 +90,50 @@ describe('EvaluacionesControlador', () => {
     const resultado = await controller.procesarReceptorSocioeconomica(payload as any);
     expect(resultado.exito).toBe(true);
     expect(servicio_mock.procesarReceptorSocioeconomica).toHaveBeenCalledWith(payload);
+  });
+
+  it('debe listar becarios asignados al supervisor para Módulo 3', async () => {
+    const usuario = { id: 10, nombre: 'Angel Ali' } as any;
+    const resultado = await controller.obtenerBecariosAsignadosModulo3(usuario, 2);
+    expect(resultado).toBeDefined();
+    expect(servicio_mock.obtenerBecariosAsignadosModulo3).toHaveBeenCalledWith(usuario, 2);
+  });
+
+  it('debe obtener la evaluación previa del Módulo 3 de un becario', async () => {
+    const resultado = await controller.obtenerEvaluacionModulo3Becario(1, 2);
+    expect(resultado).toBeDefined();
+    expect(servicio_mock.obtenerEvaluacionModulo3Becario).toHaveBeenCalledWith(1, 2);
+  });
+
+  it('debe subir documento académico para revisión directa de administración', async () => {
+    const usuario = { id: 5, nombre: 'Estudiante' } as any;
+    const dto = { periodo_id: 2, tipo_documento: 'record_academico' } as any;
+    const archivo = { filename: 'doc.pdf', originalname: 'doc.pdf' };
+    const resultado = await controller.subirDocumentoAcademico(dto, archivo, usuario);
+    expect(resultado).toBeDefined();
+    expect(servicio_mock.subirDocumentoAcademico).toHaveBeenCalledWith(dto, archivo, usuario);
+  });
+
+  it('debe listar las tareas de escuela de líderes CETI', async () => {
+    const usuario = { id: 5, nombre: 'Estudiante' } as any;
+    const resultado = await controller.obtenerTareasEscuelaLideres(usuario, 1, 2);
+    expect(resultado).toBeDefined();
+    expect(servicio_mock.obtenerTareasEscuelaLideres).toHaveBeenCalledWith(usuario, 1, 2);
+  });
+
+  it('debe entregar una tarea de escuela de líderes CETI', async () => {
+    const usuario = { id: 5, nombre: 'Estudiante' } as any;
+    const dto = { periodo_id: 2, tarea_numero: 1, archivo_evidencia_url: '/evidencia.pdf', nombre_archivo: 'ev.pdf' };
+    const resultado = await controller.entregarTareaLideres(dto, usuario);
+    expect(resultado).toBeDefined();
+    expect(servicio_mock.entregarTareaEscuelaLideres).toHaveBeenCalledWith(dto, usuario);
+  });
+
+  it('debe revisar y calificar una entrega de escuela de líderes CETI', async () => {
+    const usuario = { id: 10, nombre: 'Facilitador' } as any;
+    const dto = { estado: 'revisado' as any, puntaje_obtenido: 8.33 };
+    const resultado = await controller.revisarEntregaLideres(1, dto, usuario);
+    expect(resultado).toBeDefined();
+    expect(servicio_mock.revisarEntregaEscuelaLideres).toHaveBeenCalledWith(1, dto, usuario);
   });
 });

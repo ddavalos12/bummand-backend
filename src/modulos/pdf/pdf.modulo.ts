@@ -10,6 +10,7 @@ import { RegistroAsistencia } from '../asistencia/entidades/registro-asistencia.
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { SolicitudPasajes } from '../pasajes/entidades/solicitud-pasaje.entidad';
 import { Recorrido } from '../pasajes/entidades/recorrido.entidad';
+import { Refrigerio } from '../refrigerios/entidades/refrigerio.entidad';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { Recorrido } from '../pasajes/entidades/recorrido.entidad';
       Becario,
       SolicitudPasajes,
       Recorrido,
+      Refrigerio,
     ]),
     EvaluacionesModulo,
   ],

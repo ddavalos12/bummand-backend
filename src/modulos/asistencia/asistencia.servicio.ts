@@ -1,16 +1,18 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { RegistroAsistencia, TipoAsistencia } from './entidades/registro-asistencia.entidad';
+import { RegistroAsistencia, TipoAsistencia, EstadoAprobacionAsistencia } from './entidades/registro-asistencia.entidad';
 import { Multa } from './entidades/multa.entidad';
 import { CoordenadasDto } from './dtos/coordenadas.dto';
 import { ConfirmarOrganizadorDto } from './dtos/confirmar-organizador.dto';
 import { RegistrarAsistenciaManualDto } from './dtos/registrar-asistencia-manual.dto';
 import { RectificarAsistenciaDto } from './dtos/rectificar-asistencia.dto';
+import { RevisarSupervisorAsistenciaDto, AprobarAdminAsistenciaDto } from './dtos/revisar-asistencia.dto';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.entidad';
 import { Iglesia } from '../iglesias/entidades/iglesia.entidad';
 import { Justificacion, EstadoJustificacion, TipoIncidencia } from '../justificaciones/entidades/justificacion.entidad';
+import { Evento, TipoEvento, EstadoEvento } from '../eventos/entidades/evento.entidad';
 import { NotificacionesServicio } from '../notificaciones/notificaciones.servicio';
 import { calcularDistanciaMetros } from '../../utilidades/geo.utilidad';
 import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
@@ -38,6 +40,9 @@ export class AsistenciaServicio {
     @Optional()
     @InjectRepository(Justificacion)
     private readonly justificacionRepositorio?: Repository<Justificacion>,
+    @Optional()
+    @InjectRepository(Evento)
+    private readonly eventoRepositorio?: Repository<Evento>,
     @Optional()
     private readonly notificacionesServicio?: NotificacionesServicio,
     @Optional()
@@ -189,28 +194,99 @@ export class AsistenciaServicio {
     let nombre_recinto_objetivo = 'Sede institucional';
     let distancia_m = 999999;
     let dentro_de_radio = false;
+    let evento_objetivo_id: number | null = null;
 
     if (tipo === TipoAsistencia.ACCIONES_SERVICIO) {
-      // 1. Modalidad Acciones de Servicio: valida contra la iglesia del becario o catálogo eclesial
-      const iglesia = becario.iglesia;
-      if (iglesia && iglesia.latitud !== null && iglesia.latitud !== undefined && iglesia.longitud !== null && iglesia.longitud !== undefined) {
-        distancia_m = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(iglesia.latitud), Number(iglesia.longitud));
-        nombre_recinto_objetivo = iglesia.nombre;
-        const radio = iglesia.radio_tolerancia_m || 60;
-        dentro_de_radio = dto.simulada !== true && distancia_m <= radio + margen;
+      // 1. Modalidad Acciones de Servicio:
+      // Busca primero si existe un Evento por dto.evento_id o activo para la fecha actual con TipoEvento.SERVICIO_DIACONAL (estado != EstadoEvento.CANCELADO)
+      let evento_encontrado: Evento | null = null;
+      if (this.eventoRepositorio) {
+        if (dto.evento_id) {
+          evento_encontrado = await this.eventoRepositorio.findOne({
+            where: { id: dto.evento_id },
+          });
+        }
+        if (!evento_encontrado) {
+          const hoyStr = ahora.toISOString().split('T')[0];
+          const eventos_hoy = await this.eventoRepositorio.find({
+            where: {
+              tipo_evento: TipoEvento.SERVICIO_DIACONAL,
+            },
+          });
+          evento_encontrado =
+            eventos_hoy.find((ev) => {
+              const evFechaStr =
+                ev.fecha instanceof Date
+                  ? ev.fecha.toISOString().split('T')[0]
+                  : String(ev.fecha).split('T')[0];
+              return evFechaStr === hoyStr && ev.estado !== EstadoEvento.CANCELADO;
+            }) || null;
+        }
       }
 
-      // Autodetección si está en otra de las iglesias oficiales registradas en el sistema
-      if (!dentro_de_radio && this.iglesiaRepositorio) {
-        const todas_iglesias = await this.iglesiaRepositorio.find();
-        for (const igl of todas_iglesias) {
-          if (igl.latitud !== null && igl.latitud !== undefined && igl.longitud !== null && igl.longitud !== undefined) {
-            const d = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(igl.latitud), Number(igl.longitud));
-            if (d <= (igl.radio_tolerancia_m || 60) + margen && dto.simulada !== true) {
-              distancia_m = d;
-              nombre_recinto_objetivo = igl.nombre;
-              dentro_de_radio = true;
-              break;
+      if (
+        evento_encontrado &&
+        evento_encontrado.latitud !== null &&
+        evento_encontrado.latitud !== undefined &&
+        evento_encontrado.longitud !== null &&
+        evento_encontrado.longitud !== undefined
+      ) {
+        distancia_m = calcularDistanciaMetros(
+          dto.latitud,
+          dto.longitud,
+          Number(evento_encontrado.latitud),
+          Number(evento_encontrado.longitud),
+        );
+        nombre_recinto_objetivo =
+          evento_encontrado.titulo ||
+          evento_encontrado.direccion_referencia ||
+          'Acción de Servicio Diaconal';
+        const radio = evento_encontrado.radio_tolerancia_m || 100;
+        dentro_de_radio = dto.simulada !== true && distancia_m <= radio + margen;
+        evento_objetivo_id = evento_encontrado.id;
+      } else {
+        // Fallback contra la iglesia del becario o catálogo eclesial
+        const iglesia = becario.iglesia;
+        if (
+          iglesia &&
+          iglesia.latitud !== null &&
+          iglesia.latitud !== undefined &&
+          iglesia.longitud !== null &&
+          iglesia.longitud !== undefined
+        ) {
+          distancia_m = calcularDistanciaMetros(
+            dto.latitud,
+            dto.longitud,
+            Number(iglesia.latitud),
+            Number(iglesia.longitud),
+          );
+          nombre_recinto_objetivo = iglesia.nombre;
+          const radio = iglesia.radio_tolerancia_m || 60;
+          dentro_de_radio = dto.simulada !== true && distancia_m <= radio + margen;
+        }
+
+        // Autodetección si está en otra de las iglesias oficiales registradas en el sistema
+        if (!dentro_de_radio && this.iglesiaRepositorio) {
+          const todas_iglesias = await this.iglesiaRepositorio.find();
+          for (const igl of todas_iglesias) {
+            if (
+              igl.latitud !== null &&
+              igl.latitud !== undefined &&
+              igl.longitud !== null &&
+              igl.longitud !== undefined
+            ) {
+              const d = calcularDistanciaMetros(
+                dto.latitud,
+                dto.longitud,
+                Number(igl.latitud),
+                Number(igl.longitud),
+              );
+              if (d <= (igl.radio_tolerancia_m || 60) + margen && dto.simulada !== true) {
+                distancia_m = d;
+                nombre_recinto_objetivo = igl.nombre;
+                dentro_de_radio = true;
+                break;
+              }
             }
           }
         }
@@ -284,6 +360,8 @@ export class AsistenciaServicio {
       dentro_de_horario: evaluacion_horario.dentro,
       minutos_retraso: evaluacion_horario.minutos_retraso,
       hora_prevista: evaluacion_horario.hora_prevista,
+      evento_id: evento_objetivo_id || dto.evento_id || null,
+      estado_aprobacion: EstadoAprobacionAsistencia.PENDIENTE,
     });
 
     await this.asistenciaRepositorio.save(registro);
@@ -292,39 +370,61 @@ export class AsistenciaServicio {
     const es_viernes = ahora.getDay() === 5;
     const es_escuela_lideres = tipo === TipoAsistencia.ESCUELA_LIDERES;
     if (es_escuela_lideres && es_viernes) {
-      const limite_tolerancia = new Date(ahora);
-      limite_tolerancia.setHours(14, 35, 0, 0);
+      // Verificar si el becario tiene una justificación/permiso aprobado para hoy
+      let tiene_permiso_aprobado = false;
+      if (this.justificacionRepositorio) {
+        const justificaciones_hoy = await this.justificacionRepositorio.find({
+          where: { becario_id: becario.id },
+        });
+        const hoyStr = hoy.toISOString().split('T')[0];
+        tiene_permiso_aprobado = justificaciones_hoy.some((j) => {
+          const jFechaStr =
+            j.fecha_incidencia instanceof Date
+              ? j.fecha_incidencia.toISOString().split('T')[0]
+              : String(j.fecha_incidencia).split('T')[0];
+          return (
+            jFechaStr === hoyStr &&
+            (j.estado === EstadoJustificacion.APROBADA ||
+              j.estado === EstadoJustificacion.APROBADO_ADMINISTRACION)
+          );
+        });
+      }
 
-      if (ahora > limite_tolerancia) {
-        const limite_oficial = new Date(ahora);
-        limite_oficial.setHours(14, 30, 0, 0);
-        const minutos_retraso_multa = Math.max(
-          Math.round((ahora.getTime() - limite_oficial.getTime()) / 60000),
-          1,
-        );
-        const { monto_bs, tramo } = this.calcularMultaEscuelaLideres(minutos_retraso_multa);
+      if (!tiene_permiso_aprobado) {
+        const limite_tolerancia = new Date(ahora);
+        limite_tolerancia.setHours(14, 35, 0, 0);
 
-        if (this.multaRepositorio) {
-          const nueva_multa = this.multaRepositorio.create({
-            becario_id: becario.id,
-            asistencia_id: registro.id,
-            minutos_retraso: minutos_retraso_multa,
-            monto_bs,
-            motivo: `Retraso de ${minutos_retraso_multa} min en Escuela de Líderes (${tramo})`,
-            fecha_aplicacion: ahora,
-            es_institucional: true,
-          });
-          await this.multaRepositorio.save(nueva_multa);
+        if (ahora > limite_tolerancia) {
+          const limite_oficial = new Date(ahora);
+          limite_oficial.setHours(14, 30, 0, 0);
+          const minutos_retraso_multa = Math.max(
+            Math.round((ahora.getTime() - limite_oficial.getTime()) / 60000),
+            1,
+          );
+          const { monto_bs, tramo } = this.calcularMultaEscuelaLideres(minutos_retraso_multa);
 
-          if (this.notificacionesServicio && becario.usuario_id) {
-            try {
-              await this.notificacionesServicio.crear({
-                usuario_id: becario.usuario_id,
-                tipo: 'multa_retraso',
-                mensaje: `Se ha emitido una multa institucional de Bs ${monto_bs} por retraso de ${minutos_retraso_multa} min en Escuela de Líderes (${tramo}).`,
-              });
-            } catch {
-              // Silencioso ante fallos de notificación
+          if (this.multaRepositorio) {
+            const nueva_multa = this.multaRepositorio.create({
+              becario_id: becario.id,
+              asistencia_id: registro.id,
+              minutos_retraso: minutos_retraso_multa,
+              monto_bs,
+              motivo: `Retraso de ${minutos_retraso_multa} min en Escuela de Líderes (${tramo})`,
+              fecha_aplicacion: ahora,
+              es_institucional: true,
+            });
+            await this.multaRepositorio.save(nueva_multa);
+
+            if (this.notificacionesServicio && becario.usuario_id) {
+              try {
+                await this.notificacionesServicio.crear({
+                  usuario_id: becario.usuario_id,
+                  tipo: 'multa_retraso',
+                  mensaje: `Se ha emitido una multa institucional de Bs ${monto_bs} por retraso de ${minutos_retraso_multa} min en Escuela de Líderes (${tramo}).`,
+                });
+              } catch {
+                // Silencioso ante fallos de notificación
+              }
             }
           }
         }
@@ -725,6 +825,62 @@ export class AsistenciaServicio {
       asistencia: guardado,
     });
 
+    return guardado;
+  }
+
+  async revisarSupervisor(
+    id: number,
+    dto: RevisarSupervisorAsistenciaDto,
+    supervisor_id: number,
+  ): Promise<RegistroAsistencia> {
+    const registro = await this.asistenciaRepositorio.findOne({
+      where: { id },
+      relations: { becario: true },
+    });
+    if (!registro) {
+      throw new NotFoundException(`Registro de asistencia #${id} no encontrado`);
+    }
+    registro.revisado_por_supervisor_id = supervisor_id;
+    registro.fecha_revision_supervisor = new Date();
+    if (dto.observacion_supervisor) {
+      registro.observacion_supervisor = dto.observacion_supervisor;
+    }
+    registro.estado_aprobacion =
+      dto.estado || EstadoAprobacionAsistencia.REVISADO_SUPERVISOR;
+
+    const guardado = await this.asistenciaRepositorio.save(registro);
+    this.tiempoRealGateway?.notificarAsistencia({
+      accion: 'revisar_supervisor',
+      registro: guardado,
+    });
+    return guardado;
+  }
+
+  async aprobarAdministracion(
+    id: number,
+    dto: AprobarAdminAsistenciaDto,
+    admin_id: number,
+  ): Promise<RegistroAsistencia> {
+    const registro = await this.asistenciaRepositorio.findOne({
+      where: { id },
+      relations: { becario: true },
+    });
+    if (!registro) {
+      throw new NotFoundException(`Registro de asistencia #${id} no encontrado`);
+    }
+    registro.aprobado_por_admin_id = admin_id;
+    registro.fecha_aprobacion_admin = new Date();
+    if (dto.observacion_admin) {
+      registro.observacion_admin = dto.observacion_admin;
+    }
+    registro.estado_aprobacion =
+      dto.estado || EstadoAprobacionAsistencia.APROBADO_ADMINISTRACION;
+
+    const guardado = await this.asistenciaRepositorio.save(registro);
+    this.tiempoRealGateway?.notificarAsistencia({
+      accion: 'aprobar_administracion',
+      registro: guardado,
+    });
     return guardado;
   }
 }

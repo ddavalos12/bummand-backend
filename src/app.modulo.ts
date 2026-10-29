@@ -6,6 +6,7 @@ import { AppServicio } from './app.servicio';
 
 // 15 Entidades Relacionales Oficiales (BUMAND)
 import { Usuario } from './modulos/usuarios/entidades/usuario.entidad';
+import { CorreoUsuario } from './modulos/usuarios/entidades/correo-usuario.entidad';
 import { Iglesia } from './modulos/iglesias/entidades/iglesia.entidad';
 import { LugarPractica } from './modulos/lugares-practica/entidades/lugar-practica.entidad';
 import { Becario } from './modulos/becarios/entidades/becario.entidad';
@@ -24,6 +25,7 @@ import { EvaluacionPastor } from './modulos/evaluaciones/entidades/evaluacion-pa
 import { PreguntaBienestar } from './modulos/evaluaciones/entidades/pregunta-bienestar.entidad';
 import { Cuestionario } from './modulos/evaluaciones/entidades/cuestionario.entidad';
 import { PreguntaCuestionario } from './modulos/evaluaciones/entidades/pregunta-cuestionario.entidad';
+import { EntregaTareaLideres } from './modulos/evaluaciones/entidades/entrega-tarea-lideres.entidad';
 import { CasoSeguimientoPastoral } from './modulos/evaluaciones/entidades/caso-seguimiento-pastoral.entidad';
 import { AprobacionPracticas } from './modulos/practicas/entidades/aprobacion-practicas.entidad';
 import { Notificacion } from './modulos/notificaciones/entidades/notificacion.entidad';
@@ -31,6 +33,7 @@ import { ReporteGenerado } from './modulos/pdf/entidades/reporte-generado.entida
 import { TarifaTransporte } from './modulos/pasajes/entidades/tarifa-transporte.entidad';
 import { ParadaTransporte } from './modulos/pasajes/entidades/parada-transporte.entidad';
 import { Devocional } from './modulos/devocionales/entidades/devocional.entidad';
+import { CitaSeguimiento } from './modulos/devocionales/entidades/cita-seguimiento.entidad';
 import { Evento } from './modulos/eventos/entidades/evento.entidad';
 import { AsistenciaEvento } from './modulos/eventos/entidades/asistencia-evento.entidad';
 import { Justificacion } from './modulos/justificaciones/entidades/justificacion.entidad';
@@ -72,6 +75,7 @@ import { RefrigeriosModulo } from './modulos/refrigerios/refrigerios.modulo';
       database: process.env.DB_DATABASE,
       entities: [
         Usuario,
+        CorreoUsuario,
         Iglesia,
         LugarPractica,
         Becario,
@@ -90,6 +94,7 @@ import { RefrigeriosModulo } from './modulos/refrigerios/refrigerios.modulo';
         PreguntaBienestar,
         Cuestionario,
         PreguntaCuestionario,
+        EntregaTareaLideres,
         CasoSeguimientoPastoral,
         AprobacionPracticas,
         Notificacion,
@@ -97,6 +102,7 @@ import { RefrigeriosModulo } from './modulos/refrigerios/refrigerios.modulo';
         TarifaTransporte,
         ParadaTransporte,
         Devocional,
+        CitaSeguimiento,
         Evento,
         AsistenciaEvento,
         Justificacion,

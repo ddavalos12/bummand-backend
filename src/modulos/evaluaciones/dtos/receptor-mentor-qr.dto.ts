@@ -125,6 +125,23 @@ export class ReceptorMentorQrDto {
   respuestas?: Record<string, unknown>;
 
   @ApiPropertyOptional({
+    example: 'perfil_supervisor',
+    description: 'Modalidad de llenado: perfil_supervisor o celular_estudiante',
+    enum: ['perfil_supervisor', 'celular_estudiante'],
+  })
+  @IsOptional()
+  @IsString()
+  modalidad_llenado?: 'perfil_supervisor' | 'celular_estudiante';
+
+  @ApiPropertyOptional({
+    example: '849201',
+    description: 'Código de verificación de identidad de 6 dígitos emitido al supervisor',
+  })
+  @IsOptional()
+  @IsString()
+  codigo_verificacion?: string;
+
+  @ApiPropertyOptional({
     example: 'Excelente desempeño y disposición al servicio durante el periodo.',
     description: 'Observaciones cualitativas generales del mentor',
   })

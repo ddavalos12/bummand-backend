@@ -11,6 +11,7 @@ import { AsistenciaEvento, EstadoAsistenciaEvento } from './entidades/asistencia
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { CrearEventoDto } from './dtos/crear-evento.dto';
 import { ActualizarEventoDto } from './dtos/actualizar-evento.dto';
+import { CambiarLugarEventoDto } from './dtos/cambiar-lugar-evento.dto';
 import { MarcarAsistenciaEventoDto } from './dtos/marcar-asistencia-evento.dto';
 import { calcularDistanciaMetros } from '../../utilidades/geo.utilidad';
 import { Optional } from '@nestjs/common';
@@ -46,6 +47,36 @@ export class EventosServicio {
     Object.assign(evento, dto);
     const guardado = await this.evento_repo.save(evento);
     this.tiempoRealGateway?.notificarEvento({ accion: 'actualizar', evento: guardado });
+    return guardado;
+  }
+
+  async cambiarLugar(id: number, dto: CambiarLugarEventoDto): Promise<Evento> {
+    const evento = await this.obtenerPorId(id);
+    evento.latitud = dto.latitud;
+    evento.longitud = dto.longitud;
+    evento.direccion_referencia = dto.direccion_referencia;
+    if (dto.radio_tolerancia_m !== undefined && dto.radio_tolerancia_m !== null) {
+      evento.radio_tolerancia_m = dto.radio_tolerancia_m;
+    }
+    const guardado = await this.evento_repo.save(evento);
+
+    this.tiempoRealGateway?.notificarEvento({
+      accion: 'cambiar_lugar',
+      evento: guardado,
+      motivo_cambio: dto.motivo_cambio,
+    });
+
+    if (this.tiempoRealGateway?.servidor) {
+      this.tiempoRealGateway.servidor.emit('cambiar_lugar', {
+        evento_id: guardado.id,
+        latitud: guardado.latitud,
+        longitud: guardado.longitud,
+        direccion_referencia: guardado.direccion_referencia,
+        radio_tolerancia_m: guardado.radio_tolerancia_m,
+        motivo_cambio: dto.motivo_cambio,
+      });
+    }
+
     return guardado;
   }
 

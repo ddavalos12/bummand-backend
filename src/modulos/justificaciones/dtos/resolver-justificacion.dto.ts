@@ -1,23 +1,31 @@
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EstadoJustificacion } from '../entidades/justificacion.entidad';
 
 export class ResolverJustificacionDto {
   @ApiProperty({
-    enum: [EstadoJustificacion.APROBADA, EstadoJustificacion.RECHAZADA],
+    enum: EstadoJustificacion,
     example: EstadoJustificacion.APROBADA,
-    description: 'Resolución administrativa: aprobada o rechazada',
+    description: 'Resolución: aprobada, rechazada, revisado_supervisor, aprobado_administracion, observada',
   })
-  @IsEnum([EstadoJustificacion.APROBADA, EstadoJustificacion.RECHAZADA], {
-    message: 'El estado de resolución debe ser "aprobada" o "rechazada"',
+  @IsEnum(EstadoJustificacion, {
+    message: 'El estado de resolución es inválido',
   })
-  estado: EstadoJustificacion.APROBADA | EstadoJustificacion.RECHAZADA;
+  estado: EstadoJustificacion;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Justificante médico verificado y validado por el área de bienestar.',
-    description: 'Dictamen motivado y observaciones obligatorias del supervisor',
+    description: 'Dictamen motivado y observaciones del supervisor',
   })
+  @IsOptional()
   @IsString({ message: 'La observación del supervisor debe ser texto' })
-  @IsNotEmpty({ message: 'La fundamentación u observación del supervisor es obligatoria' })
-  observacion_supervisor: string;
+  observacion_supervisor?: string;
+
+  @ApiPropertyOptional({
+    example: 'Aprobado formalmente por administración con exención de penalidad.',
+    description: 'Dictamen motivado y observaciones de administración',
+  })
+  @IsOptional()
+  @IsString({ message: 'La observación de administración debe ser texto' })
+  observacion_admin?: string;
 }

@@ -7,7 +7,10 @@ import { PeriodoEvaluacion, EstadoPeriodo } from './entidades/periodo-evaluacion
 import { Evaluador } from './entidades/evaluador.entidad';
 import { EvaluacionPastor } from './entidades/evaluacion-pastor.entidad';
 import { PreguntaBienestar } from './entidades/pregunta-bienestar.entidad';
+import { EntregaTareaLideres, EstadoEntregaTarea } from './entidades/entrega-tarea-lideres.entidad';
+import { DocumentoSemestralBecario } from '../becarios/entidades/documento-semestral-becario.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
+import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 
 describe('EvaluacionesServicio', () => {
   let servicio: EvaluacionesServicio;
@@ -18,6 +21,8 @@ describe('EvaluacionesServicio', () => {
   let evaluacion_pastor_repo: any;
   let pregunta_bienestar_repo: any;
   let becario_repo: any;
+  let entrega_tarea_repo: any;
+  let documento_semestral_repo: any;
 
   beforeEach(async () => {
     evaluacion_repo = {
@@ -42,6 +47,9 @@ describe('EvaluacionesServicio', () => {
 
     evaluador_repo = {
       find: jest.fn(),
+      findOne: jest.fn(),
+      create: jest.fn().mockImplementation((d) => ({ ...d, id: 1 })),
+      save: jest.fn().mockImplementation((d) => Promise.resolve({ ...d, id: d.id || 1 })),
     };
 
     evaluacion_pastor_repo = {
@@ -62,6 +70,22 @@ describe('EvaluacionesServicio', () => {
       findOne: jest.fn(),
     };
 
+    entrega_tarea_repo = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn(),
+      create: jest.fn().mockImplementation((d) => ({ ...d, id: 1 })),
+      save: jest.fn().mockImplementation((d) => Promise.resolve({ ...d, id: d.id || 1 })),
+    };
+
+    documento_semestral_repo = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn(),
+      create: jest.fn().mockImplementation((d) => ({ ...d, id: 1 })),
+      save: jest.fn().mockImplementation((d) => Promise.resolve({ ...d, id: d.id || 1 })),
+      delete: jest.fn().mockResolvedValue({ affected: 1 }),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EvaluacionesServicio,
@@ -72,6 +96,8 @@ describe('EvaluacionesServicio', () => {
         { provide: getRepositoryToken(EvaluacionPastor), useValue: evaluacion_pastor_repo },
         { provide: getRepositoryToken(PreguntaBienestar), useValue: pregunta_bienestar_repo },
         { provide: getRepositoryToken(Becario), useValue: becario_repo },
+        { provide: getRepositoryToken(EntregaTareaLideres), useValue: entrega_tarea_repo },
+        { provide: getRepositoryToken(DocumentoSemestralBecario), useValue: documento_semestral_repo },
       ],
     }).compile();
 
@@ -382,6 +408,230 @@ describe('EvaluacionesServicio', () => {
       expect(resultado.id).toBe(101);
       expect(resultado.puntaje).toBeDefined();
       expect(resultado.semaforo_socioeconomico).toBe('verde');
+    });
+  });
+
+  describe('TAREA-02: Evaluación Módulo 3 (Perfil Supervisor o Celular Estudiante con Validación de Identidad)', () => {
+    it('debe listar becarios asignados al supervisor con su estado de evaluación del Módulo 3', async () => {
+      const supervisor: Usuario = {
+        id: 10,
+        nombre: 'Angel Ali',
+        correo: 'angel.ali@bumand.bo',
+        rol: Rol.SUPERVISOR,
+      } as any;
+
+      becario_repo.find.mockResolvedValue([
+        { id: 1, nombre: 'Juan Perez', carrera: 'Sistemas', universidad: 'UMSA', ci: '1234567', supervisor_id: 10 },
+      ]);
+      periodo_repo.findOne.mockResolvedValue({ id: 2, estado: EstadoPeriodo.ABIERTO });
+      evaluacion_repo.findOne.mockResolvedValue({
+        id: 50,
+        becario_id: 1,
+        modulo_id: 3,
+        periodo_id: 2,
+        puntaje: 18.5,
+        estado: EstadoEvaluacion.COMPLETADO,
+        datos_formulario: { modalidad_llenado: 'perfil_supervisor', codigo_verificacion: '654321' },
+      });
+
+      const resultado = await servicio.obtenerBecariosAsignadosModulo3(supervisor, 2);
+
+      expect(resultado).toBeDefined();
+      expect(resultado.length).toBe(1);
+      expect(resultado[0].becario_id).toBe(1);
+      expect(resultado[0].evaluado).toBe(true);
+      expect(resultado[0].puntaje).toBe(18.5);
+      expect(resultado[0].modalidad_llenado).toBe('perfil_supervisor');
+    });
+
+    it('debe obtener la evaluación previa del Módulo 3 de un becario para precargar respuestas', async () => {
+      periodo_repo.findOne.mockResolvedValue({ id: 2, estado: EstadoPeriodo.ABIERTO });
+      evaluacion_repo.findOne.mockResolvedValue({
+        id: 50,
+        becario_id: 1,
+        modulo_id: 3,
+        periodo_id: 2,
+        puntaje: 19.0,
+        datos_formulario: { calificaciones_1_18: [10, 9], modalidad_llenado: 'celular_estudiante' },
+      });
+
+      const res = await servicio.obtenerEvaluacionModulo3Becario(1, 2);
+
+      expect(res.evaluado).toBe(true);
+      expect(res.datos_formulario).toBeDefined();
+      expect(res.modalidad_llenado).toBe('celular_estudiante');
+    });
+
+    it('debe procesar receptor mentor registrando modalidad_llenado y codigo_verificacion', async () => {
+      periodo_repo.findOne.mockResolvedValue({ id: 2, estado: EstadoPeriodo.ABIERTO });
+      evaluador_repo.findOne.mockResolvedValue({ id: 5, nombre: 'Angel Ali', tipo: 'supervisor' });
+      evaluacion_repo.findOne.mockResolvedValue(null);
+      evaluacion_repo.create.mockImplementation((d: any) => ({ ...d, id: 75 }));
+      evaluacion_repo.save.mockImplementation((d: any) => Promise.resolve({ ...d, id: 75 }));
+
+      const supervisor: Usuario = {
+        id: 10,
+        nombre: 'Angel Ali',
+        correo: 'angel.ali@bumand.bo',
+        rol: Rol.SUPERVISOR,
+      } as any;
+
+      const res = await servicio.procesarReceptorMentorQr(
+        {
+          becario_id: 1,
+          periodo_id: 2,
+          modalidad_llenado: 'perfil_supervisor',
+          codigo_verificacion: '123456',
+          calificaciones_1_18: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
+          puntaje_19: 3.33,
+          puntaje_20: 3.33,
+          puntaje_21: 3.34,
+        },
+        supervisor,
+      );
+
+      expect(res).toBeDefined();
+      expect(res.puntaje).toBe(20);
+      expect((res.datos_formulario as any).modalidad_llenado).toBe('perfil_supervisor');
+      expect((res.datos_formulario as any).codigo_verificacion).toBe('123456');
+    });
+  });
+
+  describe('TAREA-13: Subida y Revisión Directa de Documentos Académicos', () => {
+    it('debe subir récord académico colocando la evaluación en EN_REVISION_ADMINISTRACION', async () => {
+      const becario_user: Usuario = { id: 7, nombre: 'Estudiante', rol: Rol.BECARIO } as any;
+      becario_repo.findOne.mockResolvedValue({ id: 1, usuario_id: 7 });
+      evaluador_repo.findOne.mockResolvedValue({ id: 1 });
+      evaluacion_repo.findOne.mockResolvedValue(null);
+      evaluacion_repo.create.mockImplementation((d: any) => ({ ...d, id: 80 }));
+      evaluacion_repo.save.mockImplementation((d: any) => Promise.resolve({ ...d, id: 80 }));
+
+      const resultado = await servicio.subirDocumentoAcademico(
+        {
+          periodo_id: 2,
+          tipo_documento: 'record_academico',
+        },
+        { filename: 'record-123.pdf', originalname: 'Record_2026.pdf', size: 2048 },
+        becario_user,
+      );
+
+      expect(resultado).toBeDefined();
+      expect(resultado.estado).toBe(EstadoEvaluacion.EN_REVISION_ADMINISTRACION);
+      expect(resultado.archivo_record_academico).toBe('/uploads/academicos/record-123.pdf');
+      expect((resultado as any).record_academico).toBe('/uploads/academicos/record-123.pdf');
+    });
+
+    it('debe incluir EN_REVISION_ADMINISTRACION en pendientes de administración', async () => {
+      const mockQueryBuilder: any = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          {
+            id: 80,
+            modulo_id: 2,
+            estado: EstadoEvaluacion.EN_REVISION_ADMINISTRACION,
+            archivo_record_academico: '/uploads/academicos/rec.pdf',
+            archivo_historial_academico: null,
+          },
+        ]),
+      };
+      evaluacion_repo.createQueryBuilder = jest.fn().mockReturnValue(mockQueryBuilder);
+
+      const lista = await servicio.obtenerPendientesAdministracion(2);
+
+      expect(lista.length).toBe(1);
+      expect(lista[0].estado).toBe(EstadoEvaluacion.EN_REVISION_ADMINISTRACION);
+      expect((lista[0] as any).record_academico).toBe('/uploads/academicos/rec.pdf');
+    });
+  });
+
+  describe('TAREA-12: Escuela de Líderes CETI (Módulo 4) - Patrón Classroom', () => {
+    it('debe listar las 12 tareas CETI y resumen para un becario', async () => {
+      const becario_user: Usuario = { id: 7, nombre: 'Estudiante', rol: Rol.BECARIO } as any;
+      becario_repo.findOne.mockResolvedValue({ id: 1, usuario_id: 7 });
+      periodo_repo.findOne.mockResolvedValue({ id: 2, estado: EstadoPeriodo.ABIERTO });
+      entrega_tarea_repo.find.mockResolvedValue([
+        {
+          id: 10,
+          tarea_numero: 1,
+          estado: EstadoEntregaTarea.REVISADO,
+          puntaje_obtenido: 8.33,
+        },
+      ]);
+
+      const resultado = await servicio.obtenerTareasEscuelaLideres(becario_user, 1, 2);
+
+      expect(resultado.tareas.length).toBe(12);
+      expect(resultado.resumen.total_tareas).toBe(12);
+      expect(resultado.resumen.revisadas).toBe(1);
+      expect(resultado.resumen.puntaje_acumulado_100).toBe(8.33);
+      expect(resultado.tareas[0].estado).toBe(EstadoEntregaTarea.REVISADO);
+      expect(resultado.tareas[1].estado).toBe(EstadoEntregaTarea.PENDIENTE);
+    });
+
+    it('debe entregar una tarea CETI registrando archivo de evidencia', async () => {
+      const becario_user: Usuario = { id: 7, nombre: 'Estudiante', rol: Rol.BECARIO } as any;
+      becario_repo.findOne.mockResolvedValue({ id: 1, usuario_id: 7 });
+      entrega_tarea_repo.findOne.mockResolvedValue(null);
+      entrega_tarea_repo.create.mockImplementation((d: any) => ({ ...d, id: 15 }));
+      entrega_tarea_repo.save.mockImplementation((d: any) => Promise.resolve({ ...d, id: 15 }));
+
+      const entrega = await servicio.entregarTareaEscuelaLideres(
+        {
+          periodo_id: 2,
+          tarea_numero: 2,
+          archivo_evidencia_url: '/uploads/escuela-lideres/tarea2.pdf',
+          nombre_archivo: 'Tarea2.pdf',
+          comentario_becario: 'Entrega puntual',
+        },
+        becario_user,
+      );
+
+      expect(entrega).toBeDefined();
+      expect(entrega.estado).toBe(EstadoEntregaTarea.ENTREGADO);
+      expect(entrega.archivo_evidencia_url).toBe('/uploads/escuela-lideres/tarea2.pdf');
+    });
+
+    it('debe revisar una entrega y recalcular automáticamente la nota del Módulo 4', async () => {
+      const facilitador: Usuario = { id: 20, nombre: 'Facilitador CETI', rol: Rol.SUPERVISOR } as any;
+      const mock_entrega = {
+        id: 15,
+        becario_id: 1,
+        periodo_id: 2,
+        tarea_numero: 1,
+        ponderacion_maxima: 8.33,
+        estado: EstadoEntregaTarea.ENTREGADO,
+        puntaje_obtenido: null,
+      };
+
+      entrega_tarea_repo.findOne.mockResolvedValue(mock_entrega);
+      entrega_tarea_repo.save.mockImplementation((d: any) => Promise.resolve({ ...d }));
+      entrega_tarea_repo.find.mockResolvedValue([
+        { ...mock_entrega, estado: EstadoEntregaTarea.REVISADO, puntaje_obtenido: 8.33 },
+      ]);
+      evaluador_repo.findOne.mockResolvedValue({ id: 4, tipo: 'facilitador' });
+      evaluacion_repo.findOne.mockResolvedValue(null);
+      evaluacion_repo.create.mockImplementation((d: any) => ({ ...d, id: 95 }));
+      evaluacion_repo.save.mockImplementation((d: any) => Promise.resolve({ ...d, id: 95 }));
+
+      const resultado = await servicio.revisarEntregaEscuelaLideres(
+        15,
+        {
+          estado: EstadoEntregaTarea.REVISADO,
+          puntaje_obtenido: 8.33,
+          comentario_revisor: 'Excelente análisis bíblico',
+        },
+        facilitador,
+      );
+
+      expect(resultado.entrega.estado).toBe(EstadoEntregaTarea.REVISADO);
+      expect(resultado.entrega.puntaje_obtenido).toBe(8.33);
+      expect(resultado.evaluacion_modulo_4).toBeDefined();
+      expect(resultado.evaluacion_modulo_4.modulo_id).toBe(4);
+      expect(resultado.evaluacion_modulo_4.puntaje).toBe(8.33);
+      expect(resultado.evaluacion_modulo_4.estado).toBe(EstadoEvaluacion.COMPLETADO);
     });
   });
 });

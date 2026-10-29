@@ -9,6 +9,8 @@ import {
 } from './entidades/justificacion.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { AsistenciaEvento, EstadoAsistenciaEvento } from '../eventos/entidades/asistencia-evento.entidad';
+import { Multa } from '../asistencia/entidades/multa.entidad';
+import { RegistroAsistencia } from '../asistencia/entidades/registro-asistencia.entidad';
 
 describe('JustificacionesServicio', () => {
   let servicio: JustificacionesServicio;
@@ -33,12 +35,19 @@ describe('JustificacionesServicio', () => {
       save: jest.fn().mockImplementation((datos) => Promise.resolve(datos)),
     };
 
+    const multa_repo = {
+      find: jest.fn().mockResolvedValue([]),
+      save: jest.fn().mockImplementation((datos) => Promise.resolve(datos)),
+    };
+
     const modulo: TestingModule = await Test.createTestingModule({
       providers: [
         JustificacionesServicio,
         { provide: getRepositoryToken(Justificacion), useValue: justificacion_repo },
         { provide: getRepositoryToken(Becario), useValue: becario_repo },
         { provide: getRepositoryToken(AsistenciaEvento), useValue: asistencia_evento_repo },
+        { provide: getRepositoryToken(Multa), useValue: multa_repo },
+        { provide: getRepositoryToken(RegistroAsistencia), useValue: {} },
       ],
     }).compile();
 
@@ -152,6 +161,58 @@ describe('JustificacionesServicio', () => {
           2,
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('debe permitir la revisión del supervisor en el flujo de 2 pasos', async () => {
+      justificacion_repo.findOne.mockResolvedValue({ ...justificacion_pendiente });
+
+      const resuelta = await servicio.revisarSupervisor(
+        1,
+        {
+          estado: EstadoJustificacion.REVISADO_SUPERVISOR,
+          observacion_supervisor: 'Visto bueno preliminar de supervisor',
+        },
+        5,
+      );
+
+      expect(resuelta.estado).toBe(EstadoJustificacion.REVISADO_SUPERVISOR);
+      expect(resuelta.revisado_por_supervisor_id).toBe(5);
+      expect(resuelta.fecha_revision_supervisor).toBeInstanceOf(Date);
+      expect(resuelta.observacion_supervisor).toBe('Visto bueno preliminar de supervisor');
+    });
+
+    it('debe aprobar por administración y anular automáticamente multas de viernes coincidentes', async () => {
+      const fecha_viernes = new Date('2026-10-16T00:00:00.000Z');
+      justificacion_repo.findOne.mockResolvedValue({
+        ...justificacion_pendiente,
+        fecha_incidencia: fecha_viernes,
+        becario_id: 7,
+      });
+
+      const multa_viernes = {
+        id: 99,
+        becario_id: 7,
+        fecha_aplicacion: fecha_viernes,
+        monto_bs: 15,
+        motivo: 'Retraso de 10 min en Escuela de Líderes',
+      };
+
+      (servicio as any).multaRepositorio.find = jest.fn().mockResolvedValue([multa_viernes]);
+      (servicio as any).multaRepositorio.save = jest.fn().mockImplementation((m) => Promise.resolve(m));
+
+      const resuelta = await servicio.aprobarAdministracion(
+        1,
+        {
+          observacion_admin: 'Permiso aprobado por administración central',
+        },
+        1,
+      );
+
+      expect(resuelta.estado).toBe(EstadoJustificacion.APROBADO_ADMINISTRACION);
+      expect(resuelta.aprobado_por_admin_id).toBe(1);
+      expect(resuelta.fecha_aprobacion_admin).toBeInstanceOf(Date);
+      expect(multa_viernes.monto_bs).toBe(0);
+      expect(multa_viernes.motivo).toContain('Multa eximida/anulada');
     });
   });
 });

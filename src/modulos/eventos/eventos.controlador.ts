@@ -21,6 +21,7 @@ import { Evento } from './entidades/evento.entidad';
 import { AsistenciaEvento } from './entidades/asistencia-evento.entidad';
 import { CrearEventoDto } from './dtos/crear-evento.dto';
 import { ActualizarEventoDto } from './dtos/actualizar-evento.dto';
+import { CambiarLugarEventoDto } from './dtos/cambiar-lugar-evento.dto';
 import { MarcarAsistenciaEventoDto } from './dtos/marcar-asistencia-evento.dto';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
@@ -64,6 +65,22 @@ export class EventosControlador {
     @Body() actualizarEventoDto: ActualizarEventoDto,
   ): Promise<Evento> {
     return this.eventos_servicio.actualizar(id, actualizarEventoDto);
+  }
+
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Patch(':id/cambiar-lugar')
+  @ApiOperation({
+    summary: 'Cambiar dinámicamente el lugar o recinto de un evento',
+    description: 'Actualiza las coordenadas geográficas, radio de tolerancia y dirección de referencia de un evento en tiempo real.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador del evento', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Lugar del evento actualizado exitosamente.', type: Evento })
+  @ApiResponse({ status: 404, description: 'Evento no encontrado.' })
+  cambiarLugar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CambiarLugarEventoDto,
+  ): Promise<Evento> {
+    return this.eventos_servicio.cambiarLugar(id, dto);
   }
 
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)

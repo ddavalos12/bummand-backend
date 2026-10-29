@@ -19,8 +19,11 @@ export enum TipoIncidencia {
 
 export enum EstadoJustificacion {
   PENDIENTE = 'pendiente',
+  REVISADO_SUPERVISOR = 'revisado_supervisor',
+  APROBADO_ADMINISTRACION = 'aprobado_administracion',
   APROBADA = 'aprobada',
   RECHAZADA = 'rechazada',
+  OBSERVADA = 'observada',
 }
 
 @Entity('justificaciones')
@@ -84,6 +87,26 @@ export class Justificacion {
   @ApiProperty({ description: 'Fecha y hora en la que se dictaminó la resolución', required: false })
   @Column({ name: 'fecha_resolucion', type: 'timestamp', nullable: true })
   fecha_resolucion: Date | null;
+
+  @ApiProperty({ example: 2, description: 'Supervisor que realizó la primera revisión', required: false })
+  @Column({ name: 'revisado_por_supervisor_id', type: 'int', nullable: true })
+  revisado_por_supervisor_id: number | null;
+
+  @ApiProperty({ description: 'Fecha de revisión por supervisor', required: false })
+  @Column({ name: 'fecha_revision_supervisor', type: 'timestamp', nullable: true })
+  fecha_revision_supervisor: Date | null;
+
+  @ApiProperty({ example: 1, description: 'Administrador que aprobó definitivamente', required: false })
+  @Column({ name: 'aprobado_por_admin_id', type: 'int', nullable: true })
+  aprobado_por_admin_id: number | null;
+
+  @ApiProperty({ description: 'Fecha de aprobación por administración', required: false })
+  @Column({ name: 'fecha_aprobacion_admin', type: 'timestamp', nullable: true })
+  fecha_aprobacion_admin: Date | null;
+
+  @ApiProperty({ description: 'Observación o dictamen de administración', required: false })
+  @Column({ name: 'observacion_admin', type: 'text', nullable: true })
+  observacion_admin: string | null;
 
   @ApiProperty({ description: 'Fecha y hora de creación de la solicitud' })
   @CreateDateColumn({ name: 'created_at' })

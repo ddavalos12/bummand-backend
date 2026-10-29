@@ -1,10 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AsistenciaServicio } from './asistencia.servicio';
-import { RegistroAsistencia, TipoAsistencia } from './entidades/registro-asistencia.entidad';
+import { RegistroAsistencia, TipoAsistencia, EstadoAprobacionAsistencia } from './entidades/registro-asistencia.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.entidad';
 import { Multa } from './entidades/multa.entidad';
+import { Justificacion, EstadoJustificacion } from '../justificaciones/entidades/justificacion.entidad';
+import { Evento, TipoEvento, EstadoEvento } from '../eventos/entidades/evento.entidad';
 
 describe('AsistenciaServicio', () => {
   let servicio: AsistenciaServicio;
@@ -45,6 +47,15 @@ describe('AsistenciaServicio', () => {
       crear: jest.fn().mockResolvedValue({ id: 1 }),
     };
 
+    const justificacion_repo = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+
+    const evento_repo = {
+      findOne: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+    };
+
     const modulo: TestingModule = await Test.createTestingModule({
       providers: [
         AsistenciaServicio,
@@ -52,6 +63,8 @@ describe('AsistenciaServicio', () => {
         { provide: getRepositoryToken(Becario), useValue: becario_repo },
         { provide: getRepositoryToken(LugarPractica), useValue: lugar_repo },
         { provide: getRepositoryToken(Multa), useValue: multa_repo },
+        { provide: getRepositoryToken(Justificacion), useValue: justificacion_repo },
+        { provide: getRepositoryToken(Evento), useValue: evento_repo },
         { provide: 'NotificacionesServicio', useValue: notificaciones_servicio },
       ],
     }).compile();
@@ -273,6 +286,127 @@ describe('AsistenciaServicio', () => {
       expect(resultado.registro.tipo).toBe(TipoAsistencia.PRACTICAS);
       expect(multa_repo.create).not.toHaveBeenCalled();
       expect(multa_repo.save).not.toHaveBeenCalled();
+    });
+
+    it('debe eximir de multa los viernes en Escuela de Líderes si el becario cuenta con permiso/justificación aprobada', async () => {
+      // Viernes 16 de Octubre de 2026 a las 14:40 (10 min de retraso)
+      jest.setSystemTime(new Date(2026, 9, 16, 14, 40, 0));
+
+      const becario_mock: Partial<Becario> = {
+        id: 14,
+        usuario_id: 14,
+      };
+
+      becario_repo.findOne.mockResolvedValue(becario_mock);
+      asistencia_repo.findOne.mockResolvedValue(null);
+      multa_repo.create.mockClear();
+      multa_repo.save.mockClear();
+
+      // Mock de justificación aprobada para la fecha actual
+      const justificacion_aprobada = {
+        id: 1,
+        becario_id: 14,
+        fecha_incidencia: new Date(2026, 9, 16),
+        estado: EstadoJustificacion.APROBADA,
+      };
+
+      (servicio as any).justificacionRepositorio.find = jest
+        .fn()
+        .mockResolvedValue([justificacion_aprobada]);
+
+      const resultado = await servicio.registrarIngreso({
+        becario_id: 14,
+        tipo: TipoAsistencia.ESCUELA_LIDERES,
+        latitud: -16.505000,
+        longitud: -68.163000,
+      });
+
+      expect(resultado.registro.tipo).toBe(TipoAsistencia.ESCUELA_LIDERES);
+      expect(multa_repo.create).not.toHaveBeenCalled();
+      expect(multa_repo.save).not.toHaveBeenCalled();
+    });
+
+    it('debe vincular dinámicamente evento_id al registrar ingreso en Acciones de Servicio', async () => {
+      const becario_mock: Partial<Becario> = {
+        id: 20,
+        usuario_id: 20,
+      };
+
+      becario_repo.findOne.mockResolvedValue(becario_mock);
+      asistencia_repo.findOne.mockResolvedValue(null);
+
+      const evento_mock = {
+        id: 77,
+        titulo: 'Servicio Diaconal en Plaza',
+        latitud: -16.510000,
+        longitud: -68.160000,
+        radio_tolerancia_m: 100,
+      };
+
+      (servicio as any).eventoRepositorio.findOne = jest.fn().mockResolvedValue(evento_mock);
+
+      const resultado = await servicio.registrarIngreso({
+        becario_id: 20,
+        tipo: TipoAsistencia.ACCIONES_SERVICIO,
+        latitud: -16.510010,
+        longitud: -68.160010,
+        evento_id: 77,
+      });
+
+      expect(resultado.registro.tipo).toBe(TipoAsistencia.ACCIONES_SERVICIO);
+      expect(asistencia_repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          evento_id: 77,
+        }),
+      );
+    });
+  });
+
+  describe('Flujo de 2 Pasos en Asistencia (Supervisor y Administración)', () => {
+    it('debe permitir la revisión del supervisor', async () => {
+      const registro = {
+        id: 10,
+        becario_id: 14,
+        estado_aprobacion: EstadoAprobacionAsistencia.PENDIENTE,
+      };
+      asistencia_repo.findOne.mockResolvedValue(registro);
+
+      const resultado = await servicio.revisarSupervisor(
+        10,
+        {
+          observacion_supervisor: 'Marcación verificada en campo',
+          estado: EstadoAprobacionAsistencia.REVISADO_SUPERVISOR,
+        },
+        3,
+      );
+
+      expect(resultado.estado_aprobacion).toBe(EstadoAprobacionAsistencia.REVISADO_SUPERVISOR);
+      expect(resultado.revisado_por_supervisor_id).toBe(3);
+      expect(resultado.fecha_revision_supervisor).toBeInstanceOf(Date);
+      expect(resultado.observacion_supervisor).toBe('Marcación verificada en campo');
+    });
+
+    it('debe permitir la aprobación final de administración', async () => {
+      const registro = {
+        id: 10,
+        becario_id: 14,
+        estado_aprobacion: EstadoAprobacionAsistencia.REVISADO_SUPERVISOR,
+      };
+      asistencia_repo.findOne.mockResolvedValue(registro);
+
+      const resultado = await servicio.aprobarAdministracion(
+        10,
+        {
+          observacion_admin: 'Validado oficialmente por Administración Central',
+          estado: EstadoAprobacionAsistencia.APROBADO_ADMINISTRACION,
+        },
+        1,
+      );
+
+      expect(resultado.estado_aprobacion).toBe(EstadoAprobacionAsistencia.APROBADO_ADMINISTRACION);
+      expect(resultado.aprobado_por_admin_id).toBe(1);
+      expect(resultado.fecha_aprobacion_admin).toBeInstanceOf(Date);
+      expect(resultado.observacion_admin).toBe('Validado oficialmente por Administración Central');
     });
   });
 

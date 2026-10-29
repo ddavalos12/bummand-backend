@@ -28,6 +28,18 @@ describe('PdfControlador', () => {
               nombre_estudiante: 'Carlos Luna',
               mes_nombre: 'Octubre 2026',
             }),
+            generarReporteRefrigerioPdf: jest.fn().mockResolvedValue({
+              bufer: Buffer.from('PDF_REFRIGERIO_TEST'),
+              nombre_archivo: 'Reporte_Refrigerio_5_2026_10_30.pdf',
+            }),
+            generarReporteRefrigeriosConsolidadoPdf: jest.fn().mockResolvedValue({
+              bufer: Buffer.from('PDF_REFRIGERIOS_CONSOLIDADO_TEST'),
+              nombre_archivo: 'Consolidado_Refrigerios_Auditoria_2026_10_01_a_2026_10_31.pdf',
+            }),
+            generarConsolidadoAuditoriaPdf: jest.fn().mockResolvedValue({
+              bufer: Buffer.from('PDF_AUDITORIA_TEST'),
+              nombre_archivo: 'Consolidado_Auditoria_BUMAND_2026_10_01_a_2026_10_31.pdf',
+            }),
           },
         },
         {
@@ -114,6 +126,57 @@ describe('PdfControlador', () => {
       expect.objectContaining({
         'Content-Type': 'application/pdf',
         'Content-Disposition': expect.stringContaining('Asistencia_Mensual'),
+      }),
+    );
+    expect(respuesta_mock.end).toHaveBeenCalled();
+  });
+
+  it('debe generar y descargar el reporte de refrigerio oficial en PDF (TAREA-07)', async () => {
+    const respuesta_mock = {
+      set: jest.fn(),
+      end: jest.fn(),
+    } as any;
+
+    await controller.generarReporteRefrigerio(5, respuesta_mock);
+
+    expect(respuesta_mock.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'attachment; filename=Reporte_Refrigerio_5_2026_10_30.pdf',
+      }),
+    );
+    expect(respuesta_mock.end).toHaveBeenCalled();
+  });
+
+  it('debe generar el consolidado de auditoría de refrigerios en PDF (TAREA-08)', async () => {
+    const respuesta_mock = {
+      set: jest.fn(),
+      end: jest.fn(),
+    } as any;
+
+    await controller.generarConsolidadoRefrigerios('2026-10-01', '2026-10-31', respuesta_mock);
+
+    expect(respuesta_mock.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': expect.stringContaining('Consolidado_Refrigerios_Auditoria'),
+      }),
+    );
+    expect(respuesta_mock.end).toHaveBeenCalled();
+  });
+
+  it('debe generar el consolidado global de auditoría en PDF (TAREA-08)', async () => {
+    const respuesta_mock = {
+      set: jest.fn(),
+      end: jest.fn(),
+    } as any;
+
+    await controller.generarConsolidadoAuditoria('2026-10-01', '2026-10-31', respuesta_mock);
+
+    expect(respuesta_mock.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': expect.stringContaining('Consolidado_Auditoria_BUMAND'),
       }),
     );
     expect(respuesta_mock.end).toHaveBeenCalled();

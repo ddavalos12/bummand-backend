@@ -6,8 +6,11 @@ import { Recorrido } from './recorrido.entidad';
 export enum EstadoSolicitud {
   BORRADOR = 'borrador',
   PENDIENTE = 'pendiente',
+  REVISADO_SUPERVISOR = 'revisado_supervisor',
+  APROBADO_ADMINISTRACION = 'aprobado_administracion',
   APROBADO = 'aprobado',
   RECHAZADO = 'rechazado',
+  OBSERVADO = 'observado',
 }
 
 @Entity('solicitudes_pasajes')
@@ -44,6 +47,24 @@ export class SolicitudPasajes {
 
   @Column({ name: 'fecha_resolucion', type: 'timestamp', nullable: true })
   fecha_resolucion: Date;
+
+  @Column({ name: 'revisado_por_supervisor_id', type: 'int', nullable: true })
+  revisado_por_supervisor_id: number | null;
+
+  @Column({ name: 'fecha_revision_supervisor', type: 'timestamp', nullable: true })
+  fecha_revision_supervisor: Date | null;
+
+  @Column({ name: 'observacion_supervisor', type: 'text', nullable: true })
+  observacion_supervisor: string | null;
+
+  @Column({ name: 'aprobado_por_admin_id', type: 'int', nullable: true })
+  aprobado_por_admin_id: number | null;
+
+  @Column({ name: 'fecha_aprobacion_admin', type: 'timestamp', nullable: true })
+  fecha_aprobacion_admin: Date | null;
+
+  @Column({ name: 'observacion_admin', type: 'text', nullable: true })
+  observacion_admin: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;

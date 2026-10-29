@@ -1,7 +1,11 @@
-import { Controller, Get, Post, Body, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PracticasServicio } from './practicas.servicio';
 import { CrearAprobacionDto } from './dtos/crear-aprobacion.dto';
+import {
+  RevisarSupervisorPracticasDto,
+  AprobarAdminPracticasDto,
+} from './dtos/revisar-aprobacion-practicas.dto';
 import { AprobacionPracticas } from './entidades/aprobacion-practicas.entidad';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
@@ -60,5 +64,37 @@ export class PracticasControlador {
   @ApiResponse({ status: 200, description: 'Detalle de la aprobación.', type: AprobacionPracticas })
   obtenerPorId(@Param('id', ParseIntPipe) id: number) {
     return this.servicio.obtenerPorId(id);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Patch('aprobaciones/:id/revisar-supervisor')
+  @ApiOperation({
+    summary: 'Revisión de aprobación de prácticas por el supervisor (Flujo de 2 Pasos)',
+    description: 'Permite al supervisor revisar y visar las horas de práctica reportadas.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador de la aprobación', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Aprobación revisada por el supervisor.', type: AprobacionPracticas })
+  revisarSupervisor(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: RevisarSupervisorPracticasDto,
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    return this.servicio.revisarSupervisor(id, dto, usuario.id);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Patch('aprobaciones/:id/aprobar-administracion')
+  @ApiOperation({
+    summary: 'Aprobación definitiva de prácticas por administración (Flujo de 2 Pasos)',
+    description: 'Dictamina la aprobación formal y convalidación definitiva del periodo de prácticas.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador de la aprobación', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Aprobación ratificada por administración.', type: AprobacionPracticas })
+  aprobarAdministracion(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AprobarAdminPracticasDto,
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    return this.servicio.aprobarAdministracion(id, dto, usuario.id);
   }
 }

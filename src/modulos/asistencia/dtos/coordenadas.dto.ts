@@ -67,4 +67,12 @@ export class CoordenadasDto {
   @IsOptional()
   @IsString()
   bloque?: string;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Identificador del evento o acción de servicio diaconal',
+  })
+  @IsOptional()
+  @IsNumber()
+  evento_id?: number;
 }

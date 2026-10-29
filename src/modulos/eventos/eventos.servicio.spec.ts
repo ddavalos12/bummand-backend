@@ -78,6 +78,32 @@ describe('EventosServicio', () => {
       const encontrado = await servicio.obtenerPorId(1);
       expect(encontrado.titulo).toBe('Encuentro General');
     });
+
+    it('debe cambiar dinámicamente el lugar de un evento y guardar las nuevas coordenadas', async () => {
+      evento_repo.findOne.mockResolvedValue({
+        id: 1,
+        titulo: 'Acción de Servicio',
+        latitud: -16.500054,
+        longitud: -68.173455,
+        direccion_referencia: 'Sede Antigua',
+        radio_tolerancia_m: 100,
+      });
+
+      const nuevo_lugar = {
+        latitud: -16.512345,
+        longitud: -68.182345,
+        direccion_referencia: 'Plaza del Minero, El Alto',
+        radio_tolerancia_m: 150,
+        motivo_cambio: 'Lluvia y traslado de sede',
+      };
+
+      const actualizado = await servicio.cambiarLugar(1, nuevo_lugar);
+      expect(actualizado.latitud).toBe(-16.512345);
+      expect(actualizado.longitud).toBe(-68.182345);
+      expect(actualizado.direccion_referencia).toBe('Plaza del Minero, El Alto');
+      expect(actualizado.radio_tolerancia_m).toBe(150);
+      expect(evento_repo.save).toHaveBeenCalled();
+    });
   });
 
   describe('Marcación geodésica de asistencia con radio de tolerancia', () => {

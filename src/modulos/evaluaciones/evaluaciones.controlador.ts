@@ -1,5 +1,24 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Patch, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Patch,
+  ParseIntPipe,
+  UseGuards,
+  Query,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as path from 'path';
+import * as fs from 'fs';
 import { EvaluacionesServicio } from './evaluaciones.servicio';
 import { CrearEvaluacionDto } from './dtos/crear-evaluacion.dto';
 import { GuardarFormularioF03Dto } from './dtos/guardar-formulario-f03.dto';
@@ -19,17 +38,49 @@ import { PreguntaBienestar } from './entidades/pregunta-bienestar.entidad';
 import { Cuestionario } from './entidades/cuestionario.entidad';
 import { PreguntaCuestionario } from './entidades/pregunta-cuestionario.entidad';
 import { ReceptorAcademicaDto } from './dtos/receptor-academica.dto';
-import { GuardarNotasEstudianteDto } from './dtos/guardar-notas-estudiante.dto';
+import { GuardarNotasEstudianteDto, SubirDocumentoAcademicoDto } from './dtos/guardar-notas-estudiante.dto';
 import { PreEvaluarSupervisorDto } from './dtos/pre-evaluar-supervisor.dto';
 import { ConvalidarAdministracionDto } from './dtos/convalidar-administracion.dto';
 import { ReceptorMentorQrDto } from './dtos/receptor-mentor-qr.dto';
 import { ReceptorSocioeconomicaDto } from './dtos/receptor-socioeconomica.dto';
 import { SolicitarCodigoTutorDto, VerificarCodigoTutorDto } from './dtos/verificacion-tutor.dto';
+import { EntregarTareaLideresDto, RevisarEntregaLideresDto } from './dtos/escuela-lideres.dto';
+import { EntregaTareaLideres } from './entidades/entrega-tarea-lideres.entidad';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
 import { Roles } from '../autenticacion/roles.decorador';
 import { UsuarioActual } from '../autenticacion/usuario-actual.decorador';
 import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
+
+const almacenamiento_academicos = diskStorage({
+  destination: (req, file, cb) => {
+    const destino = path.join(process.cwd(), 'uploads', 'academicos');
+    if (!fs.existsSync(destino)) {
+      fs.mkdirSync(destino, { recursive: true });
+    }
+    cb(null, destino);
+  },
+  filename: (req, file, cb) => {
+    const unico = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = path.extname(file.originalname);
+    cb(null, `academico-${unico}${ext}`);
+  },
+});
+
+const almacenamiento_lideres = diskStorage({
+  destination: (req, file, cb) => {
+    const destino = path.join(process.cwd(), 'uploads', 'escuela-lideres');
+    if (!fs.existsSync(destino)) {
+      fs.mkdirSync(destino, { recursive: true });
+    }
+    cb(null, destino);
+  },
+  filename: (req, file, cb) => {
+    const unico = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = path.extname(file.originalname);
+    cb(null, `ceti-${unico}${ext}`);
+  },
+});
 
 @ApiTags('Evaluaciones')
 @ApiBearerAuth('JWT-auth')
@@ -151,15 +202,66 @@ export class EvaluacionesControlador {
     return this.evaluaciones_servicio.obtenerPendientesAdministracion(periodo_id ? Number(periodo_id) : undefined);
   }
 
+  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Post('academica/subir-documento')
+  @UseInterceptors(FileInterceptor('archivo', { storage: almacenamiento_academicos }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Subir Récord Académico o Historial Académico por semestre',
+    description: 'Permite al estudiante o administración subir el archivo probatorio a ./uploads/academicos y pasa directamente a revisión de Administración.',
+  })
+  @ApiResponse({ status: 201, description: 'Documento académico subido y remitido a revisión directa de Administración.', type: Evaluacion })
+  subirDocumentoAcademico(
+    @Body() dto: SubirDocumentoAcademicoDto,
+    @UploadedFile() archivo: any,
+    @UsuarioActual() usuario: Usuario,
+  ): Promise<Evaluacion> {
+    return this.evaluaciones_servicio.subirDocumentoAcademico(dto, archivo, usuario);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('modulo-3/becarios-asignados')
+  @ApiOperation({
+    summary: 'Listar becarios asignados al supervisor con estado de evaluación del Módulo 3',
+    description: 'Retorna los becarios asignados al supervisor autenticado (o todos si es administrador) y el estado de su evaluación de prácticas/mentor.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de becarios asignados y estado de evaluación del Módulo 3.' })
+  obtenerBecariosAsignadosModulo3(
+    @UsuarioActual() usuario: Usuario,
+    @Query('periodo_id') periodo_id?: number,
+  ) {
+    return this.evaluaciones_servicio.obtenerBecariosAsignadosModulo3(usuario, periodo_id ? Number(periodo_id) : undefined);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR, Rol.BECARIO)
+  @Get('modulo-3/becario/:becarioId')
+  @ApiOperation({
+    summary: 'Obtener evaluación y respuestas del Módulo 3 de un becario',
+    description: 'Retorna la evaluación previa del Módulo 3 y sus datos de formulario para edición y precarga.',
+  })
+  @ApiParam({ name: 'becarioId', description: 'ID del becario', type: Number })
+  @ApiResponse({ status: 200, description: 'Evaluación y formulario del Módulo 3.' })
+  obtenerEvaluacionModulo3Becario(
+    @Param('becarioId', ParseIntPipe) becarioId: number,
+    @Query('periodo_id') periodo_id?: number,
+  ) {
+    return this.evaluaciones_servicio.obtenerEvaluacionModulo3Becario(becarioId, periodo_id ? Number(periodo_id) : undefined);
+  }
+
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('receptor/mentor-qr')
   @ApiOperation({
-    summary: 'Receptor de evaluación mentor / prácticas vía QR (Módulo 3)',
-    description: 'Procesa respuestas de rúbrica Likert enviadas por el mentor o supervisor de prácticas.',
+    summary: 'Receptor de evaluación mentor / prácticas vía QR o perfil supervisor (Módulo 3)',
+    description: 'Procesa o actualiza la evaluación de prácticas/mentor validando modalidad y código de verificación.',
   })
   @ApiResponse({ status: 201, description: 'Evaluación del mentor procesada con éxito.', type: Evaluacion })
-  procesarReceptorMentorQr(@Body() dto: ReceptorMentorQrDto): Promise<Evaluacion> {
-    return this.evaluaciones_servicio.procesarReceptorMentorQr(dto);
+  procesarReceptorMentorQr(
+    @Body() dto: ReceptorMentorQrDto,
+    @UsuarioActual() usuario?: Usuario,
+  ): Promise<Evaluacion> {
+    return usuario
+      ? this.evaluaciones_servicio.procesarReceptorMentorQr(dto, usuario)
+      : this.evaluaciones_servicio.procesarReceptorMentorQr(dto);
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
@@ -658,5 +760,79 @@ export class EvaluacionesControlador {
   async sembrarCuestionarios(): Promise<{ mensaje: string }> {
     await this.evaluaciones_servicio.sembrarCuestionariosBase();
     return { mensaje: 'Cuestionarios e instrumentos base sembrados exitosamente.' };
+  }
+
+  // ==============================================================
+  // ESCUELA DE LÍDERES CETI (MÓDULO 4) - PATRÓN CLASSROOM
+  // ==============================================================
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('escuela-lideres/tareas')
+  @ApiOperation({
+    summary: 'Listar las 12 tareas CETI y estado de entrega del becario',
+    description: 'Retorna las 12 tareas formativas del semestre y el estado de entrega y calificación del becario.',
+  })
+  @ApiQuery({ name: 'becario_id', required: false, description: 'ID del becario (opcional para supervisor/admin)' })
+  @ApiQuery({ name: 'periodo_id', required: false, description: 'ID del periodo académico' })
+  obtenerTareasEscuelaLideres(
+    @UsuarioActual() usuario: Usuario,
+    @Query('becario_id') becario_id?: number,
+    @Query('periodo_id') periodo_id?: number,
+  ) {
+    return this.evaluaciones_servicio.obtenerTareasEscuelaLideres(
+      usuario,
+      becario_id ? Number(becario_id) : undefined,
+      periodo_id ? Number(periodo_id) : undefined,
+    );
+  }
+
+  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Post('escuela-lideres/tareas/subir-evidencia')
+  @UseInterceptors(FileInterceptor('archivo', { storage: almacenamiento_lideres }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Subir evidencia documental de tarea de Escuela de Líderes',
+    description: 'Almacena el archivo en ./uploads/escuela-lideres y retorna la URL.',
+  })
+  subirEvidenciaLideres(@UploadedFile() archivo: any) {
+    if (!archivo) {
+      throw new BadRequestException('Se requiere adjuntar un archivo de evidencia');
+    }
+    const url = `/uploads/escuela-lideres/${archivo.filename}`;
+    return {
+      url,
+      archivo_evidencia_url: url,
+      nombre_archivo: archivo.originalname,
+      tamano_archivo: `${(archivo.size / 1024).toFixed(1)} KB`,
+    };
+  }
+
+  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Post('escuela-lideres/tareas/entregar')
+  @ApiOperation({
+    summary: 'Entregar tarea de Escuela de Líderes CETI',
+    description: 'Registra la entrega de informe práctico con evidencia adjunta y comentario del becario.',
+  })
+  @ApiResponse({ status: 201, description: 'Tarea entregada con éxito.', type: EntregaTareaLideres })
+  entregarTareaLideres(
+    @Body() dto: EntregarTareaLideresDto,
+    @UsuarioActual() usuario: Usuario,
+  ): Promise<EntregaTareaLideres> {
+    return this.evaluaciones_servicio.entregarTareaEscuelaLideres(dto, usuario);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Patch('escuela-lideres/entregas/:id/revisar')
+  @ApiOperation({
+    summary: 'Revisar y calificar entrega de tarea CETI',
+    description: 'El supervisor o facilitador califica la tarea (revisado/observado) y se recalcula automáticamente la nota del Módulo 4.',
+  })
+  @ApiParam({ name: 'id', description: 'ID de la entrega a calificar', type: Number })
+  revisarEntregaLideres(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: RevisarEntregaLideresDto,
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    return this.evaluaciones_servicio.revisarEntregaEscuelaLideres(id, dto, usuario);
   }
 }

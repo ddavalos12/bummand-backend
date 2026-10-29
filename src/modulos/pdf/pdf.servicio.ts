@@ -8,6 +8,7 @@ import { RegistroAsistencia, TipoAsistencia } from '../asistencia/entidades/regi
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { SolicitudPasajes } from '../pasajes/entidades/solicitud-pasaje.entidad';
 import { Recorrido, Tramo } from '../pasajes/entidades/recorrido.entidad';
+import { Refrigerio } from '../refrigerios/entidades/refrigerio.entidad';
 import {
   REGISTROS_CONSOLIDADO_SEM_II,
   RegistroConsolidadoSemestral,
@@ -35,6 +36,9 @@ export class PdfServicio {
     @Optional()
     @InjectRepository(Recorrido)
     private readonly recorrido_repo?: Repository<Recorrido>,
+    @Optional()
+    @InjectRepository(Refrigerio)
+    private readonly refrigerio_repo?: Repository<Refrigerio>,
   ) {}
 
   async generarPdf(html: string): Promise<Buffer> {
@@ -1088,8 +1092,16 @@ export class PdfServicio {
     becario_id: number;
     mes?: string;
     solicitud_id?: number;
+    fecha_inicio?: string;
+    fecha_fin?: string;
   }): Promise<{ bufer: Buffer; nombre_archivo: string; nombre_estudiante: string; mes_nombre: string }> {
-    const { anio, mes_num, fecha_inicio, fecha_fin, mes_nombre } = this.parsearMes(opciones.mes);
+    const parseado = this.parsearMes(opciones.mes);
+    const { anio, mes_num } = parseado;
+    const fecha_inicio = opciones.fecha_inicio || parseado.fecha_inicio;
+    const fecha_fin = opciones.fecha_fin || parseado.fecha_fin;
+    const mes_nombre = opciones.fecha_inicio && opciones.fecha_fin
+      ? `${opciones.fecha_inicio} al ${opciones.fecha_fin}`
+      : parseado.mes_nombre;
 
     let becario: Becario | null = null;
     if (this.becario_repo) {
@@ -1621,8 +1633,16 @@ export class PdfServicio {
   async generarAsistenciaMensualEstudiantePdf(opciones: {
     becario_id: number;
     mes?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
   }): Promise<{ bufer: Buffer; nombre_archivo: string; nombre_estudiante: string; mes_nombre: string }> {
-    const { anio, mes_num, fecha_inicio, fecha_fin, mes_nombre } = this.parsearMes(opciones.mes);
+    const parseado = this.parsearMes(opciones.mes);
+    const { anio, mes_num } = parseado;
+    const fecha_inicio = opciones.fecha_inicio || parseado.fecha_inicio;
+    const fecha_fin = opciones.fecha_fin || parseado.fecha_fin;
+    const mes_nombre = opciones.fecha_inicio && opciones.fecha_fin
+      ? `${opciones.fecha_inicio} al ${opciones.fecha_fin}`
+      : parseado.mes_nombre;
 
     let becario: Becario | null = null;
     if (this.becario_repo) {
@@ -2206,5 +2226,791 @@ export class PdfServicio {
         </body>
       </html>
     `;
+  }
+
+  /**
+   * Genera el HTML oficial de la Planilla de Rendición y Reembolso al 100% de Refrigerios (TAREA-07, TAREA-15)
+   */
+  generarReporteRefrigerioHtml(refrigerio: Refrigerio): string {
+    const fecha_actual = new Date();
+    const fecha_refrigerio = refrigerio.fecha ? new Date(refrigerio.fecha) : new Date();
+    const fecha_formato = fecha_refrigerio.toLocaleDateString('es-BO', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    const modalidad_texto =
+      refrigerio.modalidad_preparacion === 'cocina_diaconia'
+        ? 'Preparado en Cocina de Diaconía'
+        : refrigerio.modalidad_preparacion === 'traido_de_casa'
+        ? 'Elaborado en Casa por la Dupla'
+        : 'Compra Directa / Listo para Servir';
+
+    const codigo_formulario = `REP-REF-${refrigerio.id.toString().padStart(5, '0')}`;
+    const codigo_auditoria = `AUD-REF-${refrigerio.id}-${Date.now().toString().slice(-4)}`;
+
+    const encargado_1 = refrigerio.becario_encargado_1_nombre || refrigerio.becario_nombre || 'Becario 1';
+    const encargado_2 = refrigerio.becario_encargado_2_nombre || 'Becario 2';
+
+    const raciones = Number(refrigerio.cantidad_raciones) || 23;
+    const costo_total = Number(refrigerio.costo_total_bs) || 0;
+    const costo_unitario = Number(refrigerio.costo_unitario_bs) || (raciones > 0 ? Number((costo_total / raciones).toFixed(2)) : 6.0);
+    const presupuesto_ref = Number(refrigerio.presupuesto_referencial_bs) || 138.0;
+    const porcentaje_dev = Number(refrigerio.porcentaje_devolucion) || 100.0;
+    const monto_dev = Number(refrigerio.monto_devolucion_bs) || costo_total;
+
+    const receptor_nombre = refrigerio.becario_receptor_devolucion_nombre || 'Pendiente de Designación';
+    const fecha_entrega_dev = refrigerio.fecha_entrega_devolucion
+      ? new Date(refrigerio.fecha_entrega_devolucion).toLocaleString('es-BO')
+      : 'Pendiente de Desembolso';
+
+    const ingredientes = Array.isArray(refrigerio.detalle_ingredientes) && refrigerio.detalle_ingredientes.length > 0
+      ? refrigerio.detalle_ingredientes
+      : [
+          {
+            insumo: refrigerio.descripcion || 'Insumos y alimentos para el refrigerio',
+            cantidad: `${raciones} raciones`,
+            costo_bs: costo_total,
+            pagado_por_nombre: encargado_1,
+          },
+        ];
+
+    const filas_ingredientes_html = ingredientes
+      .map((ing, idx) => `
+        <tr>
+          <td style="text-align: center; font-weight: bold; width: 30px;">${idx + 1}</td>
+          <td><strong>${ing.insumo}</strong></td>
+          <td style="text-align: center; width: 120px;">${ing.cantidad || 'S/C'}</td>
+          <td style="text-align: center; width: 180px; color: #035683;">${ing.pagado_por_nombre || 'Dupla'}</td>
+          <td style="text-align: right; width: 90px; font-weight: bold; font-family: monospace;">Bs ${Number(ing.costo_bs).toFixed(2)}</td>
+        </tr>
+      `)
+      .join('');
+
+    return `
+      <!DOCTYPE html>
+      <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <title>Reporte Oficial de Refrigerios - BUMAND</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 12mm 15mm;
+            }
+            body {
+              font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+              color: #1E293B;
+              font-size: 10px;
+              line-height: 1.4;
+              margin: 0;
+              padding: 0;
+            }
+            .header-table {
+              width: 100%;
+              border-bottom: 2px solid #007BBE;
+              padding-bottom: 8px;
+              margin-bottom: 12px;
+            }
+            .header-title {
+              font-size: 15px;
+              font-weight: 800;
+              color: #007BBE;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            .header-subtitle {
+              font-size: 10.5px;
+              color: #035683;
+              font-weight: 600;
+              margin-top: 2px;
+            }
+            .badge-codigo {
+              background: #007BBE;
+              color: #FFFFFF;
+              font-size: 10px;
+              font-weight: bold;
+              padding: 4px 10px;
+              border-radius: 6px;
+              font-family: monospace;
+              display: inline-block;
+            }
+            .auditoria-bar {
+              background: #F1F5F9;
+              border: 1px solid #CBD5E1;
+              border-radius: 6px;
+              padding: 6px 12px;
+              margin-bottom: 14px;
+              display: flex;
+              justify-content: space-between;
+              font-size: 8.5px;
+              color: #475569;
+            }
+            .seccion-card {
+              border: 1px solid #E2E8F0;
+              border-radius: 8px;
+              padding: 10px 14px;
+              margin-bottom: 12px;
+              background: #FFFFFF;
+            }
+            .seccion-titulo {
+              font-size: 11px;
+              font-weight: bold;
+              color: #007BBE;
+              margin-bottom: 8px;
+              text-transform: uppercase;
+              border-bottom: 1px solid #E2E8F0;
+              padding-bottom: 4px;
+            }
+            .dupla-grid {
+              display: table;
+              width: 100%;
+              margin-top: 4px;
+            }
+            .dupla-col {
+              display: table-cell;
+              width: 50%;
+              vertical-align: top;
+            }
+            .item-label {
+              font-size: 8.5px;
+              color: #64748B;
+              font-weight: 600;
+              text-transform: uppercase;
+            }
+            .item-val {
+              font-size: 10.5px;
+              font-weight: bold;
+              color: #0F172A;
+              margin-bottom: 6px;
+            }
+            .tabla-insumos {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 6px;
+            }
+            .tabla-insumos th {
+              background: #F8FAFC;
+              color: #334155;
+              border: 1px solid #CBD5E1;
+              padding: 6px 8px;
+              font-size: 8.5px;
+              text-transform: uppercase;
+              text-align: left;
+            }
+            .tabla-insumos td {
+              border: 1px solid #E2E8F0;
+              padding: 6px 8px;
+              font-size: 9px;
+            }
+            .devolucion-box {
+              background: #ECFEFF;
+              border: 2px solid #00ABBD;
+              border-radius: 8px;
+              padding: 12px 16px;
+              margin-top: 14px;
+              margin-bottom: 14px;
+            }
+            .devolucion-titulo {
+              font-size: 12px;
+              font-weight: 900;
+              color: #00808E;
+              text-transform: uppercase;
+              margin-bottom: 4px;
+            }
+            .devolucion-monto {
+              font-size: 18px;
+              font-weight: 900;
+              color: #035683;
+              font-family: monospace;
+            }
+            .receptor-destacado {
+              margin-top: 8px;
+              padding: 8px 12px;
+              background: #FFFFFF;
+              border: 1px dashed #00ABBD;
+              border-radius: 6px;
+            }
+            .firmas-grid {
+              display: table;
+              width: 100%;
+              margin-top: 24px;
+              table-layout: fixed;
+            }
+            .firma-item {
+              display: table-cell;
+              text-align: center;
+              padding: 0 10px;
+            }
+            .firma-linea {
+              border-top: 1px solid #64748B;
+              padding-top: 5px;
+              font-weight: bold;
+              font-size: 8.5px;
+              color: #1E293B;
+            }
+            .firma-cargo {
+              font-size: 7.5px;
+              color: #64748B;
+            }
+            .footer-nota {
+              font-size: 7.5px;
+              color: #94A3B8;
+              text-align: right;
+              margin-top: 14px;
+              border-top: 1px solid #E2E8F0;
+              padding-top: 4px;
+            }
+          </style>
+        </head>
+        <body>
+          <table class="header-table">
+            <tr>
+              <td>
+                <div class="header-title">Fundación Diaconía FRIF-IFD · Programa BUMAND</div>
+                <div class="header-subtitle">Planilla Oficial de Rendición de Refrigerios y Solicitud de Devolución (100%)</div>
+              </td>
+              <td style="text-align: right;">
+                <span class="badge-codigo">${codigo_formulario}</span>
+              </td>
+            </tr>
+          </table>
+
+          <div class="auditoria-bar">
+            <span><strong>AUDITORÍA INSTITUCIONAL:</strong> ${codigo_auditoria}</span>
+            <span><strong>JORNADA DE VIERNES:</strong> ${fecha_formato.toUpperCase()}</span>
+            <span><strong>ESTADO:</strong> ${refrigerio.estado_reposicion ? refrigerio.estado_reposicion.toUpperCase() : 'PROGRAMADO'}</span>
+          </div>
+
+          <div class="seccion-card">
+            <div class="seccion-titulo">1. Dupla de Becarios Encargados y Modalidad Operativa</div>
+            <div class="dupla-grid">
+              <div class="dupla-col">
+                <div class="item-label">Primer Becario Encargado (Dupla):</div>
+                <div class="item-val">${encargado_1} ${refrigerio.becario_encargado_1_id ? `(ID #${refrigerio.becario_encargado_1_id})` : ''}</div>
+
+                <div class="item-label">Segundo Becario Encargado (Dupla):</div>
+                <div class="item-val">${encargado_2} ${refrigerio.becario_encargado_2_id ? `(ID #${refrigerio.becario_encargado_2_id})` : ''}</div>
+              </div>
+              <div class="dupla-col">
+                <div class="item-label">Modalidad de Preparación:</div>
+                <div class="item-val">${modalidad_texto}</div>
+
+                <div class="item-label">Menú / Alimentos Distribuidos:</div>
+                <div class="item-val">${refrigerio.descripcion || 'Refrigerio de Jornada'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="seccion-card">
+            <div class="seccion-titulo">2. Desglose de Insumos e Ingredientes Adquiridos</div>
+            <table class="tabla-insumos">
+              <thead>
+                <tr>
+                  <th style="width: 30px; text-align: center;">N°</th>
+                  <th>Insumo / Descripción del Producto</th>
+                  <th style="text-align: center; width: 120px;">Cantidad / Detalle</th>
+                  <th style="text-align: center; width: 180px;">Abonado Inicialmente Por</th>
+                  <th style="text-align: right; width: 90px;">Costo (Bs)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filas_ingredientes_html}
+              </tbody>
+              <tfoot>
+                <tr style="background: #F8FAFC; font-weight: bold;">
+                  <td colspan="4" style="text-align: right; padding: 6px 10px;">TOTAL RENDIDO POR LA DUPLA:</td>
+                  <td style="text-align: right; font-family: monospace; font-size: 11px; color: #007BBE; padding: 6px 8px;">
+                    Bs ${costo_total.toFixed(2)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+
+            <div style="margin-top: 8px; font-size: 8.5px; color: #64748B; display: flex; justify-content: space-between;">
+              <span><strong>Raciones Servidas:</strong> ${raciones} becarios</span>
+              <span><strong>Costo Unitario Efectivo:</strong> Bs ${costo_unitario.toFixed(2)} / ración</span>
+              <span><strong>Presupuesto Referencial:</strong> Bs ${presupuesto_ref.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div class="devolucion-box">
+            <div class="devolucion-titulo">3. Dictamen de Devolución al 100% y Becario Receptor Único</div>
+            <div style="font-size: 9px; color: #035683; margin-bottom: 6px;">
+              De acuerdo con la directriz del Directorio de BUMAND, el gasto del refrigerio se repone íntegramente (100%) a un <strong>único integrante de la dupla encargada</strong> para su posterior conciliación interna.
+            </div>
+
+            <div class="dupla-grid" style="margin-top: 8px;">
+              <div class="dupla-col">
+                <div class="item-label">Porcentaje de Reposición Institucional:</div>
+                <div style="font-size: 12px; font-weight: bold; color: #00808E;">${porcentaje_dev.toFixed(2)}% (Reembolso Total)</div>
+
+                <div class="item-label" style="margin-top: 6px;">Monto Total Desembolsado:</div>
+                <div class="devolucion-monto">Bs ${monto_dev.toFixed(2)}</div>
+              </div>
+              <div class="dupla-col">
+                <div class="receptor-destacado">
+                  <div class="item-label">Becario Receptor del Reembolso del 100%:</div>
+                  <div style="font-size: 12px; font-weight: 900; color: #007BBE;">
+                    ${receptor_nombre} ${refrigerio.becario_receptor_devolucion_id ? `(ID #${refrigerio.becario_receptor_devolucion_id})` : ''}
+                  </div>
+                  <div style="font-size: 8px; color: #64748B; margin-top: 3px;">
+                    Fecha y Hora de Entrega: <strong>${fecha_entrega_dev}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="firmas-grid">
+            <div class="firma-item">
+              <div class="firma-linea">${encargado_1}</div>
+              <div class="firma-cargo">Becario Encargado 1 · Dupla Refrigerio</div>
+            </div>
+            <div class="firma-item">
+              <div class="firma-linea">${encargado_2}</div>
+              <div class="firma-cargo">Becario Encargado 2 · Dupla Refrigerio</div>
+            </div>
+            <div class="firma-item">
+              <div class="firma-linea">
+                ${refrigerio.revisado_por_supervisor_id ? `Supervisor Institucional (ID #${refrigerio.revisado_por_supervisor_id})` : 'Supervisor de Cohorte'}
+              </div>
+              <div class="firma-cargo">Revisión y Conformidad Operativa</div>
+            </div>
+            <div class="firma-item">
+              <div class="firma-linea">
+                ${refrigerio.entregado_por_usuario_id ? `Administración BUMAND (ID #${refrigerio.entregado_por_usuario_id})` : 'Administración y Finanzas'}
+              </div>
+              <div class="firma-cargo">Autorización de Desembolso 100%</div>
+            </div>
+          </div>
+
+          <div class="footer-nota">
+            Reporte oficial generado por el Sistema BUMAND (v2.0) · Fundación Diaconía FRIF-IFD · Certificación de Rendición y Reembolso · Fecha de emisión: ${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO')}.
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Genera el PDF del Reporte Oficial de Refrigerio con Puppeteer (TAREA-07, TAREA-15)
+   */
+  async generarReporteRefrigerioPdf(id: number): Promise<{ bufer: Buffer; nombre_archivo: string }> {
+    let refrigerio: Refrigerio | null = null;
+    if (this.refrigerio_repo) {
+      refrigerio = await this.refrigerio_repo.findOne({
+        where: { id },
+        relations: { responsable: true, evento: true, lugar_practica: true },
+      });
+    }
+
+    if (!refrigerio) {
+      throw new NotFoundException(`Refrigerio con ID ${id} no encontrado`);
+    }
+
+    const html = this.generarReporteRefrigerioHtml(refrigerio);
+    const bufer = await this.generarPdf(html);
+
+    const fecha_limpia = refrigerio.fecha
+      ? refrigerio.fecha.toString().split('T')[0].replace(/-/g, '_')
+      : 'fecha';
+    const nombre_archivo = `Reporte_Refrigerio_${refrigerio.id}_${fecha_limpia}.pdf`;
+
+    return { bufer, nombre_archivo };
+  }
+
+  /**
+   * Genera el HTML del reporte consolidado de refrigerios por intervalo de auditoría (TAREA-08)
+   */
+  generarReporteRefrigeriosConsolidadoHtml(datos: {
+    refrigerios: Refrigerio[];
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): string {
+    const fecha_actual = new Date();
+    const rango_texto = datos.fecha_inicio && datos.fecha_fin
+      ? `Desde: ${datos.fecha_inicio} · Hasta: ${datos.fecha_fin}`
+      : 'Historial Consolidado de Gestión';
+
+    let total_gastado = 0;
+    let total_devolucion = 0;
+    let total_raciones = 0;
+
+    const filas_html = datos.refrigerios.map((ref, idx) => {
+      const gasto = Number(ref.costo_total_bs) || 0;
+      const dev = Number(ref.monto_devolucion_bs) || gasto;
+      const rac = Number(ref.cantidad_raciones) || 0;
+
+      total_gastado += gasto;
+      total_devolucion += dev;
+      total_raciones += rac;
+
+      const f_str = ref.fecha ? ref.fecha.toString().split('T')[0] : 'N/A';
+      const enc1 = ref.becario_encargado_1_nombre || ref.becario_nombre || 'Becario 1';
+      const enc2 = ref.becario_encargado_2_nombre || 'Becario 2';
+      const receptor = ref.becario_receptor_devolucion_nombre || 'Pendiente';
+
+      return `
+        <tr>
+          <td style="text-align: center; font-weight: bold;">${idx + 1}</td>
+          <td style="text-align: center; font-family: monospace;">${f_str}</td>
+          <td><strong>${enc1}</strong> & <strong>${enc2}</strong></td>
+          <td>${ref.descripcion || 'Refrigerio'}</td>
+          <td style="text-align: center;">${rac}</td>
+          <td style="text-align: right; font-family: monospace;">Bs ${gasto.toFixed(2)}</td>
+          <td style="text-align: right; font-family: monospace; color: #007BBE; font-weight: bold;">Bs ${dev.toFixed(2)}</td>
+          <td style="color: #035683; font-weight: bold;">${receptor}</td>
+          <td style="text-align: center;"><span style="font-size: 8px; font-weight: bold;">${ref.estado_reposicion ? ref.estado_reposicion.toUpperCase() : 'PROGRAMADO'}</span></td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <title>Consolidado Oficial de Refrigerios - BUMAND</title>
+          <style>
+            @page { size: A4 landscape; margin: 10mm 12mm; }
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1E293B; font-size: 9px; margin: 0; padding: 0; }
+            .header-table { width: 100%; border-bottom: 2px solid #007BBE; padding-bottom: 6px; margin-bottom: 10px; }
+            .header-title { font-size: 14px; font-weight: 800; color: #007BBE; text-transform: uppercase; }
+            .kpi-row { display: table; width: 100%; margin-bottom: 12px; }
+            .kpi-col { display: table-cell; width: 25%; padding: 0 4px; }
+            .kpi-card { border: 1px solid #CBD5E1; border-radius: 6px; padding: 6px 10px; background: #F8FAFC; text-align: center; }
+            .kpi-val { font-size: 14px; font-weight: 900; color: #007BBE; font-family: monospace; }
+            .kpi-lbl { font-size: 7.5px; color: #64748B; text-transform: uppercase; font-weight: bold; }
+            table.tabla-datos { width: 100%; border-collapse: collapse; margin-top: 8px; }
+            table.tabla-datos th { background: #007BBE; color: #FFFFFF; border: 1px solid #005F92; padding: 5px 6px; font-size: 8px; text-transform: uppercase; }
+            table.tabla-datos td { border: 1px solid #CBD5E1; padding: 5px 6px; font-size: 8.5px; }
+            .footer-nota { font-size: 7.5px; color: #94A3B8; text-align: right; margin-top: 10px; border-top: 1px solid #E2E8F0; padding-top: 3px; }
+          </style>
+        </head>
+        <body>
+          <table class="header-table">
+            <tr>
+              <td>
+                <div class="header-title">Fundación Diaconía FRIF-IFD · Programa BUMAND</div>
+                <div style="font-size: 10px; color: #035683; font-weight: bold;">Consolidado de Auditoría de Refrigerios y Devoluciones al 100%</div>
+              </td>
+              <td style="text-align: right;">
+                <span style="background: #007BBE; color: #FFFFFF; font-size: 9px; font-weight: bold; padding: 4px 8px; border-radius: 4px;">
+                  AUDITORÍA: ${rango_texto.toUpperCase()}
+                </span>
+              </td>
+            </tr>
+          </table>
+
+          <div class="kpi-row">
+            <div class="kpi-col">
+              <div class="kpi-card">
+                <div class="kpi-lbl">Total Jornadas / Viernes</div>
+                <div class="kpi-val">${datos.refrigerios.length}</div>
+              </div>
+            </div>
+            <div class="kpi-col">
+              <div class="kpi-card">
+                <div class="kpi-lbl">Total Raciones Distribuidas</div>
+                <div class="kpi-val">${total_raciones}</div>
+              </div>
+            </div>
+            <div class="kpi-col">
+              <div class="kpi-card">
+                <div class="kpi-lbl">Gasto Total Rendido</div>
+                <div class="kpi-val">Bs ${total_gastado.toFixed(2)}</div>
+              </div>
+            </div>
+            <div class="kpi-col">
+              <div class="kpi-card" style="border-color: #00ABBD; background: #ECFEFF;">
+                <div class="kpi-lbl" style="color: #00808E;">Total Reembolsado (100%)</div>
+                <div class="kpi-val" style="color: #00808E;">Bs ${total_devolucion.toFixed(2)}</div>
+              </div>
+            </div>
+          </div>
+
+          <table class="tabla-datos">
+            <thead>
+              <tr>
+                <th style="width: 25px;">N°</th>
+                <th style="width: 75px;">Fecha</th>
+                <th>Dupla Encargada (2 Becarios)</th>
+                <th>Menú / Descripción</th>
+                <th style="width: 50px;">Raciones</th>
+                <th style="width: 80px;">Gasto Total</th>
+                <th style="width: 85px;">Devolución 100%</th>
+                <th>Receptor del Reembolso</th>
+                <th style="width: 85px;">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filas_html}
+            </tbody>
+            <tfoot>
+              <tr style="background: #F1F5F9; font-weight: bold;">
+                <td colspan="4" style="text-align: right; padding: 5px;">TOTALES AUDITADOS:</td>
+                <td style="text-align: center; font-family: monospace;">${total_raciones}</td>
+                <td style="text-align: right; font-family: monospace;">Bs ${total_gastado.toFixed(2)}</td>
+                <td style="text-align: right; font-family: monospace; color: #007BBE;">Bs ${total_devolucion.toFixed(2)}</td>
+                <td colspan="2" style="text-align: center; font-size: 8px; color: #00808E;">DEVOLUCIÓN AL 100% AUDITADA</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="footer-nota">
+            Consolidado Institucional extraído para Auditoría · Sistema BUMAND · Emisión: ${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO')}.
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Genera el PDF del consolidado de refrigerios por intervalo de auditoría (TAREA-08)
+   */
+  async generarReporteRefrigeriosConsolidadoPdf(filtros: {
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): Promise<{ bufer: Buffer; nombre_archivo: string }> {
+    let refrigerios: Refrigerio[] = [];
+
+    if (this.refrigerio_repo) {
+      const qb = this.refrigerio_repo.createQueryBuilder('ref')
+        .leftJoinAndSelect('ref.responsable', 'responsable')
+        .leftJoinAndSelect('ref.evento', 'evento')
+        .leftJoinAndSelect('ref.lugar_practica', 'lugar_practica');
+
+      if (filtros.fecha_inicio && filtros.fecha_fin) {
+        qb.where('ref.fecha >= :inicio AND ref.fecha <= :fin', {
+          inicio: filtros.fecha_inicio,
+          fin: filtros.fecha_fin,
+        });
+      } else if (filtros.fecha_inicio) {
+        qb.where('ref.fecha >= :inicio', { inicio: filtros.fecha_inicio });
+      } else if (filtros.fecha_fin) {
+        qb.where('ref.fecha <= :fin', { fin: filtros.fecha_fin });
+      }
+
+      qb.orderBy('ref.fecha', 'ASC');
+      refrigerios = await qb.getMany();
+    }
+
+    const html = this.generarReporteRefrigeriosConsolidadoHtml({
+      refrigerios,
+      fecha_inicio: filtros.fecha_inicio,
+      fecha_fin: filtros.fecha_fin,
+    });
+
+    const bufer = await this.generarPdf(html);
+    const nombre_archivo = `Consolidado_Refrigerios_Auditoria_${(filtros.fecha_inicio || 'inicio').replace(/-/g, '_')}_a_${(filtros.fecha_fin || 'fin').replace(/-/g, '_')}.pdf`;
+
+    return { bufer, nombre_archivo };
+  }
+
+  /**
+   * Genera el HTML oficial de Consolidado Integral de Auditoría BUMAND (TAREA-08)
+   */
+  generarConsolidadoAuditoriaHtml(datos: {
+    fecha_inicio?: string;
+    fecha_fin?: string;
+    total_asistencias: number;
+    total_horas: number;
+    total_solicitudes_pasajes: number;
+    total_monto_pasajes: number;
+    total_refrigerios: number;
+    total_monto_refrigerios: number;
+  }): string {
+    const fecha_actual = new Date();
+    const rango_texto = datos.fecha_inicio && datos.fecha_fin
+      ? `Desde: ${datos.fecha_inicio} · Hasta: ${datos.fecha_fin}`
+      : 'Periodo de Evaluación Integral';
+
+    const codigo_auditoria = `AUD-GLOBAL-${Date.now().toString().slice(-6)}`;
+
+    return `
+      <!DOCTYPE html>
+      <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <title>Consolidado Global de Auditoría - BUMAND</title>
+          <style>
+            @page { size: A4 portrait; margin: 12mm 15mm; }
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1E293B; font-size: 10px; margin: 0; padding: 0; }
+            .header-table { width: 100%; border-bottom: 2px solid #007BBE; padding-bottom: 8px; margin-bottom: 12px; }
+            .header-title { font-size: 16px; font-weight: 800; color: #007BBE; text-transform: uppercase; }
+            .auditoria-badge { background: #007BBE; color: #FFFFFF; font-size: 10px; font-weight: bold; padding: 4px 10px; border-radius: 4px; font-family: monospace; }
+            .rango-banner { background: #F1F5F9; border-left: 4px solid #00ABBD; padding: 8px 12px; margin-bottom: 14px; font-size: 9.5px; }
+            .card-resumen { border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+            .card-titulo { font-size: 11px; font-weight: bold; color: #035683; text-transform: uppercase; margin-bottom: 8px; border-bottom: 1px solid #E2E8F0; padding-bottom: 4px; }
+            .metric-table { width: 100%; border-collapse: collapse; }
+            .metric-table td { padding: 8px 10px; border-bottom: 1px solid #F1F5F9; }
+            .metric-lbl { font-weight: 600; color: #475569; width: 60%; }
+            .metric-val { font-weight: 900; font-family: monospace; font-size: 13px; color: #007BBE; text-align: right; }
+            .firmas-grid { display: table; width: 100%; margin-top: 35px; }
+            .firma-col { display: table-cell; width: 33.33%; text-align: center; padding: 0 10px; }
+            .firma-linea { border-top: 1px solid #475569; padding-top: 4px; font-weight: bold; font-size: 8.5px; }
+            .footer-nota { font-size: 7.5px; color: #94A3B8; text-align: right; margin-top: 20px; border-top: 1px solid #E2E8F0; padding-top: 4px; }
+          </style>
+        </head>
+        <body>
+          <table class="header-table">
+            <tr>
+              <td>
+                <div class="header-title">Fundación Diaconía FRIF-IFD · Programa BUMAND</div>
+                <div style="font-size: 11px; color: #035683; font-weight: 600;">Informe Oficial Consolidado de Auditoría y Fiscalización Institucional</div>
+              </td>
+              <td style="text-align: right;">
+                <span class="auditoria-badge">${codigo_auditoria}</span>
+              </td>
+            </tr>
+          </table>
+
+          <div class="rango-banner">
+            <strong>INTERVALO DE AUDITORÍA:</strong> ${rango_texto.toUpperCase()} &nbsp;|&nbsp;
+            <strong>FECHA Y HORA DE EXTRACCIÓN:</strong> ${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO')}
+          </div>
+
+          <div class="card-resumen">
+            <div class="card-titulo">1. Auditoría de Asistencia y Acreditación de Horas</div>
+            <table class="metric-table">
+              <tr>
+                <td class="metric-lbl">Total de marcaciones de asistencia verificadas:</td>
+                <td class="metric-val">${datos.total_asistencias} registros</td>
+              </tr>
+              <tr>
+                <td class="metric-lbl">Horas acumuladas y acreditadas en prácticas/liderazgo:</td>
+                <td class="metric-val">${datos.total_horas.toFixed(2)} hrs</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="card-resumen">
+            <div class="card-titulo">2. Auditoría de Liquidación de Pasajes (80%)</div>
+            <table class="metric-table">
+              <tr>
+                <td class="metric-lbl">Total solicitudes de transporte procesadas:</td>
+                <td class="metric-val">${datos.total_solicitudes_pasajes} expedientes</td>
+              </tr>
+              <tr>
+                <td class="metric-lbl">Importe total desembolsado por pasajes (80% reglamentario):</td>
+                <td class="metric-val" style="color: #035683;">Bs ${datos.total_monto_pasajes.toFixed(2)}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="card-resumen">
+            <div class="card-titulo">3. Auditoría de Refrigerios y Devolución Total (100%)</div>
+            <table class="metric-table">
+              <tr>
+                <td class="metric-lbl">Total suministros de refrigerio de los viernes:</td>
+                <td class="metric-val">${datos.total_refrigerios} jornadas</td>
+              </tr>
+              <tr>
+                <td class="metric-lbl">Monto total reembolsado al 100% a las duplas receptoras:</td>
+                <td class="metric-val" style="color: #00808E;">Bs ${datos.total_monto_refrigerios.toFixed(2)}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="firmas-grid">
+            <div class="firma-col">
+              <div class="firma-linea">Lic. Angel Javier Ali Paz</div>
+              <div style="font-size: 7.5px; color: #64748B;">Supervisor Tutor Institucional</div>
+            </div>
+            <div class="firma-col">
+              <div class="firma-linea">Lic. Coordinación Nacional</div>
+              <div style="font-size: 7.5px; color: #64748B;">Programa de Becas BUMAND</div>
+            </div>
+            <div class="firma-col">
+              <div class="firma-linea">Dirección y Finanzas</div>
+              <div style="font-size: 7.5px; color: #64748B;">Fundación Diaconía FRIF - IFD</div>
+            </div>
+          </div>
+
+          <div class="footer-nota">
+            Documento Oficial de Auditoría Institucional emitido mediante Puppeteer por el Sistema BUMAND (v2.0) · Rango: ${rango_texto}.
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Genera el PDF de Consolidado Integral de Auditoría (TAREA-08)
+   */
+  async generarConsolidadoAuditoriaPdf(filtros: {
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): Promise<{ bufer: Buffer; nombre_archivo: string }> {
+    let total_asistencias = 0;
+    let total_horas = 0;
+    let total_solicitudes_pasajes = 0;
+    let total_monto_pasajes = 0;
+    let total_refrigerios = 0;
+    let total_monto_refrigerios = 0;
+
+    if (this.registro_asistencia_repo) {
+      const qb = this.registro_asistencia_repo.createQueryBuilder('asist');
+      if (filtros.fecha_inicio && filtros.fecha_fin) {
+        qb.where('asist.fecha >= :inicio AND asist.fecha <= :fin', {
+          inicio: filtros.fecha_inicio,
+          fin: filtros.fecha_fin,
+        });
+      }
+      const asistencias = await qb.getMany();
+      total_asistencias = asistencias.length;
+      total_horas = asistencias.reduce((acc, a) => acc + (Number(a.horas_trabajadas) || 0), 0);
+    }
+
+    if (this.solicitud_pasajes_repo) {
+      const qb = this.solicitud_pasajes_repo.createQueryBuilder('sol');
+      if (filtros.fecha_inicio && filtros.fecha_fin) {
+        qb.where('sol.created_at >= :inicio AND sol.created_at <= :fin', {
+          inicio: filtros.fecha_inicio,
+          fin: filtros.fecha_fin,
+        });
+      }
+      const solicitudes = await qb.getMany();
+      total_solicitudes_pasajes = solicitudes.length;
+      total_monto_pasajes = solicitudes.reduce(
+        (acc, s) => acc + (Number(s.monto_devolucion) || Number(s.monto_total) || 0),
+        0,
+      );
+    }
+
+    if (this.refrigerio_repo) {
+      const qb = this.refrigerio_repo.createQueryBuilder('ref');
+      if (filtros.fecha_inicio && filtros.fecha_fin) {
+        qb.where('ref.fecha >= :inicio AND ref.fecha <= :fin', {
+          inicio: filtros.fecha_inicio,
+          fin: filtros.fecha_fin,
+        });
+      }
+      const refrigerios = await qb.getMany();
+      total_refrigerios = refrigerios.length;
+      total_monto_refrigerios = refrigerios.reduce(
+        (acc, r) => acc + (Number(r.monto_devolucion_bs) || Number(r.costo_total_bs) || 0),
+        0,
+      );
+    }
+
+    const html = this.generarConsolidadoAuditoriaHtml({
+      fecha_inicio: filtros.fecha_inicio,
+      fecha_fin: filtros.fecha_fin,
+      total_asistencias,
+      total_horas,
+      total_solicitudes_pasajes,
+      total_monto_pasajes,
+      total_refrigerios,
+      total_monto_refrigerios,
+    });
+
+    const bufer = await this.generarPdf(html);
+    const nombre_archivo = `Consolidado_Auditoria_BUMAND_${(filtros.fecha_inicio || 'inicio').replace(/-/g, '_')}_a_${(filtros.fecha_fin || 'fin').replace(/-/g, '_')}.pdf`;
+
+    return { bufer, nombre_archivo };
   }
 }

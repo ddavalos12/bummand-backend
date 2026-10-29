@@ -333,5 +333,49 @@ describe('PasajesServicio', () => {
       expect(primer_item.destino).toBeDefined();
     });
   });
+
+  describe('Flujo de 2 Pasos en Pasajes (Supervisor y Administración)', () => {
+    it('debe permitir la revisión del supervisor', async () => {
+      const solicitud_mock = {
+        id: 1,
+        becario_id: 2,
+        periodo: 'Septiembre 2026',
+        estado: EstadoSolicitud.PENDIENTE,
+      };
+
+      solicitud_repo.findOne.mockResolvedValue(solicitud_mock);
+
+      const resultado = await servicio.revisarSupervisor(1, 10, {
+        estado: EstadoSolicitud.REVISADO_SUPERVISOR,
+        observacion_supervisor: 'Tramos y distancias revisados correctamente',
+      });
+
+      expect(resultado.estado).toBe(EstadoSolicitud.REVISADO_SUPERVISOR);
+      expect(resultado.revisado_por_supervisor_id).toBe(10);
+      expect(resultado.fecha_revision_supervisor).toBeInstanceOf(Date);
+      expect(resultado.observacion_supervisor).toBe('Tramos y distancias revisados correctamente');
+    });
+
+    it('debe permitir la aprobación final por parte de administración', async () => {
+      const solicitud_mock = {
+        id: 1,
+        becario_id: 2,
+        periodo: 'Septiembre 2026',
+        estado: EstadoSolicitud.REVISADO_SUPERVISOR,
+      };
+
+      solicitud_repo.findOne.mockResolvedValue(solicitud_mock);
+
+      const resultado = await servicio.aprobarAdministracion(1, 1, {
+        estado: EstadoSolicitud.APROBADO_ADMINISTRACION,
+        observacion_admin: 'Planilla aprobada para desembolso financiero',
+      });
+
+      expect(resultado.estado).toBe(EstadoSolicitud.APROBADO_ADMINISTRACION);
+      expect(resultado.aprobado_por_admin_id).toBe(1);
+      expect(resultado.fecha_aprobacion_admin).toBeInstanceOf(Date);
+      expect(resultado.observacion_admin).toBe('Planilla aprobada para desembolso financiero');
+    });
+  });
 });
 

@@ -13,6 +13,10 @@ import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
 
 import { CrearTarifaDto } from './dtos/crear-tarifa.dto';
 import { ActualizarTarifaDto } from './dtos/actualizar-tarifa.dto';
+import {
+  RevisarSupervisorPasajeDto,
+  AprobarAdminPasajeDto,
+} from './dtos/revisar-solicitud-pasaje.dto';
 
 export interface CalculoReembolsoPasajes {
   monto_total: number;
@@ -449,6 +453,44 @@ export class PasajesServicio {
     solicitud.fecha_resolucion = new Date();
     const guardada = await this.solicitudRepositorio.save(solicitud);
     this.tiempoRealGateway?.notificarPasajes({ accion: 'aprobar', solicitud: guardada });
+    return guardada;
+  }
+
+  async revisarSupervisor(
+    id: number,
+    supervisor_id: number,
+    dto?: RevisarSupervisorPasajeDto,
+  ): Promise<SolicitudPasajes> {
+    const solicitud = await this.obtenerPorId(id);
+    solicitud.estado = dto?.estado || EstadoSolicitud.REVISADO_SUPERVISOR;
+    solicitud.supervisor_id = supervisor_id;
+    solicitud.revisado_por_supervisor_id = supervisor_id;
+    solicitud.fecha_revision_supervisor = new Date();
+    if (dto?.observacion_supervisor) {
+      solicitud.observacion_supervisor = dto.observacion_supervisor;
+      solicitud.observaciones = dto.observacion_supervisor;
+    }
+    const guardada = await this.solicitudRepositorio.save(solicitud);
+    this.tiempoRealGateway?.notificarPasajes({ accion: 'revisar_supervisor', solicitud: guardada });
+    return guardada;
+  }
+
+  async aprobarAdministracion(
+    id: number,
+    admin_id: number,
+    dto?: AprobarAdminPasajeDto,
+  ): Promise<SolicitudPasajes> {
+    const solicitud = await this.obtenerPorId(id);
+    solicitud.estado = dto?.estado || EstadoSolicitud.APROBADO_ADMINISTRACION;
+    solicitud.aprobado_por_admin_id = admin_id;
+    solicitud.fecha_aprobacion_admin = new Date();
+    solicitud.fecha_resolucion = new Date();
+    if (dto?.observacion_admin) {
+      solicitud.observacion_admin = dto.observacion_admin;
+      solicitud.observaciones = dto.observacion_admin;
+    }
+    const guardada = await this.solicitudRepositorio.save(solicitud);
+    this.tiempoRealGateway?.notificarPasajes({ accion: 'aprobar_administracion', solicitud: guardada });
     return guardada;
   }
 

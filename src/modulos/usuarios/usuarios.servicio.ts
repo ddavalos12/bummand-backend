@@ -9,8 +9,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Usuario, Rol, EstadoUsuario } from './entidades/usuario.entidad';
 import { CorreoUsuario } from './entidades/correo-usuario.entidad';
+import { Becario } from '../becarios/entidades/becario.entidad';
 import { CrearUsuarioDto } from './dtos/crear-usuario.dto';
-import { hashearContrasena } from '../../utilidades/hash.utilidad';
+import { ActualizarPerfilUsuarioDto } from './dtos/actualizar-perfil-usuario.dto';
+import { CambiarContrasenaDto } from './dtos/cambiar-contrasena.dto';
+import { ActualizarUsuarioAdminDto } from './dtos/actualizar-usuario-admin.dto';
+import { hashearContrasena, verificarContrasena } from '../../utilidades/hash.utilidad';
 
 @Injectable()
 export class UsuariosServicio {
@@ -20,6 +24,9 @@ export class UsuariosServicio {
     @Optional()
     @InjectRepository(CorreoUsuario)
     private readonly correoUsuarioRepositorio?: Repository<CorreoUsuario>,
+    @Optional()
+    @InjectRepository(Becario)
+    private readonly becarioRepositorio?: Repository<Becario>,
   ) {}
 
   async verificarCorreoDisponible(
@@ -93,10 +100,12 @@ export class UsuariosServicio {
         correo_alternativo: true,
         rol: true,
         estado: true,
+        correo_confirmado: true,
         created_at: true,
       },
       relations: {
         correos_adicionales: true,
+        becario: true,
       },
       order: { id: 'ASC' },
     });
@@ -327,5 +336,239 @@ export class UsuariosServicio {
     usuario.correo_confirmado = true;
     usuario.token_confirmacion = null;
     return this.usuarioRepositorio.save(usuario);
+  }
+
+  async obtenerMiPerfilCompleto(usuario_id: number) {
+    const usuario = await this.usuarioRepositorio.findOne({
+      where: { id: usuario_id },
+      relations: { correos_adicionales: true, becario: true },
+    });
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    let becario = usuario.becario;
+    if (!becario && this.becarioRepositorio) {
+      becario = (await this.becarioRepositorio.findOne({
+        where: { usuario_id },
+      })) as any;
+    }
+
+    const becario_datos = becario
+      ? {
+          id: becario.id,
+          ci: becario.ci ?? null,
+          telefono: becario.celular ?? (becario as any).telefono ?? null,
+          celular: becario.celular ?? null,
+          direccion: becario.direccion ?? null,
+          universidad: becario.universidad ?? null,
+          carrera: becario.carrera ?? null,
+          semestre: (becario as any).semestre ?? null,
+          modalidad_pasajes: becario.modalidad_pasajes ?? null,
+          horas_meta_mes: (becario as any).horas_meta_mes ?? 80,
+          supervisor_id: becario.supervisor_id ?? null,
+        }
+      : null;
+
+    return {
+      id: usuario.id,
+      nombre: usuario.nombre,
+      correo: usuario.correo,
+      correo_alternativo: usuario.correo_alternativo ?? null,
+      rol: usuario.rol,
+      estado: usuario.estado,
+      correo_confirmado: usuario.correo_confirmado,
+      created_at: usuario.created_at,
+      correos_adicionales: usuario.correos_adicionales ?? [],
+      becario: becario_datos,
+      ci: becario_datos?.ci ?? null,
+      telefono: becario_datos?.telefono ?? null,
+      celular: becario_datos?.celular ?? null,
+      direccion: becario_datos?.direccion ?? null,
+      universidad: becario_datos?.universidad ?? null,
+      carrera: becario_datos?.carrera ?? null,
+      semestre: becario_datos?.semestre ?? null,
+      modalidad_pasajes: becario_datos?.modalidad_pasajes ?? null,
+      horas_meta_mes: becario_datos?.horas_meta_mes ?? (becario_datos ? 80 : null),
+      supervisor_id: becario_datos?.supervisor_id ?? null,
+    };
+  }
+
+  async actualizarMiPerfil(usuario_id: number, dto: ActualizarPerfilUsuarioDto) {
+    const usuario = await this.usuarioRepositorio.findOne({
+      where: { id: usuario_id },
+      relations: { becario: true },
+    });
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    if (dto.nombre !== undefined && dto.nombre.trim() !== '') {
+      usuario.nombre = dto.nombre.trim();
+    }
+
+    if (dto.correo !== undefined && dto.correo.trim() !== '') {
+      const correo_limpio = dto.correo.trim().toLowerCase();
+      if (correo_limpio !== usuario.correo.toLowerCase()) {
+        await this.verificarCorreoDisponible(correo_limpio, usuario_id);
+        usuario.correo = correo_limpio;
+      }
+    }
+
+    await this.usuarioRepositorio.save(usuario);
+
+    if (dto.correo_alternativo !== undefined) {
+      await this.actualizarCorreoAlternativo(usuario_id, dto.correo_alternativo);
+    }
+
+    if (this.becarioRepositorio) {
+      let becario = usuario.becario;
+      if (!becario) {
+        becario = (await this.becarioRepositorio.findOne({
+          where: { usuario_id },
+        })) as any;
+      }
+
+      if (becario) {
+        let modificado = false;
+
+        if (dto.nombre !== undefined && dto.nombre.trim() !== '') {
+          if ('nombre' in becario) {
+            becario.nombre = dto.nombre.trim();
+            modificado = true;
+          }
+          if ('nombre_completo' in becario) {
+            (becario as any).nombre_completo = dto.nombre.trim();
+            modificado = true;
+          }
+        }
+
+        if (dto.telefono !== undefined) {
+          becario.celular = dto.telefono.trim();
+          if ('telefono' in becario) {
+            (becario as any).telefono = dto.telefono.trim();
+          }
+          modificado = true;
+        }
+
+        if (dto.direccion !== undefined) {
+          becario.direccion = dto.direccion.trim();
+          modificado = true;
+        }
+
+        if (dto.carrera !== undefined) {
+          becario.carrera = dto.carrera.trim();
+          modificado = true;
+        }
+
+        if (dto.semestre !== undefined && 'semestre' in becario) {
+          (becario as any).semestre = dto.semestre.trim();
+          modificado = true;
+        }
+
+        if (modificado) {
+          await this.becarioRepositorio.save(becario);
+        }
+      }
+    }
+
+    return this.obtenerMiPerfilCompleto(usuario_id);
+  }
+
+  async cambiarMiContrasena(usuario_id: number, dto: CambiarContrasenaDto) {
+    const usuario = await this.usuarioRepositorio.findOne({
+      where: { id: usuario_id },
+      select: {
+        id: true,
+        contrasena_hash: true,
+      },
+    });
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    if (dto.contrasena_actual) {
+      const coincide = await verificarContrasena(dto.contrasena_actual, usuario.contrasena_hash);
+      if (!coincide) {
+        throw new BadRequestException('La contraseña actual ingresada es incorrecta.');
+      }
+    }
+
+    if (!dto.nueva_contrasena || dto.nueva_contrasena.trim().length < 6) {
+      throw new BadRequestException('La nueva contraseña debe tener al menos 6 caracteres.');
+    }
+
+    usuario.contrasena_hash = await hashearContrasena(dto.nueva_contrasena.trim());
+    await this.usuarioRepositorio.save(usuario);
+
+    return {
+      mensaje: 'Contraseña actualizada exitosamente.',
+      actualizado: true,
+    };
+  }
+
+  async actualizarUsuarioPorAdmin(id: number, dto: ActualizarUsuarioAdminDto) {
+    const usuario = await this.usuarioRepositorio.findOne({
+      where: { id },
+      relations: { correos_adicionales: true, becario: true },
+    });
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    if (dto.nombre !== undefined && dto.nombre.trim() !== '') {
+      usuario.nombre = dto.nombre.trim();
+    }
+
+    if (dto.correo !== undefined && dto.correo.trim() !== '') {
+      const correo_limpio = dto.correo.trim().toLowerCase();
+      if (correo_limpio !== usuario.correo.toLowerCase()) {
+        await this.verificarCorreoDisponible(correo_limpio, id);
+        usuario.correo = correo_limpio;
+      }
+    }
+
+    if (dto.rol !== undefined) {
+      usuario.rol = dto.rol;
+    }
+
+    if (dto.estado !== undefined) {
+      usuario.estado = dto.estado;
+    }
+
+    if (dto.nueva_contrasena !== undefined && dto.nueva_contrasena.trim() !== '') {
+      if (dto.nueva_contrasena.trim().length < 6) {
+        throw new BadRequestException('La nueva contraseña debe tener al menos 6 caracteres.');
+      }
+      usuario.contrasena_hash = await hashearContrasena(dto.nueva_contrasena.trim());
+    }
+
+    await this.usuarioRepositorio.save(usuario);
+
+    if (dto.correo_alternativo !== undefined) {
+      await this.actualizarCorreoAlternativo(id, dto.correo_alternativo);
+    }
+
+    const { contrasena_hash, ...usuario_seguro } = usuario;
+    return usuario_seguro;
+  }
+
+  async restablecerContrasenaPorAdmin(id: number, nueva_contrasena: string) {
+    if (!nueva_contrasena || typeof nueva_contrasena !== 'string' || nueva_contrasena.trim().length < 6) {
+      throw new BadRequestException('La nueva contraseña debe tener al menos 6 caracteres.');
+    }
+
+    const usuario = await this.usuarioRepositorio.findOne({ where: { id } });
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    usuario.contrasena_hash = await hashearContrasena(nueva_contrasena.trim());
+    await this.usuarioRepositorio.save(usuario);
+
+    return {
+      mensaje: 'Contraseña restablecida exitosamente por administración.',
+      usuario_id: id,
+    };
   }
 }

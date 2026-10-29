@@ -7,6 +7,7 @@ import { CoordenadasDto } from './dtos/coordenadas.dto';
 import { ConfirmarOrganizadorDto } from './dtos/confirmar-organizador.dto';
 import { RegistrarAsistenciaManualDto } from './dtos/registrar-asistencia-manual.dto';
 import { RectificarAsistenciaDto } from './dtos/rectificar-asistencia.dto';
+import { RevisarSupervisorAsistenciaDto, AprobarAdminAsistenciaDto } from './dtos/revisar-asistencia.dto';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
 import { Roles } from '../autenticacion/roles.decorador';
@@ -104,6 +105,38 @@ export class AsistenciaControlador {
     @UsuarioActual() usuario: Usuario,
   ) {
     return this.asistenciaServicio.rectificarHoraYJustificar(id, dto, usuario?.id);
+  }
+
+  @Patch(':id/revisar-supervisor')
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'Revisión y validación de asistencia por el supervisor',
+    description: 'Permite al supervisor revisar la marcación de asistencia del becario y emitir observaciones.',
+  })
+  @ApiParam({ name: 'id', description: 'ID del registro de asistencia', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Asistencia revisada por el supervisor.', type: RegistroAsistencia })
+  revisarSupervisor(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: RevisarSupervisorAsistenciaDto,
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    return this.asistenciaServicio.revisarSupervisor(id, dto, usuario.id);
+  }
+
+  @Patch(':id/aprobar-administracion')
+  @Roles(Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'Aprobación definitiva de asistencia por administración',
+    description: 'Dictamina la aprobación formal o convalidación final de la marcación de asistencia.',
+  })
+  @ApiParam({ name: 'id', description: 'ID del registro de asistencia', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Asistencia aprobada por administración.', type: RegistroAsistencia })
+  aprobarAdministracion(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AprobarAdminAsistenciaDto,
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    return this.asistenciaServicio.aprobarAdministracion(id, dto, usuario.id);
   }
 
   @Get('multas')

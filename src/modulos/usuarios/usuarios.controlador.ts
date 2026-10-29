@@ -15,6 +15,9 @@ import {
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UsuariosServicio } from './usuarios.servicio';
 import { CrearUsuarioDto } from './dtos/crear-usuario.dto';
+import { ActualizarPerfilUsuarioDto } from './dtos/actualizar-perfil-usuario.dto';
+import { CambiarContrasenaDto } from './dtos/cambiar-contrasena.dto';
+import { ActualizarUsuarioAdminDto } from './dtos/actualizar-usuario-admin.dto';
 import { Usuario, Rol, EstadoUsuario } from './entidades/usuario.entidad';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
@@ -23,7 +26,7 @@ import { UsuarioActual } from '../autenticacion/usuario-actual.decorador';
 
 @ApiTags('Usuarios')
 @ApiBearerAuth('JWT-auth')
-@Controller('usuarios')
+@Controller(['usuarios', 'api/usuarios'])
 @UseGuards(JwtGuardia, RolesGuardia)
 export class UsuariosControlador {
   constructor(private readonly usuariosServicio: UsuariosServicio) {}
@@ -71,6 +74,46 @@ export class UsuariosControlador {
       throw new BadRequestException('Rol inválido');
     }
     return this.usuariosServicio.listar(rol as Rol);
+  }
+
+  @Get('mi-perfil')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @ApiOperation({
+    summary: 'Obtener información completa de mi perfil',
+    description: 'Retorna los datos del usuario autenticado, correos asociados y su ficha de becario vinculada si aplica.',
+  })
+  @ApiResponse({ status: 200, description: 'Perfil completo recuperado exitosamente.' })
+  obtenerMiPerfil(@UsuarioActual() usuarioAutenticado: Usuario) {
+    return this.usuariosServicio.obtenerMiPerfilCompleto(usuarioAutenticado.id);
+  }
+
+  @Patch('mi-perfil')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @ApiOperation({
+    summary: 'Actualizar datos de mi perfil',
+    description: 'Permite al usuario autenticado actualizar su nombre, correos y datos académicos o de contacto.',
+  })
+  @ApiResponse({ status: 200, description: 'Perfil actualizado exitosamente.' })
+  actualizarMiPerfil(
+    @UsuarioActual() usuarioAutenticado: Usuario,
+    @Body() dto: ActualizarPerfilUsuarioDto,
+  ) {
+    return this.usuariosServicio.actualizarMiPerfil(usuarioAutenticado.id, dto);
+  }
+
+  @Patch('mi-perfil/contrasena')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @ApiOperation({
+    summary: 'Cambiar mi contraseña institucional',
+    description: 'Permite actualizar la contraseña institucional verificando opcionalmente la clave anterior.',
+  })
+  @ApiResponse({ status: 200, description: 'Contraseña cambiada exitosamente.' })
+  @ApiResponse({ status: 400, description: 'Contraseña actual incorrecta o nueva contraseña inválida.' })
+  cambiarMiContrasena(
+    @UsuarioActual() usuarioAutenticado: Usuario,
+    @Body() dto: CambiarContrasenaDto,
+  ) {
+    return this.usuariosServicio.cambiarMiContrasena(usuarioAutenticado.id, dto);
   }
 
   @Get('mi-perfil/correos')
@@ -151,6 +194,48 @@ export class UsuariosControlador {
       usuarioAutenticado.id,
       correo_alternativo ?? null,
     );
+  }
+
+  @Patch(':id')
+  @Roles(Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'Actualizar usuario institucional (Administrador)',
+    description: 'Permite al administrador modificar datos, rol, estado o contraseña de cualquier usuario institucional.',
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'ID del usuario a modificar' })
+  @ApiResponse({ status: 200, description: 'Usuario modificado exitosamente.', type: Usuario })
+  @ApiResponse({ status: 404, description: 'Usuario no encontrado.' })
+  actualizarUsuarioPorAdmin(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ActualizarUsuarioAdminDto,
+  ) {
+    return this.usuariosServicio.actualizarUsuarioPorAdmin(id, dto);
+  }
+
+  @Patch(':id/contrasena')
+  @Roles(Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'Restablecer contraseña de un usuario (Administrador)',
+    description: 'Permite restablecer forzosamente la contraseña institucional de cualquier cuenta de usuario.',
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'ID del usuario' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        nueva_contrasena: { type: 'string', example: 'ClaveSegura2026*' },
+      },
+      required: ['nueva_contrasena'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Contraseña restablecida exitosamente.' })
+  @ApiResponse({ status: 400, description: 'Contraseña inválida (mínimo 6 caracteres).' })
+  restablecerContrasenaPorAdmin(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() cuerpo: { nueva_contrasena?: string; contrasena?: string },
+  ) {
+    const contrasena = cuerpo?.nueva_contrasena || cuerpo?.contrasena || '';
+    return this.usuariosServicio.restablecerContrasenaPorAdmin(id, contrasena);
   }
 
   @Patch(':id/correo-alternativo')

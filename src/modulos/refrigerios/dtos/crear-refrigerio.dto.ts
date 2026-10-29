@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { DetalleIngredienteRefrigerio } from '../entidades/refrigerio.entidad';
 
 export class CrearRefrigerioDto {
   @ApiProperty({
@@ -35,7 +36,7 @@ export class CrearRefrigerioDto {
   descripcion: string;
 
   @ApiProperty({
-    example: 30,
+    example: 23,
     description: 'Cantidad de raciones distribuidas a los becarios',
   })
   @IsNotEmpty()
@@ -44,7 +45,7 @@ export class CrearRefrigerioDto {
   cantidad_raciones: number;
 
   @ApiPropertyOptional({
-    example: 8.0,
+    example: 6.0,
     description: 'Costo unitario en Bolivianos (Bs) por cada ración (opcional si se envía costo total)',
   })
   @IsOptional()
@@ -53,16 +54,37 @@ export class CrearRefrigerioDto {
   costo_unitario_bs?: number;
 
   @ApiPropertyOptional({
-    example: 240.0,
+    example: 138.0,
     description: 'Costo total calculado en Bs (opcional si se envía costo unitario)',
   })
   @IsOptional()
   @IsNumber()
   costo_total_bs?: number;
 
+  // Dupla encargada
+  @ApiPropertyOptional({ example: 4, description: 'ID del primer becario de la dupla' })
+  @IsOptional()
+  @IsNumber()
+  becario_encargado_1_id?: number;
+
+  @ApiPropertyOptional({ example: 'Nilda Amalia Churata Paye', description: 'Nombre del primer becario encargado' })
+  @IsOptional()
+  @IsString()
+  becario_encargado_1_nombre?: string;
+
+  @ApiPropertyOptional({ example: 5, description: 'ID del segundo becario de la dupla' })
+  @IsOptional()
+  @IsNumber()
+  becario_encargado_2_id?: number;
+
+  @ApiPropertyOptional({ example: 'Joel Mamani Quispe', description: 'Nombre del segundo becario encargado' })
+  @IsOptional()
+  @IsString()
+  becario_encargado_2_nombre?: string;
+
   @ApiPropertyOptional({
     example: 4,
-    description: 'Identificador del becario encargado del refrigerio (opcional)',
+    description: 'Identificador del becario encargado principal (compatibilidad)',
   })
   @IsOptional()
   @IsNumber()
@@ -70,11 +92,57 @@ export class CrearRefrigerioDto {
 
   @ApiPropertyOptional({
     example: 'Nilda Amalia Churata Paye',
-    description: 'Nombre del becario encargado del refrigerio (opcional)',
+    description: 'Nombre del becario encargado del refrigerio (compatibilidad)',
   })
   @IsOptional()
   @IsString()
   becario_nombre?: string;
+
+  @ApiPropertyOptional({
+    example: 'cocina_diaconia',
+    description: 'Modalidad de preparación: cocina_diaconia | traido_de_casa | compra_directa',
+  })
+  @IsOptional()
+  @IsString()
+  modalidad_preparacion?: string;
+
+  @ApiPropertyOptional({
+    description: 'Desglose de ingredientes e insumos adquiridos',
+    example: [{ insumo: 'Pan surtido', cantidad: '25 unid', costo_bs: 20.0, pagado_por_becario_id: 4, pagado_por_nombre: 'Nilda Churata' }],
+  })
+  @IsOptional()
+  @IsArray()
+  detalle_ingredientes?: DetalleIngredienteRefrigerio[];
+
+  @ApiPropertyOptional({ example: 138.0, description: 'Presupuesto referencial en Bs' })
+  @IsOptional()
+  @IsNumber()
+  presupuesto_referencial_bs?: number;
+
+  @ApiPropertyOptional({ example: 100.0, description: 'Porcentaje de devolución' })
+  @IsOptional()
+  @IsNumber()
+  porcentaje_devolucion?: number;
+
+  @ApiPropertyOptional({ example: 138.0, description: 'Monto de devolución en Bs' })
+  @IsOptional()
+  @IsNumber()
+  monto_devolucion_bs?: number;
+
+  @ApiPropertyOptional({ example: 4, description: 'ID del único becario receptor del reembolso 100%' })
+  @IsOptional()
+  @IsNumber()
+  becario_receptor_devolucion_id?: number;
+
+  @ApiPropertyOptional({ example: 'Nilda Amalia Churata Paye', description: 'Nombre del receptor de la devolución' })
+  @IsOptional()
+  @IsString()
+  becario_receptor_devolucion_nombre?: string;
+
+  @ApiPropertyOptional({ example: 'sorteado_programado', description: 'Estado de la reposición' })
+  @IsOptional()
+  @IsString()
+  estado_reposicion?: string;
 
   @ApiProperty({
     example: 2,

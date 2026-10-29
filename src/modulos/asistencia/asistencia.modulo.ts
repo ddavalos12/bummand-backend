@@ -8,11 +8,20 @@ import { Becario } from '../becarios/entidades/becario.entidad';
 import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.entidad';
 import { Iglesia } from '../iglesias/entidades/iglesia.entidad';
 import { Justificacion } from '../justificaciones/entidades/justificacion.entidad';
+import { Evento } from '../eventos/entidades/evento.entidad';
 import { NotificacionesModulo } from '../notificaciones/notificaciones.modulo';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([RegistroAsistencia, Becario, LugarPractica, Multa, Iglesia, Justificacion]),
+    TypeOrmModule.forFeature([
+      RegistroAsistencia,
+      Becario,
+      LugarPractica,
+      Multa,
+      Iglesia,
+      Justificacion,
+      Evento,
+    ]),
     NotificacionesModulo,
   ],
   controllers: [AsistenciaControlador],

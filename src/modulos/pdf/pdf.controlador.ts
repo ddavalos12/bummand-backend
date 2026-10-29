@@ -129,6 +129,8 @@ export class PdfControlador {
     description: 'Genera el PDF oficial en formato apaisado (landscape) con las 14 columnas, observaciones cualitativas, rangos de aprobación y trazabilidad de conformidad en sistema.',
   })
   @ApiQuery({ name: 'periodo', required: false, description: 'Periodo o gestión (ej. II-2025)' })
+  @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio para auditoría (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin para auditoría (YYYY-MM-DD)' })
   @ApiProduces('application/pdf')
   @ApiResponse({
     status: 200,
@@ -141,12 +143,15 @@ export class PdfControlador {
   async generarReporteEvaluacionSemestral(
     @Query('periodo') periodo: string | undefined,
     @Res() respuesta: Response,
+    @Query('fecha_inicio') fecha_inicio?: string,
+    @Query('fecha_fin') fecha_fin?: string,
   ) {
     const consolidado = await this.evaluaciones_servicio.obtenerConsolidadoSemestral(periodo);
     const buffer = await this.pdf_servicio.generarReporteEvaluacionSemestralPdf(consolidado.registros);
 
     const periodo_limpio = (periodo || 'II_2025').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const nombre_archivo = `Evaluacion_Semestre_${periodo_limpio}.pdf`;
+    const sufijo_rango = fecha_inicio && fecha_fin ? `_${fecha_inicio}_al_${fecha_fin}` : '';
+    const nombre_archivo = `Evaluacion_Semestre_${periodo_limpio}${sufijo_rango}.pdf`;
 
     respuesta.set({
       'Content-Type': 'application/pdf',
@@ -208,6 +213,8 @@ export class PdfControlador {
   @ApiParam({ name: 'becario_id', description: 'ID del becario o estudiante', type: Number, example: 1 })
   @ApiQuery({ name: 'mes', required: false, description: 'Mes del expediente (YYYY-MM o texto, ej. 2026-10)', example: '2026-10' })
   @ApiQuery({ name: 'solicitud_id', required: false, description: 'ID opcional de solicitud de pasaje específica' })
+  @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio para auditoría (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin para auditoría (YYYY-MM-DD)' })
   @ApiProduces('application/pdf')
   @ApiResponse({
     status: 200,
@@ -222,11 +229,15 @@ export class PdfControlador {
     @Query('mes') mes: string | undefined,
     @Query('solicitud_id') solicitud_id: number | undefined,
     @Res() respuesta: Response,
+    @Query('fecha_inicio') fecha_inicio?: string,
+    @Query('fecha_fin') fecha_fin?: string,
   ) {
     const resultado = await this.pdf_servicio.generarExpedienteRecorridosEstudiantePdf({
       becario_id,
       mes,
       solicitud_id: solicitud_id ? Number(solicitud_id) : undefined,
+      fecha_inicio,
+      fecha_fin,
     });
 
     respuesta.set({
@@ -245,6 +256,8 @@ export class PdfControlador {
   })
   @ApiParam({ name: 'becario_id', description: 'ID del becario o estudiante', type: Number, example: 1 })
   @ApiQuery({ name: 'mes', required: false, description: 'Mes de asistencia (YYYY-MM o texto, ej. 2026-10)', example: '2026-10' })
+  @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio para auditoría (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin para auditoría (YYYY-MM-DD)' })
   @ApiProduces('application/pdf')
   @ApiResponse({
     status: 200,
@@ -258,10 +271,121 @@ export class PdfControlador {
     @Param('becario_id', ParseIntPipe) becario_id: number,
     @Query('mes') mes: string | undefined,
     @Res() respuesta: Response,
+    @Query('fecha_inicio') fecha_inicio?: string,
+    @Query('fecha_fin') fecha_fin?: string,
   ) {
     const resultado = await this.pdf_servicio.generarAsistenciaMensualEstudiantePdf({
       becario_id,
       mes,
+      fecha_inicio,
+      fecha_fin,
+    });
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${resultado.nombre_archivo}`,
+      'Content-Length': resultado.bufer.length,
+    });
+
+    respuesta.end(resultado.bufer);
+  }
+
+  @Get('refrigerios/consolidado')
+  @ApiOperation({
+    summary: 'Generar y descargar informe consolidado de refrigerios en PDF para auditoría',
+    description: 'Genera el PDF con el resumen institucional de los refrigerios del intervalo con desglose de duplas, montos y becarios receptores.',
+  })
+  @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({ status: 200, description: 'Archivo binario del consolidado de refrigerios en PDF descargado.' })
+  async generarConsolidadoRefrigerios(
+    @Query('fecha_inicio') fecha_inicio: string | undefined,
+    @Query('fecha_fin') fecha_fin: string | undefined,
+    @Res() respuesta: Response,
+  ) {
+    const resultado = await this.pdf_servicio.generarReporteRefrigeriosConsolidadoPdf({
+      fecha_inicio,
+      fecha_fin,
+    });
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${resultado.nombre_archivo}`,
+      'Content-Length': resultado.bufer.length,
+    });
+
+    respuesta.end(resultado.bufer);
+  }
+
+  @Get('refrigerios/:id')
+  @ApiOperation({
+    summary: 'Generar y descargar planilla oficial de refrigerio en PDF (TAREA-07, TAREA-15)',
+    description: 'Renderiza mediante Puppeteer la planilla oficial con membrete Diaconía, los 2 becarios de la dupla, ingredientes, devolución al 100% y becario receptor único.',
+  })
+  @ApiParam({ name: 'id', description: 'ID del refrigerio', type: Number, example: 1 })
+  @ApiProduces('application/pdf')
+  @ApiResponse({ status: 200, description: 'Archivo binario del reporte de refrigerio en PDF descargado.' })
+  async generarReporteRefrigerio(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() respuesta: Response,
+  ) {
+    const resultado = await this.pdf_servicio.generarReporteRefrigerioPdf(id);
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${resultado.nombre_archivo}`,
+      'Content-Length': resultado.bufer.length,
+    });
+
+    respuesta.end(resultado.bufer);
+  }
+
+  @Get('refrigerios')
+  @ApiOperation({
+    summary: 'Generar reporte de refrigerios en PDF con intervalo de fechas (TAREA-07, TAREA-08)',
+    description: 'Genera el reporte consolidado de refrigerios por intervalo de auditoría.',
+  })
+  @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({ status: 200, description: 'Archivo PDF consolidado descargado.' })
+  async generarReporteRefrigeriosIntervalo(
+    @Query('fecha_inicio') fecha_inicio: string | undefined,
+    @Query('fecha_fin') fecha_fin: string | undefined,
+    @Res() respuesta: Response,
+  ) {
+    const resultado = await this.pdf_servicio.generarReporteRefrigeriosConsolidadoPdf({
+      fecha_inicio,
+      fecha_fin,
+    });
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${resultado.nombre_archivo}`,
+      'Content-Length': resultado.bufer.length,
+    });
+
+    respuesta.end(resultado.bufer);
+  }
+
+  @Get('consolidado-auditoria')
+  @ApiOperation({
+    summary: 'Generar informe consolidado global de auditoría institucional en PDF (TAREA-08)',
+    description: 'Consolida horas de asistencia, liquidación de pasajes (80%) y reembolsos de refrigerio (100%) por intervalo de fechas.',
+  })
+  @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({ status: 200, description: 'Archivo binario del consolidado de auditoría en PDF descargado.' })
+  async generarConsolidadoAuditoria(
+    @Query('fecha_inicio') fecha_inicio: string | undefined,
+    @Query('fecha_fin') fecha_fin: string | undefined,
+    @Res() respuesta: Response,
+  ) {
+    const resultado = await this.pdf_servicio.generarConsolidadoAuditoriaPdf({
+      fecha_inicio,
+      fecha_fin,
     });
 
     respuesta.set({

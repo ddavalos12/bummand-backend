@@ -102,3 +102,26 @@ export class GuardarNotasEstudianteDto {
   @IsString()
   observaciones?: string;
 }
+
+export class SubirDocumentoAcademicoDto {
+  @ApiProperty({ example: 2, description: 'ID del periodo de evaluación (semestre)' })
+  @IsNotEmpty()
+  @Type(() => Number)
+  @IsNumber()
+  periodo_id: number;
+
+  @ApiProperty({
+    example: 'record_academico',
+    description: 'Tipo de documento académico subido',
+    enum: ['record_academico', 'historial_academico'],
+  })
+  @IsNotEmpty()
+  @IsString()
+  tipo_documento: 'record_academico' | 'historial_academico';
+
+  @ApiPropertyOptional({ example: 1, description: 'ID del becario (opcional si es el becario autenticado)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  becario_id?: number;
+}

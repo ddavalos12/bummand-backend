@@ -3,12 +3,25 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { PdfServicio } from './pdf.servicio';
 import { Evento } from '../eventos/entidades/evento.entidad';
 import { AsistenciaEvento } from '../eventos/entidades/asistencia-evento.entidad';
+import { Refrigerio } from '../refrigerios/entidades/refrigerio.entidad';
 import { REGISTROS_CONSOLIDADO_SEM_II } from '../evaluaciones/constantes/consolidado-semestral-datos.constantes';
 
 describe('PdfServicio', () => {
   let servicio: PdfServicio;
+  let refrigerio_repo: any;
 
   beforeEach(async () => {
+    refrigerio_repo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue({
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PdfServicio,
@@ -19,6 +32,10 @@ describe('PdfServicio', () => {
         {
           provide: getRepositoryToken(AsistenciaEvento),
           useValue: { find: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(Refrigerio),
+          useValue: refrigerio_repo,
         },
       ],
     }).compile();
@@ -212,6 +229,97 @@ describe('PdfServicio', () => {
     });
   });
 
+  describe('Reportes PDF de Refrigerios y Auditoría (TAREA-07, TAREA-08, TAREA-15)', () => {
+    it('debe generar HTML del reporte de refrigerio con dupla, modalidad, ingredientes y devolución al 100%', () => {
+      const refrigerio_mock: Partial<Refrigerio> = {
+        id: 10,
+        fecha: new Date('2026-10-30'),
+        descripcion: 'Sándwich de huevo con jugo de durazno',
+        cantidad_raciones: 23,
+        costo_unitario_bs: 6.0,
+        costo_total_bs: 138.0,
+        presupuesto_referencial_bs: 138.0,
+        porcentaje_devolucion: 100.0,
+        monto_devolucion_bs: 138.0,
+        modalidad_preparacion: 'cocina_diaconia',
+        becario_encargado_1_id: 1,
+        becario_encargado_1_nombre: 'Nilda Churata',
+        becario_encargado_2_id: 2,
+        becario_encargado_2_nombre: 'Joel Mamani',
+        becario_receptor_devolucion_id: 1,
+        becario_receptor_devolucion_nombre: 'Nilda Churata',
+        fecha_entrega_devolucion: new Date('2026-10-30T16:00:00Z'),
+        entregado_por_usuario_id: 99,
+        estado_reposicion: 'aprobado_administracion',
+        detalle_ingredientes: [
+          { insumo: 'Pan surtido', cantidad: '25 unid', costo_bs: 38.0, pagado_por_nombre: 'Nilda Churata' },
+          { insumo: 'Huevos y refresco', cantidad: '1 maple', costo_bs: 100.0, pagado_por_nombre: 'Joel Mamani' },
+        ],
+      };
+
+      const html = servicio.generarReporteRefrigerioHtml(refrigerio_mock as Refrigerio);
+
+      expect(html).toContain('Planilla Oficial de Rendición de Refrigerios y Solicitud de Devolución (100%)');
+      expect(html).toContain('REP-REF-00010');
+      expect(html).toContain('Nilda Churata');
+      expect(html).toContain('Joel Mamani');
+      expect(html).toContain('Preparado en Cocina de Diaconía');
+      expect(html).toContain('Pan surtido');
+      expect(html).toContain('Bs 138.00');
+      expect(html).toContain('100.00% (Reembolso Total)');
+      expect(html).toContain('Nilda Churata');
+      expect(html).toContain('De acuerdo con la directriz del Directorio de BUMAND');
+    });
+
+    it('debe generar HTML del consolidado de refrigerios por intervalo de auditoría', () => {
+      const refrigerios = [
+        {
+          id: 1,
+          fecha: new Date('2026-10-02'),
+          descripcion: 'Refrigerio 1',
+          cantidad_raciones: 23,
+          costo_total_bs: 138.0,
+          monto_devolucion_bs: 138.0,
+          becario_encargado_1_nombre: 'Nilda Churata',
+          becario_encargado_2_nombre: 'Joel Mamani',
+          becario_receptor_devolucion_nombre: 'Nilda Churata',
+          estado_reposicion: 'aprobado_administracion',
+        } as Refrigerio,
+      ];
+
+      const html = servicio.generarReporteRefrigeriosConsolidadoHtml({
+        refrigerios,
+        fecha_inicio: '2026-10-01',
+        fecha_fin: '2026-10-31',
+      });
+
+      expect(html).toContain('Consolidado de Auditoría de Refrigerios y Devoluciones al 100%');
+      expect(html).toContain('2026-10-01');
+      expect(html).toContain('2026-10-31');
+      expect(html).toContain('Nilda Churata');
+      expect(html).toContain('Joel Mamani');
+    });
+
+    it('debe generar HTML del consolidado global de auditoría', () => {
+      const html = servicio.generarConsolidadoAuditoriaHtml({
+        fecha_inicio: '2026-10-01',
+        fecha_fin: '2026-10-31',
+        total_asistencias: 50,
+        total_horas: 180.5,
+        total_solicitudes_pasajes: 20,
+        total_monto_pasajes: 560.0,
+        total_refrigerios: 4,
+        total_monto_refrigerios: 552.0,
+      });
+
+      expect(html).toContain('Informe Oficial Consolidado de Auditoría y Fiscalización Institucional');
+      expect(html).toContain('Auditoría de Asistencia y Acreditación de Horas');
+      expect(html).toContain('Auditoría de Liquidación de Pasajes (80%)');
+      expect(html).toContain('Auditoría de Refrigerios y Devolución Total (100%)');
+      expect(html).toContain('Bs 552.00');
+    });
+  });
+
   describe('generación binaria con Puppeteer', () => {
     it('debe generar el buffer PDF válido del expediente de recorridos mensual', async () => {
       const resultado = await servicio.generarExpedienteRecorridosEstudiantePdf({
@@ -237,6 +345,36 @@ describe('PdfServicio', () => {
       expect(resultado.bufer.length).toBeGreaterThan(0);
       expect(resultado.nombre_archivo).toContain('Asistencia_Mensual_');
       expect(resultado.mes_nombre).toBe('Octubre 2026');
+    });
+
+    it('debe generar el buffer PDF válido del reporte de refrigerio (TAREA-07)', async () => {
+      refrigerio_repo.findOne.mockResolvedValue({
+        id: 12,
+        fecha: new Date('2026-10-30'),
+        descripcion: 'Refrigerio jornada Escuela de Líderes',
+        cantidad_raciones: 23,
+        costo_unitario_bs: 6.0,
+        costo_total_bs: 138.0,
+        presupuesto_referencial_bs: 138.0,
+        porcentaje_devolucion: 100.0,
+        monto_devolucion_bs: 138.0,
+        modalidad_preparacion: 'cocina_diaconia',
+        becario_encargado_1_id: 1,
+        becario_encargado_1_nombre: 'Nilda Churata',
+        becario_encargado_2_id: 2,
+        becario_encargado_2_nombre: 'Joel Mamani',
+        becario_receptor_devolucion_id: 1,
+        becario_receptor_devolucion_nombre: 'Nilda Churata',
+        estado_reposicion: 'aprobado_administracion',
+        detalle_ingredientes: [],
+      });
+
+      const resultado = await servicio.generarReporteRefrigerioPdf(12);
+
+      expect(resultado).toBeDefined();
+      expect(resultado.bufer).toBeInstanceOf(Buffer);
+      expect(resultado.bufer.length).toBeGreaterThan(0);
+      expect(resultado.nombre_archivo).toContain('Reporte_Refrigerio_12_');
     });
   });
 });

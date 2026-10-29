@@ -9,3 +9,6 @@ export async function hashearContrasena(contrasena: string): Promise<string> {
 export async function compararContrasena(contrasena: string, hash: string): Promise<boolean> {
   return bcrypt.compare(contrasena, hash);
 }
+
+export const verificarContrasena = compararContrasena;
+

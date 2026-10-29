@@ -8,6 +8,10 @@ import { CrearSolicitudPasajeDto } from './dtos/crear-solicitud-pasaje.dto';
 import { AgregarRecorridoDto, ItemRecorridoDto } from './dtos/agregar-recorrido.dto';
 import { CrearTarifaDto } from './dtos/crear-tarifa.dto';
 import { ActualizarTarifaDto } from './dtos/actualizar-tarifa.dto';
+import {
+  RevisarSupervisorPasajeDto,
+  AprobarAdminPasajeDto,
+} from './dtos/revisar-solicitud-pasaje.dto';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
 import { Roles } from '../autenticacion/roles.decorador';
@@ -375,6 +379,38 @@ export class PasajesControlador {
     @UsuarioActual() usuario: Usuario,
   ): Promise<SolicitudPasajes> {
     return this.pasajesServicio.aprobarSolicitud(id, usuario.id);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Patch(':id/revisar-supervisor')
+  @ApiOperation({
+    summary: 'Revisión técnica de viáticos por el supervisor (Flujo de 2 Pasos)',
+    description: 'Pasa la solicitud de pasajes a estado revisado_supervisor con registro de trazabilidad.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador de la solicitud', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Solicitud revisada por el supervisor.', type: SolicitudPasajes })
+  revisarSupervisor(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: RevisarSupervisorPasajeDto,
+    @UsuarioActual() usuario: Usuario,
+  ): Promise<SolicitudPasajes> {
+    return this.pasajesServicio.revisarSupervisor(id, usuario.id, dto);
+  }
+
+  @Roles(Rol.ADMINISTRADOR)
+  @Patch(':id/aprobar-administracion')
+  @ApiOperation({
+    summary: 'Aprobación definitiva de planilla de viáticos por Administración (Flujo de 2 Pasos)',
+    description: 'Dictamina la aprobación formal y autorización para desembolso financiero de la planilla de pasajes.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador de la solicitud', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Solicitud aprobada por administración central.', type: SolicitudPasajes })
+  aprobarAdministracion(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AprobarAdminPasajeDto,
+    @UsuarioActual() usuario: Usuario,
+  ): Promise<SolicitudPasajes> {
+    return this.pasajesServicio.aprobarAdministracion(id, usuario.id, dto);
   }
 
   @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)

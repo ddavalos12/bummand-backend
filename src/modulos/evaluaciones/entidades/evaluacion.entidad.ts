@@ -9,6 +9,7 @@ export enum EstadoEvaluacion {
   PENDIENTE = 'pendiente',
   BORRADOR = 'borrador',
   EN_REVISION_SUPERVISOR = 'en_revision_supervisor',
+  EN_REVISION_ADMINISTRACION = 'en_revision_administracion',
   PRE_EVALUADO = 'pre_evaluado',
   COMPLETADO = 'completado',
   OBSERVADO = 'observado',
@@ -86,6 +87,12 @@ export class Evaluacion {
   detalle_pastor: EvaluacionPastor;
 
   // Getters / Setters de compatibilidad transitoria
+  get record_academico(): string | null { return this.archivo_record_academico; }
+  set record_academico(v: string | null) { this.archivo_record_academico = v; }
+
+  get historial_academico(): string | null { return this.archivo_historial_academico; }
+  set historial_academico(v: string | null) { this.archivo_historial_academico = v; }
+
   get creado_en(): Date { return this.created_at; }
   set creado_en(v: Date) { this.created_at = v; }
 }
