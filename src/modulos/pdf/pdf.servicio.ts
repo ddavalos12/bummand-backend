@@ -2495,17 +2495,17 @@ export class PdfServicio {
                 <div class="item-val">${encargado_2} ${refrigerio.becario_encargado_2_id ? `(ID #${refrigerio.becario_encargado_2_id})` : ''}</div>
               </div>
               <div class="dupla-col">
-                <div class="item-label">Modalidad de Preparación:</div>
-                <div class="item-val">${modalidad_texto}</div>
-
-                <div class="item-label">Menú / Alimentos Distribuidos:</div>
+                <div class="item-label">Menú / Identificador del Refrigerio:</div>
                 <div class="item-val">${refrigerio.descripcion || 'Refrigerio de Jornada'}</div>
+
+                <div class="item-label" style="margin-top: 6px;">Raciones Distribuidas:</div>
+                <div class="item-val">${raciones} becarios (Bs ${costo_unitario.toFixed(2)} c/u)</div>
               </div>
             </div>
           </div>
 
           <div class="seccion-card">
-            <div class="seccion-titulo">2. Desglose de Insumos e Ingredientes Adquiridos</div>
+            <div class="seccion-titulo">2. Resumen Financiero y Rendición del 100%</div>
             <table class="tabla-insumos">
               <thead>
                 <tr>

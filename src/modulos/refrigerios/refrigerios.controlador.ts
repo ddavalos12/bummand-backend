@@ -44,14 +44,15 @@ import { UsuarioActual } from '../autenticacion/usuario-actual.decorador';
 export class RefrigeriosControlador {
   constructor(private readonly refrigerios_servicio: RefrigeriosServicio) {}
 
+  @Post('asignar-dupla')
   @Post('sortear-dupla')
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
   @ApiOperation({
-    summary: 'Sortear o asignar dupla de 2 becarios encargados para el refrigerio del viernes',
+    summary: 'Asignar o programar dupla de 2 becarios encargados para el refrigerio del viernes',
     description:
-      'Consulta los becarios activos y el historial de turnos para rotar equitativamente, o asigna manualmente a los dos becarios designados.',
+      'Registra formalmente a los dos becarios designados por la Directiva para la entrega del refrigerio institucional.',
   })
-  @ApiResponse({ status: 201, description: 'Dupla sorteada y refrigerio programado.', type: Refrigerio })
+  @ApiResponse({ status: 201, description: 'Dupla asignada y refrigerio programado.', type: Refrigerio })
   sortearDupla(
     @Body() dto: SortearDuplaDto,
     @UsuarioActual() usuario?: Usuario,

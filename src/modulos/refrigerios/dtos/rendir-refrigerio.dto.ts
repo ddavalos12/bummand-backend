@@ -11,26 +11,21 @@ export class RendirRefrigerioDto {
   @IsString()
   descripcion?: string;
 
-  @ApiProperty({
-    example: 'cocina_diaconia',
-    description: 'Modalidad de preparación: cocina_diaconia | traido_de_casa | compra_directa',
+  @ApiPropertyOptional({
+    example: 'general',
+    description: 'Modalidad de preparación (opcional, en reserva de la dupla)',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  modalidad_preparacion: string;
+  modalidad_preparacion?: string;
 
-  @ApiProperty({
-    description: 'Lista de insumos/ingredientes adquiridos, costos y quién pagó cada uno',
-    example: [
-      { insumo: 'Pan surtido', cantidad: '25 unidades', costo_bs: 20.0, pagado_por_becario_id: 4, pagado_por_nombre: 'Nilda Churata' },
-      { insumo: 'Maple de huevos', cantidad: '30 unidades', costo_bs: 35.0, pagado_por_becario_id: 5, pagado_por_nombre: 'Joel Mamani' },
-      { insumo: 'Queso criollo', cantidad: '1 bloque', costo_bs: 25.0, pagado_por_becario_id: 4, pagado_por_nombre: 'Nilda Churata' },
-      { insumo: 'Refresco e insumos', cantidad: 'Para 23 personas', costo_bs: 55.0, pagado_por_becario_id: 5, pagado_por_nombre: 'Joel Mamani' },
-    ],
+  @ApiPropertyOptional({
+    description: 'Lista de insumos/ingredientes adquiridos, costos y quién pagó cada uno (opcional, preparación en reserva)',
+    example: [],
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsArray()
-  detalle_ingredientes: DetalleIngredienteRefrigerio[];
+  detalle_ingredientes?: DetalleIngredienteRefrigerio[];
 
   @ApiProperty({
     example: 135.0,

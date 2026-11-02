@@ -486,8 +486,8 @@ export class RefrigeriosServicio {
     if (dto.descripcion) {
       refrigerio.descripcion = dto.descripcion;
     }
-    refrigerio.modalidad_preparacion = dto.modalidad_preparacion;
-    refrigerio.detalle_ingredientes = dto.detalle_ingredientes;
+    refrigerio.modalidad_preparacion = dto.modalidad_preparacion || refrigerio.modalidad_preparacion || 'general';
+    refrigerio.detalle_ingredientes = dto.detalle_ingredientes || null;
     refrigerio.costo_total_bs = Number(dto.costo_total_bs);
 
     if (dto.cantidad_raciones) {

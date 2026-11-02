@@ -21,7 +21,7 @@ import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 @ApiTags('Pasajes')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtGuardia, RolesGuardia)
-@Controller('pasajes')
+@Controller(['pasajes', 'api/pasajes'])
 export class PasajesControlador {
   constructor(private readonly pasajesServicio: PasajesServicio) {}
 
