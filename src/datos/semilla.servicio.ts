@@ -221,6 +221,153 @@ export class SemillaServicio implements OnModuleInit {
   }
 
   /**
+   * Limpieza de Usuarios Tipo Becario:
+   * Elimina todos los usuarios con rol 'becario', sus expedientes en 'becarios'
+   * y todos sus registros transaccionales u operativos asociados (asistencias, pasajes,
+   * evaluaciones, horarios, asignaciones, multas, devocionales, justificaciones, etc.),
+   * preservando íntegros a los administradores, supervisores y catálogos institucionales.
+   */
+  async limpiarBecarios(): Promise<void> {
+    this.logger.log('Iniciando limpieza de usuarios tipo becario y registros vinculados...');
+
+    let ids_usuarios_becarios: number[] = [];
+    try {
+      const res_usuarios = await this.dataSource.query(
+        `SELECT id, correo FROM "usuarios" WHERE LOWER(rol::text) = 'becario';`,
+      );
+      ids_usuarios_becarios = res_usuarios.map((u: any) => u.id);
+    } catch (err: any) {
+      this.logger.warn(`No se pudo consultar usuarios con rol becario: ${err.message}`);
+    }
+
+    let ids_becarios: number[] = [];
+    try {
+      const res_becarios = await this.dataSource.query(`SELECT id FROM "becarios";`);
+      ids_becarios = res_becarios.map((b: any) => b.id);
+    } catch (err: any) {
+      this.logger.warn(`No se pudo consultar la tabla becarios: ${err.message}`);
+    }
+
+    this.logger.log(
+      `Cuentas de usuario tipo becario encontradas: ${ids_usuarios_becarios.length}. Perfiles de becarios encontrados: ${ids_becarios.length}.`,
+    );
+
+    // 1. Limpieza de tablas operativas dependientes de becarios
+    // Se respeta estrictamente el orden de dependencias referenciales
+    const tablas_dependientes = [
+      'recorridos',
+      'solicitudes_pasajes',
+      'multas',
+      'justificaciones',
+      'evaluaciones_pastor',
+      'evaluaciones',
+      'casos_seguimiento_pastoral',
+      'entregas_tareas_lideres',
+      'registros_asistencia',
+      'asistencias_eventos',
+      'aprobaciones_practicas',
+      'reportes_generados',
+      'horarios_apoyo',
+      'asignaciones_practica',
+      'documentos_semestrales_becarios',
+      'devocionales',
+      'citas_seguimiento',
+    ];
+
+    for (const tabla of tablas_dependientes) {
+      try {
+        await this.dataSource.query(`DELETE FROM "${tabla}";`);
+      } catch (err: any) {
+        this.logger.warn(`Aviso al limpiar tabla ${tabla}: ${err.message}`);
+      }
+    }
+
+    // 2. Desvincular referencias a becarios en refrigerios para preservar el registro del supervisor
+    try {
+      await this.dataSource.query(`
+        UPDATE "refrigerios" 
+        SET "becario_encargado_1_id" = NULL,
+            "becario_encargado_2_id" = NULL,
+            "becario_id" = NULL,
+            "becario_receptor_devolucion_id" = NULL;
+      `);
+    } catch (err: any) {
+      this.logger.warn(`Aviso al desvincular becarios en refrigerios: ${err.message}`);
+    }
+
+    // 3. Eliminar registros de la tabla 'becarios'
+    try {
+      await this.dataSource.query(`DELETE FROM "becarios";`);
+    } catch (err: any) {
+      this.logger.warn(`Aviso al vaciar la tabla becarios: ${err.message}`);
+    }
+
+    // 4. Eliminar evaluadores de tipo becario (autoevaluación)
+    try {
+      await this.dataSource.query(`
+        DELETE FROM "evaluadores" 
+        WHERE LOWER(tipo::text) = 'becario' 
+           OR correo IN (SELECT correo FROM "usuarios" WHERE LOWER(rol::text) = 'becario');
+      `);
+    } catch (err: any) {
+      this.logger.warn(`Aviso al limpiar evaluadores de tipo becario: ${err.message}`);
+    }
+
+    // 5. Eliminar notificaciones y correos adicionales asociados a usuarios tipo becario
+    if (ids_usuarios_becarios.length > 0) {
+      try {
+        await this.dataSource.query(
+          `DELETE FROM "notificaciones" WHERE "usuario_id" = ANY($1::int[]);`,
+          [ids_usuarios_becarios],
+        );
+      } catch {
+        try {
+          await this.dataSource.query(
+            `DELETE FROM "notificaciones" WHERE "usuario_id" IN (SELECT id FROM "usuarios" WHERE LOWER(rol::text) = 'becario');`,
+          );
+        } catch (err: any) {
+          this.logger.warn(`Aviso al limpiar notificaciones de becarios: ${err.message}`);
+        }
+      }
+
+      try {
+        await this.dataSource.query(
+          `DELETE FROM "correos_usuarios" WHERE "usuario_id" = ANY($1::int[]);`,
+          [ids_usuarios_becarios],
+        );
+      } catch {
+        try {
+          await this.dataSource.query(
+            `DELETE FROM "correos_usuarios" WHERE "usuario_id" IN (SELECT id FROM "usuarios" WHERE LOWER(rol::text) = 'becario');`,
+          );
+        } catch (err: any) {
+          this.logger.warn(`Aviso al limpiar correos adicionales de becarios: ${err.message}`);
+        }
+      }
+    }
+
+    // 6. Eliminar cuentas de usuarios con rol 'becario'
+    try {
+      await this.dataSource.query(
+        `DELETE FROM "usuarios" WHERE LOWER(rol::text) = 'becario' AND LOWER(rol::text) NOT IN ('administrador', 'supervisor');`,
+      );
+    } catch (err: any) {
+      this.logger.warn(`Aviso al eliminar usuarios con rol becario: ${err.message}`);
+    }
+
+    // 7. Reiniciar secuencia de identificadores de becarios
+    try {
+      await this.dataSource.query(`ALTER SEQUENCE IF EXISTS becarios_id_seq RESTART WITH 1;`);
+    } catch (err: any) {
+      this.logger.warn(`Aviso al reiniciar secuencia de becarios: ${err.message}`);
+    }
+
+    this.logger.log(
+      `Limpieza completada con éxito. Se eliminaron ${ids_becarios.length} perfiles de becarios y ${ids_usuarios_becarios.length} usuarios con rol becario. Administradores, supervisores y catálogos permanecen intactos.`,
+    );
+  }
+
+  /**
    * Siembra de catálogos estructurales e institucionales del sistema:
    * Módulos de evaluación, periodos semestrales, lugares de práctica, iglesias, tarifas y paradas.
    */

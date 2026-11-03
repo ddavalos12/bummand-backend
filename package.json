@@ -11,6 +11,8 @@
     "sembrar": "ts-node -r tsconfig-paths/register src/datos/sembrar.ts",
     "sembrar:limpiar-todo": "ts-node -r tsconfig-paths/register src/datos/sembrar.ts --limpiar-todo",
     "sembrar:limpiar-datos": "ts-node -r tsconfig-paths/register src/datos/sembrar.ts --limpiar-datos",
+    "sembrar:limpiar-becarios": "ts-node -r tsconfig-paths/register src/datos/sembrar.ts --limpiar-becarios",
+    "limpiar:becarios": "ts-node -r tsconfig-paths/register src/datos/sembrar.ts --limpiar-becarios",
     "sembrar:catalogos": "ts-node -r tsconfig-paths/register src/datos/sembrar.ts --catalogos",
     "sembrar:cuestionarios": "ts-node -r tsconfig-paths/register src/datos/sembrar.ts --cuestionarios",
     "dev": "nest start --watch",

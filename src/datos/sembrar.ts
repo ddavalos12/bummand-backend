@@ -17,6 +17,10 @@ async function bootstrap() {
     console.log('>>> Ejecutando Limpieza de Datos Operativos (Tipo 1: preserva usuarios y catálogos)...');
     await semilla.limpiarDatosOperativos();
     console.log('>>> Limpieza de declaraciones y datos operativos completada con éxito.');
+  } else if (args.includes('--limpiar-becarios')) {
+    console.log('>>> Ejecutando Limpieza de Usuarios Tipo Becario...');
+    await semilla.limpiarBecarios();
+    console.log('>>> Limpieza de usuarios tipo becario completada con éxito.');
   } else if (args.includes('--catalogos')) {
     console.log('>>> Sembrando únicamente catálogos institucionales base...');
     await semilla.sembrarCatalogos();
