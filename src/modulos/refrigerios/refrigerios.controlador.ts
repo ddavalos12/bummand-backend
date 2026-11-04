@@ -46,7 +46,7 @@ export class RefrigeriosControlador {
 
   @Post('asignar-dupla')
   @Post('sortear-dupla')
-  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Roles(Rol.ADMINISTRADOR)
   @ApiOperation({
     summary: 'Asignar o programar dupla de 2 becarios encargados para el refrigerio del viernes',
     description:
@@ -73,7 +73,7 @@ export class RefrigeriosControlador {
   }
 
   @Post()
-  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Roles(Rol.ADMINISTRADOR)
   @ApiOperation({
     summary: 'Registrar nueva rendición o suministro de refrigerio',
     description: 'Registra los gastos y distribución de raciones para eventos o sedes operativas.',
@@ -130,7 +130,7 @@ export class RefrigeriosControlador {
   }
 
   @Patch(':id/revisar-supervisor')
-  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Roles(Rol.ADMINISTRADOR)
   @ApiOperation({
     summary: 'Marcar rendición de refrigerio como revisada por Supervisor',
     description: 'Verifica los insumos y avanza el estado a revisado_supervisor para aprobación de Administración.',
@@ -175,7 +175,7 @@ export class RefrigeriosControlador {
   }
 
   @Put(':id')
-  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Roles(Rol.ADMINISTRADOR)
   @ApiOperation({
     summary: 'Actualizar rendición de refrigerio',
     description: 'Modifica datos de raciones, costos o registros de conformidad en sistema de un refrigerio.',

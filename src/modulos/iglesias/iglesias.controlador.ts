@@ -28,7 +28,7 @@ export class IglesiasControlador {
   }
 
   @Get()
-  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
   @ApiOperation({
     summary: 'Listar congregaciones e iglesias',
     description: 'Retorna el catálogo completo de iglesias registradas en el programa BUMAND.',
@@ -39,7 +39,7 @@ export class IglesiasControlador {
   }
 
   @Get(':id')
-  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
   @ApiOperation({
     summary: 'Obtener iglesia por ID',
     description: 'Consulta los datos de una iglesia específica.',

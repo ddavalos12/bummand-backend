@@ -12,6 +12,8 @@ import { Becario } from '../becarios/entidades/becario.entidad';
 import { Usuario } from '../usuarios/entidades/usuario.entidad';
 import { NotificacionesServicio } from '../notificaciones/notificaciones.servicio';
 
+export const COSTO_RACION_POR_PERSONA_BS = 5.0;
+
 export interface PlanillaReposicionRefrigerio {
   codigo_formulario: string;
   refrigerio_id: number;
@@ -111,7 +113,7 @@ export class RefrigeriosServicio {
 
     const presupuesto_ref = dto.presupuesto_referencial_bs !== undefined
       ? Number(dto.presupuesto_referencial_bs)
-      : Number((raciones * 6.0).toFixed(2));
+      : Number((raciones * COSTO_RACION_POR_PERSONA_BS).toFixed(2));
 
     const porcentaje_dev = dto.porcentaje_devolucion !== undefined
       ? Number(dto.porcentaje_devolucion)
@@ -356,7 +358,7 @@ export class RefrigeriosServicio {
     const raciones = Number(dto.cantidad_raciones || 23);
     const presupuesto_referencial = dto.presupuesto_referencial_bs !== undefined
       ? Number(dto.presupuesto_referencial_bs)
-      : Number((raciones * 6.0).toFixed(2));
+      : Number((raciones * COSTO_RACION_POR_PERSONA_BS).toFixed(2));
 
     const nuevo_refrigerio = this.refrigerio_repo.create({
       fecha: new Date(dto.fecha),
@@ -364,7 +366,7 @@ export class RefrigeriosServicio {
       lugar_practica_id: dto.lugar_practica_id || null,
       descripcion: dto.descripcion || `Refrigerio Escuela de Líderes (${dto.fecha})`,
       cantidad_raciones: raciones,
-      costo_unitario_bs: 6.0,
+      costo_unitario_bs: COSTO_RACION_POR_PERSONA_BS,
       costo_total_bs: 0.0,
       presupuesto_referencial_bs: presupuesto_referencial,
       porcentaje_devolucion: 100.0,
@@ -607,7 +609,7 @@ export class RefrigeriosServicio {
       cantidad_raciones: Number(refrigerio.cantidad_raciones),
       costo_unitario_bs: Number(refrigerio.costo_unitario_bs),
       costo_total_bs: Number(refrigerio.costo_total_bs),
-      presupuesto_referencial_bs: Number(refrigerio.presupuesto_referencial_bs || 138.0),
+      presupuesto_referencial_bs: Number(refrigerio.presupuesto_referencial_bs || 115.0),
       porcentaje_devolucion: Number(refrigerio.porcentaje_devolucion || 100.0),
       monto_devolucion_bs: Number(refrigerio.monto_devolucion_bs || refrigerio.costo_total_bs),
       modalidad_preparacion: refrigerio.modalidad_preparacion || 'cocina_diaconia',

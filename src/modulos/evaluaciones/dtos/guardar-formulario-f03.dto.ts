@@ -10,6 +10,14 @@ export class GuardarFormularioF03Dto {
   @IsNumber()
   evaluacion_id?: number;
 
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'ID del becario evaluado (permite auto-crear o vincular la evaluación F-03)',
+  })
+  @IsOptional()
+  @IsNumber()
+  becario_id?: number;
+
   @ApiProperty({
     example: 'Pr. Juan Carlos Quispe',
     description: 'Nombre completo del pastor que evalúa',

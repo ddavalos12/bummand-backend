@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class RevisarSupervisorDto {
   @ApiPropertyOptional({
@@ -9,4 +9,24 @@ export class RevisarSupervisorDto {
   @IsOptional()
   @IsString()
   observacion?: string;
+
+  @ApiPropertyOptional({ description: 'ID del supervisor o revisor (opcional)' })
+  @IsOptional()
+  @IsNumber()
+  supervisor_id?: number;
+
+  @ApiPropertyOptional({ description: 'Nombre del supervisor o revisor (opcional)' })
+  @IsOptional()
+  @IsString()
+  supervisor_nombre?: string;
+
+  @ApiPropertyOptional({ description: 'Observación del supervisor (opcional)' })
+  @IsOptional()
+  @IsString()
+  observacion_supervisor?: string;
+
+  @ApiPropertyOptional({ description: 'Motivo de rechazo (opcional)' })
+  @IsOptional()
+  @IsString()
+  motivo_rechazo?: string;
 }

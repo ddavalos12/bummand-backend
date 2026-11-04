@@ -18,9 +18,17 @@ async function bootstrap() {
     await semilla.limpiarDatosOperativos();
     console.log('>>> Limpieza de declaraciones y datos operativos completada con éxito.');
   } else if (args.includes('--limpiar-becarios')) {
-    console.log('>>> Ejecutando Limpieza de Usuarios Tipo Becario...');
+    console.log('>>> Ejecutando Limpieza de Usuarios Tipo Becario (Enfoque A)...');
     await semilla.limpiarBecarios();
     console.log('>>> Limpieza de usuarios tipo becario completada con éxito.');
+  } else if (args.includes('--usuarios')) {
+    console.log('>>> Sembrando únicamente usuarios institucionales (admins y supervisores)...');
+    await semilla.sembrarUsuarios();
+    console.log('>>> Usuarios sembrados con éxito.');
+  } else if (args.includes('--becarios')) {
+    console.log('>>> Sembrando nómina oficial de 23 becarios (usuario_id = null)...');
+    await semilla.sembrarBecarios();
+    console.log('>>> Nómina de becarios sembrada con éxito.');
   } else if (args.includes('--catalogos')) {
     console.log('>>> Sembrando únicamente catálogos institucionales base...');
     await semilla.sembrarCatalogos();

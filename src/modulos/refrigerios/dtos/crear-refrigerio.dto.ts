@@ -45,7 +45,7 @@ export class CrearRefrigerioDto {
   cantidad_raciones: number;
 
   @ApiPropertyOptional({
-    example: 6.0,
+    example: 5.0,
     description: 'Costo unitario en Bolivianos (Bs) por cada ración (opcional si se envía costo total)',
   })
   @IsOptional()
@@ -54,7 +54,7 @@ export class CrearRefrigerioDto {
   costo_unitario_bs?: number;
 
   @ApiPropertyOptional({
-    example: 138.0,
+    example: 115.0,
     description: 'Costo total calculado en Bs (opcional si se envía costo unitario)',
   })
   @IsOptional()

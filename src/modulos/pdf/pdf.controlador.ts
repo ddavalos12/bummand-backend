@@ -396,4 +396,88 @@ export class PdfControlador {
 
     respuesta.end(resultado.bufer);
   }
+
+  @Get('pasajes-general')
+  @ApiOperation({
+    summary: 'Generar y descargar informe consolidado general de pasajes en PDF (TAREA-07, TAREA-01)',
+    description: 'Genera el PDF oficial de auditoría de recorridos y solicitud de pasajes con detalle de tramos, calles declaradas (origen -> calles -> destino) y liquidación del 80%.',
+  })
+  @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({ status: 200, description: 'Archivo binario del consolidado general de pasajes en PDF.' })
+  async generarPasajesGeneral(
+    @Query('fecha_inicio') fecha_inicio: string | undefined,
+    @Query('fecha_fin') fecha_fin: string | undefined,
+    @Res() respuesta: Response,
+  ) {
+    const resultado = await this.pdf_servicio.generarPasajesGeneralPdf({
+      fecha_inicio,
+      fecha_fin,
+    });
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${resultado.nombre_archivo}`,
+      'Content-Length': resultado.bufer.length,
+    });
+
+    respuesta.end(resultado.bufer);
+  }
+
+  @Get('justificaciones-general')
+  @ApiOperation({
+    summary: 'Generar y descargar informe consolidado general de justificaciones y permisos en PDF (TAREA-07, TAREA-01)',
+    description: 'Genera el PDF oficial de permisos, justificaciones de inasistencia/retraso y resoluciones de convalidación.',
+  })
+  @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({ status: 200, description: 'Archivo binario del consolidado general de justificaciones en PDF.' })
+  async generarJustificacionesGeneral(
+    @Query('fecha_inicio') fecha_inicio: string | undefined,
+    @Query('fecha_fin') fecha_fin: string | undefined,
+    @Res() respuesta: Response,
+  ) {
+    const resultado = await this.pdf_servicio.generarJustificacionesGeneralPdf({
+      fecha_inicio,
+      fecha_fin,
+    });
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${resultado.nombre_archivo}`,
+      'Content-Length': resultado.bufer.length,
+    });
+
+    respuesta.end(resultado.bufer);
+  }
+
+  @Get('asistencia-general')
+  @ApiOperation({
+    summary: 'Generar y descargar informe consolidado general de asistencia en PDF (TAREA-07, TAREA-01)',
+    description: 'Genera el PDF oficial de auditoría con columnas # | Becario | Fecha | Hora Prog. | Hora GPS | Horas | Retraso | Estado.',
+  })
+  @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({ status: 200, description: 'Archivo binario del consolidado general de asistencia en PDF.' })
+  async generarAsistenciaGeneral(
+    @Query('fecha_inicio') fecha_inicio: string | undefined,
+    @Query('fecha_fin') fecha_fin: string | undefined,
+    @Res() respuesta: Response,
+  ) {
+    const resultado = await this.pdf_servicio.generarAsistenciaGeneralPdf({
+      fecha_inicio,
+      fecha_fin,
+    });
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${resultado.nombre_archivo}`,
+      'Content-Length': resultado.bufer.length,
+    });
+
+    respuesta.end(resultado.bufer);
+  }
 }

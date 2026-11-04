@@ -11,6 +11,7 @@ import { Becario } from '../becarios/entidades/becario.entidad';
 import { SolicitudPasajes } from '../pasajes/entidades/solicitud-pasaje.entidad';
 import { Recorrido } from '../pasajes/entidades/recorrido.entidad';
 import { Refrigerio } from '../refrigerios/entidades/refrigerio.entidad';
+import { Justificacion } from '../justificaciones/entidades/justificacion.entidad';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { Refrigerio } from '../refrigerios/entidades/refrigerio.entidad';
       SolicitudPasajes,
       Recorrido,
       Refrigerio,
+      Justificacion,
     ]),
     EvaluacionesModulo,
   ],

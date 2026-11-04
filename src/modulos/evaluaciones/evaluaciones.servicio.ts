@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Evaluacion, EstadoEvaluacion } from './entidades/evaluacion.entidad';
 import { ModuloEvaluacion } from './entidades/modulo-evaluacion.entidad';
 import { PeriodoEvaluacion, EstadoPeriodo } from './entidades/periodo-evaluacion.entidad';
@@ -347,18 +347,63 @@ export class EvaluacionesServicio {
   }
 
   async registrarFormularioF03(
-    evaluacion_id: number,
+    id: number,
     dto: GuardarFormularioF03Dto,
   ): Promise<EvaluacionPastor> {
-    const evaluacion = await this.evaluacion_repo.findOne({ where: { id: evaluacion_id } });
+    let evaluacion = await this.evaluacion_repo.findOne({ where: { id } });
+
+    // Si :id no es el ID de una evaluación existente, o si se envió becario_id en el body
     if (!evaluacion) {
-      throw new NotFoundException(`Evaluación con ID ${evaluacion_id} no encontrada`);
+      const becario_referencia = dto.becario_id || id;
+      let becario: Becario | null = null;
+      if (this.becario_repo) {
+        becario = await this.becario_repo.findOne({
+          where: [{ id: becario_referencia }, { usuario_id: becario_referencia }],
+        });
+      }
+
+      if (!becario) {
+        throw new NotFoundException(`No se encontró evaluación ni perfil de becario con el identificador ${id}`);
+      }
+
+      // Obtener el periodo activo
+      let periodo_activo_id = 2;
+      if (this.periodo_repo) {
+        const p_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+        if (p_activo) periodo_activo_id = p_activo.id;
+      }
+
+      // Buscar si ya existe una evaluación de Módulo 1 (Iglesia F-03) para este becario en el periodo activo
+      evaluacion = await this.evaluacion_repo.findOne({
+        where: { becario_id: becario.id, modulo_id: 1, periodo_id: periodo_activo_id },
+      });
+
+      // Si aún no tiene fila en evaluaciones para el Módulo 1 en el periodo activo, crearla automáticamente
+      if (!evaluacion) {
+        let evaluador_pastor = await this.evaluador_repo.findOne({
+          where: { tipo: TipoEvaluador.PASTOR },
+        });
+        if (!evaluador_pastor) {
+          evaluador_pastor = await this.evaluador_repo.findOne({ where: {} });
+        }
+
+        evaluacion = this.evaluacion_repo.create({
+          becario_id: becario.id,
+          modulo_id: 1,
+          periodo_id: periodo_activo_id,
+          evaluador_id: evaluador_pastor ? evaluador_pastor.id : 1,
+          estado: EstadoEvaluacion.COMPLETADO,
+          fecha_evaluacion: new Date(),
+        });
+        evaluacion = await this.evaluacion_repo.save(evaluacion);
+      }
     }
 
-    let detalle = await this.evaluacion_pastor_repo.findOne({ where: { evaluacion_id } });
+    // Guardar o actualizar las respuestas y datos del pastor en evaluaciones_pastor
+    let detalle = await this.evaluacion_pastor_repo.findOne({ where: { evaluacion_id: evaluacion.id } });
     if (!detalle) {
       detalle = this.evaluacion_pastor_repo.create({
-        evaluacion_id,
+        evaluacion_id: evaluacion.id,
         pastor_nombre: dto.pastor_nombre,
         pastor_correo: dto.pastor_correo || null,
         pastor_celular: dto.pastor_celular || null,
@@ -377,10 +422,18 @@ export class EvaluacionesServicio {
 
     const pastor_guardado = await this.evaluacion_pastor_repo.save(detalle);
 
+    // Actualizar el puntaje sobre 20 puntos
     if (dto.puntaje !== undefined) {
-      evaluacion.puntaje = dto.puntaje;
+      const puntaje_num = Number(dto.puntaje);
+      const puntaje_20 = puntaje_num > 20
+        ? Number(((puntaje_num / 100) * 20).toFixed(2))
+        : Number(puntaje_num.toFixed(2));
+      evaluacion.puntaje = puntaje_20;
+      evaluacion.estado = EstadoEvaluacion.COMPLETADO;
+    } else {
       evaluacion.estado = EstadoEvaluacion.COMPLETADO;
     }
+
     if (dto.observaciones !== undefined) {
       evaluacion.observaciones = dto.observaciones;
     }
@@ -388,6 +441,72 @@ export class EvaluacionesServicio {
     await this.evaluacion_repo.save(evaluacion);
 
     return pastor_guardado;
+  }
+
+  async obtenerNominaF03(): Promise<Array<{
+    becario_id: number;
+    nombre: string;
+    ci: string;
+    evaluacion_id: number | null;
+    puntaje: number | null;
+    estado: string;
+    iglesia_nombre: string | null;
+    pastor_nombre: string | null;
+    pastor_celular: string | null;
+    campos_formulario: Record<string, unknown> | null;
+    fecha_evaluacion: string | null;
+  }>> {
+    const becarios = this.becario_repo
+      ? await this.becario_repo.find({
+          relations: { usuario: true, iglesia: true },
+          order: { id: 'ASC' },
+        })
+      : [];
+
+    let periodo_id = 2;
+    if (this.periodo_repo) {
+      const p_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+      if (p_activo) periodo_id = p_activo.id;
+    }
+
+    const evs_modulo1 = await this.evaluacion_repo.find({
+      where: { modulo_id: 1, periodo_id },
+    });
+
+    const mapa_evs = new Map<number, Evaluacion>();
+    for (const ev of evs_modulo1) {
+      mapa_evs.set(ev.becario_id, ev);
+    }
+
+    const ids_evs = evs_modulo1.map((e) => e.id);
+    const mapa_pastor = new Map<number, EvaluacionPastor>();
+    if (ids_evs.length > 0) {
+      const pastores = await this.evaluacion_pastor_repo.find({
+        where: { evaluacion_id: In(ids_evs) },
+      });
+      for (const p of pastores) {
+        mapa_pastor.set(p.evaluacion_id, p);
+      }
+    }
+
+    return becarios.map((b) => {
+      const ev = mapa_evs.get(b.id);
+      const ev_pastor = ev ? mapa_pastor.get(ev.id) : null;
+
+      return {
+        becario_id: b.id,
+        nombre: b.usuario?.nombre || b.nombre || `Becario #${b.id}`,
+        ci: b.ci || '—',
+        evaluacion_id: ev?.id || null,
+        puntaje: ev?.puntaje !== null && ev?.puntaje !== undefined ? Number(ev.puntaje) : null,
+        estado: ev?.estado || 'pendiente',
+        iglesia_nombre: ev_pastor?.iglesia_nombre || b.iglesia?.nombre || null,
+        pastor_nombre: ev_pastor?.pastor_nombre || b.iglesia?.pastor_nombre || null,
+        pastor_celular: ev_pastor?.pastor_celular || b.iglesia?.pastor_telefono || null,
+        campos_formulario: ev_pastor?.campos_formulario || null,
+        fecha_evaluacion: ev?.fecha_evaluacion ? new Date(ev.fecha_evaluacion).toISOString() : null,
+      };
+    });
   }
 
   async obtenerFormularioF03(evaluacion_id: number): Promise<EvaluacionPastor> {
@@ -1421,6 +1540,8 @@ export class EvaluacionesServicio {
     usuario_actual?: Usuario,
   ): Promise<{
     enviado: boolean;
+    codigo?: string;
+    expira_en_minutos?: number;
     becario_id: number;
     becario_nombre: string;
     supervisor_id?: number;
@@ -1512,6 +1633,8 @@ export class EvaluacionesServicio {
 
     return {
       enviado: true,
+      codigo,
+      expira_en_minutos: 10,
       becario_id: becario_id_clave,
       becario_nombre,
       supervisor_id,
@@ -1524,6 +1647,7 @@ export class EvaluacionesServicio {
 
   async verificarCodigoTutor(dto: VerificarCodigoTutorDto): Promise<{
     verificado: boolean;
+    valido: boolean;
     metodo: string;
     supervisor_nombre: string;
     supervisor_correo: string;
@@ -1538,10 +1662,11 @@ export class EvaluacionesServicio {
           this.codigos_tutor.delete(clave);
           return {
             verificado: true,
+            valido: true,
             metodo: 'codigo_notificacion',
             supervisor_nombre: valor.supervisor_nombre,
             supervisor_correo: valor.supervisor_correo,
-            mensaje: `Identidad confirmada: ${valor.supervisor_nombre}`,
+            mensaje: 'Código verificado correctamente',
           };
         }
       }
@@ -1564,10 +1689,11 @@ export class EvaluacionesServicio {
         ) {
           return {
             verificado: true,
+            valido: true,
             metodo: 'credenciales',
             supervisor_nombre: usuario.nombre,
             supervisor_correo: usuario.correo,
-            mensaje: `Identidad confirmada: ${usuario.nombre}`,
+            mensaje: 'Código verificado correctamente',
           };
         }
       }

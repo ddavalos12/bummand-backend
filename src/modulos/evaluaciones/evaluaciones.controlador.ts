@@ -459,6 +459,32 @@ export class EvaluacionesControlador {
     return this.evaluaciones_servicio.resolverCasoPastoral(id, conclusion);
   }
 
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Get('f03/nomina')
+  @ApiOperation({
+    summary: 'Nómina de becarios y estado de su evaluación F-03',
+    description: 'Devuelve la lista de todos los becarios activos junto con los datos de su evaluación F-03.',
+  })
+  @ApiResponse({ status: 200, description: 'Nómina F-03 de becarios.' })
+  obtenerNominaF03() {
+    return this.evaluaciones_servicio.obtenerNominaF03();
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('f03/becario/:becario_id')
+  @ApiOperation({
+    summary: 'Registrar o actualizar el Formulario F-03 por ID de becario',
+    description: 'Guarda las respuestas cualitativas, datos del pastor e iglesia local para un becario específico.',
+  })
+  @ApiParam({ name: 'becario_id', description: 'Identificador del becario', type: Number, example: 1 })
+  @ApiResponse({ status: 201, description: 'Formulario F-03 guardado con éxito.', type: EvaluacionPastor })
+  registrarFormularioF03PorBecario(
+    @Param('becario_id', ParseIntPipe) becario_id: number,
+    @Body() dto: GuardarFormularioF03Dto,
+  ): Promise<EvaluacionPastor> {
+    return this.evaluaciones_servicio.registrarFormularioF03(becario_id, dto);
+  }
+
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get(':id')
   @ApiOperation({

@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS lugares_practica (
 -- Tabla 04: becarios
 CREATE TABLE IF NOT EXISTS becarios (
     id                  SERIAL PRIMARY KEY,
-    usuario_id          INTEGER         NOT NULL UNIQUE REFERENCES usuarios(id) ON DELETE CASCADE,
+    usuario_id          INTEGER         UNIQUE REFERENCES usuarios(id) ON DELETE SET NULL,
     ci                  VARCHAR(20)     UNIQUE,
     carrera             VARCHAR(100)    NOT NULL,
     universidad         VARCHAR(150)    NOT NULL,
@@ -130,6 +130,8 @@ CREATE TABLE IF NOT EXISTS becarios (
     fecha_ingreso       DATE            NOT NULL,
     supervisor_id       INTEGER         REFERENCES usuarios(id) ON DELETE SET NULL,
     unidad              VARCHAR(100),
+    modalidad_pasajes   VARCHAR(30)     DEFAULT 'ida_y_vuelta',
+    configuracion_pasajes_actividades JSONB,
     modalidad_carrera   VARCHAR(50),
     tipo_beca           VARCHAR(50),
     comentario_academico TEXT,

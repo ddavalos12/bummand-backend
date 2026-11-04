@@ -73,6 +73,7 @@ export class SemillaServicio implements OnModuleInit {
 
   async onModuleInit() {
     try {
+      await this.asegurarEsquemaBase();
       const cantidad_usuarios = await this.usuario_repo.count();
       if (cantidad_usuarios === 0) {
         this.logger.log('Base de datos limpia detectada al inicio. Asegurando Administrador Primario y catálogos base...');
@@ -84,6 +85,24 @@ export class SemillaServicio implements OnModuleInit {
       }
     } catch (error: any) {
       this.logger.warn(`No se pudo verificar la semilla automática en inicio: ${error.message}`);
+    }
+  }
+
+  /**
+   * Garantiza de forma idempotente que las columnas críticas de migración existan
+   * y que usuario_id en becarios sea anulable (para becarios aún no registrados).
+   */
+  async asegurarEsquemaBase(): Promise<void> {
+    try {
+      await this.dataSource.query(`
+        ALTER TABLE "becarios" ADD COLUMN IF NOT EXISTS "modalidad_pasajes" VARCHAR(30) DEFAULT 'ida_y_vuelta';
+        ALTER TABLE "becarios" ADD COLUMN IF NOT EXISTS "configuracion_pasajes_actividades" JSONB;
+      `);
+      try {
+        await this.dataSource.query(`ALTER TABLE "becarios" ALTER COLUMN "usuario_id" DROP NOT NULL;`);
+      } catch (_) {}
+    } catch (error: any) {
+      this.logger.warn(`Aviso al asegurar esquema base de la tabla becarios: ${error.message}`);
     }
   }
 
@@ -227,143 +246,57 @@ export class SemillaServicio implements OnModuleInit {
    * evaluaciones, horarios, asignaciones, multas, devocionales, justificaciones, etc.),
    * preservando íntegros a los administradores, supervisores y catálogos institucionales.
    */
+  /**
+   * Limpieza de Usuarios Tipo Becario (TAREA-11 - Enfoque A):
+   * SÓLO desvincula las cuentas de usuario de la tabla becarios (usuario_id = NULL),
+   * elimina correos_usuario y notificaciones de usuarios con rol = 'becario',
+   * y ejecuta DELETE FROM "usuarios" WHERE rol = 'becario';
+   * Conservando INTACTOS tanto la nómina de 'becarios' como sus datos institucionales.
+   */
   async limpiarBecarios(): Promise<void> {
-    this.logger.log('Iniciando limpieza de usuarios tipo becario y registros vinculados...');
+    this.logger.log('Iniciando limpieza de cuentas de usuario tipo becario (Enfoque A)...');
 
-    let ids_usuarios_becarios: number[] = [];
-    try {
-      const res_usuarios = await this.dataSource.query(
-        `SELECT id, correo FROM "usuarios" WHERE LOWER(rol::text) = 'becario';`,
-      );
-      ids_usuarios_becarios = res_usuarios.map((u: any) => u.id);
-    } catch (err: any) {
-      this.logger.warn(`No se pudo consultar usuarios con rol becario: ${err.message}`);
-    }
-
-    let ids_becarios: number[] = [];
-    try {
-      const res_becarios = await this.dataSource.query(`SELECT id FROM "becarios";`);
-      ids_becarios = res_becarios.map((b: any) => b.id);
-    } catch (err: any) {
-      this.logger.warn(`No se pudo consultar la tabla becarios: ${err.message}`);
-    }
-
-    this.logger.log(
-      `Cuentas de usuario tipo becario encontradas: ${ids_usuarios_becarios.length}. Perfiles de becarios encontrados: ${ids_becarios.length}.`,
-    );
-
-    // 1. Limpieza de tablas operativas dependientes de becarios
-    // Se respeta estrictamente el orden de dependencias referenciales
-    const tablas_dependientes = [
-      'recorridos',
-      'solicitudes_pasajes',
-      'multas',
-      'justificaciones',
-      'evaluaciones_pastor',
-      'evaluaciones',
-      'casos_seguimiento_pastoral',
-      'entregas_tareas_lideres',
-      'registros_asistencia',
-      'asistencias_eventos',
-      'aprobaciones_practicas',
-      'reportes_generados',
-      'horarios_apoyo',
-      'asignaciones_practica',
-      'documentos_semestrales_becarios',
-      'devocionales',
-      'citas_seguimiento',
-    ];
-
-    for (const tabla of tablas_dependientes) {
-      try {
-        await this.dataSource.query(`DELETE FROM "${tabla}";`);
-      } catch (err: any) {
-        this.logger.warn(`Aviso al limpiar tabla ${tabla}: ${err.message}`);
-      }
-    }
-
-    // 2. Desvincular referencias a becarios en refrigerios para preservar el registro del supervisor
-    try {
-      await this.dataSource.query(`
-        UPDATE "refrigerios" 
-        SET "becario_encargado_1_id" = NULL,
-            "becario_encargado_2_id" = NULL,
-            "becario_id" = NULL,
-            "becario_receptor_devolucion_id" = NULL;
-      `);
-    } catch (err: any) {
-      this.logger.warn(`Aviso al desvincular becarios en refrigerios: ${err.message}`);
-    }
-
-    // 3. Eliminar registros de la tabla 'becarios'
-    try {
-      await this.dataSource.query(`DELETE FROM "becarios";`);
-    } catch (err: any) {
-      this.logger.warn(`Aviso al vaciar la tabla becarios: ${err.message}`);
-    }
-
-    // 4. Eliminar evaluadores de tipo becario (autoevaluación)
-    try {
-      await this.dataSource.query(`
-        DELETE FROM "evaluadores" 
-        WHERE LOWER(tipo::text) = 'becario' 
-           OR correo IN (SELECT correo FROM "usuarios" WHERE LOWER(rol::text) = 'becario');
-      `);
-    } catch (err: any) {
-      this.logger.warn(`Aviso al limpiar evaluadores de tipo becario: ${err.message}`);
-    }
-
-    // 5. Eliminar notificaciones y correos adicionales asociados a usuarios tipo becario
-    if (ids_usuarios_becarios.length > 0) {
-      try {
-        await this.dataSource.query(
-          `DELETE FROM "notificaciones" WHERE "usuario_id" = ANY($1::int[]);`,
-          [ids_usuarios_becarios],
-        );
-      } catch {
-        try {
-          await this.dataSource.query(
-            `DELETE FROM "notificaciones" WHERE "usuario_id" IN (SELECT id FROM "usuarios" WHERE LOWER(rol::text) = 'becario');`,
-          );
-        } catch (err: any) {
-          this.logger.warn(`Aviso al limpiar notificaciones de becarios: ${err.message}`);
-        }
-      }
-
-      try {
-        await this.dataSource.query(
-          `DELETE FROM "correos_usuarios" WHERE "usuario_id" = ANY($1::int[]);`,
-          [ids_usuarios_becarios],
-        );
-      } catch {
-        try {
-          await this.dataSource.query(
-            `DELETE FROM "correos_usuarios" WHERE "usuario_id" IN (SELECT id FROM "usuarios" WHERE LOWER(rol::text) = 'becario');`,
-          );
-        } catch (err: any) {
-          this.logger.warn(`Aviso al limpiar correos adicionales de becarios: ${err.message}`);
-        }
-      }
-    }
-
-    // 6. Eliminar cuentas de usuarios con rol 'becario'
+    // 1. Desvincular las cuentas de usuario de la tabla becarios
     try {
       await this.dataSource.query(
-        `DELETE FROM "usuarios" WHERE LOWER(rol::text) = 'becario' AND LOWER(rol::text) NOT IN ('administrador', 'supervisor');`,
+        `UPDATE "becarios" SET "usuario_id" = NULL WHERE "usuario_id" IS NOT NULL;`,
       );
+      this.logger.log('Nómina de becarios y datos institucionales preservados intactos. Cuentas de usuario desvinculadas (usuario_id = NULL).');
+    } catch (err: any) {
+      this.logger.warn(`Aviso al desvincular usuario_id en tabla becarios: ${err.message}`);
+    }
+
+    // 2. Eliminar correos adicionales y notificaciones de usuarios con rol = 'becario'
+    try {
+      await this.dataSource.query(
+        `DELETE FROM "correos_usuarios" WHERE "usuario_id" IN (SELECT id FROM "usuarios" WHERE LOWER(rol::text) = 'becario');`,
+      );
+    } catch (_) {}
+    try {
+      await this.dataSource.query(
+        `DELETE FROM "correos_usuario" WHERE "usuario_id" IN (SELECT id FROM "usuarios" WHERE LOWER(rol::text) = 'becario');`,
+      );
+    } catch (_) {}
+    try {
+      await this.dataSource.query(
+        `DELETE FROM "notificaciones" WHERE "usuario_id" IN (SELECT id FROM "usuarios" WHERE LOWER(rol::text) = 'becario');`,
+      );
+    } catch (err: any) {
+      this.logger.warn(`Aviso al limpiar notificaciones de becarios: ${err.message}`);
+    }
+
+    // 3. Eliminar únicamente las cuentas de usuario tipo becario
+    try {
+      const res = await this.dataSource.query(
+        `DELETE FROM "usuarios" WHERE LOWER(rol::text) = 'becario';`,
+      );
+      this.logger.log('Cuentas de usuario con rol becario eliminadas exitosamente.');
     } catch (err: any) {
       this.logger.warn(`Aviso al eliminar usuarios con rol becario: ${err.message}`);
     }
 
-    // 7. Reiniciar secuencia de identificadores de becarios
-    try {
-      await this.dataSource.query(`ALTER SEQUENCE IF EXISTS becarios_id_seq RESTART WITH 1;`);
-    } catch (err: any) {
-      this.logger.warn(`Aviso al reiniciar secuencia de becarios: ${err.message}`);
-    }
-
     this.logger.log(
-      `Limpieza completada con éxito. Se eliminaron ${ids_becarios.length} perfiles de becarios y ${ids_usuarios_becarios.length} usuarios con rol becario. Administradores, supervisores y catálogos permanecen intactos.`,
+      'Limpieza Enfoque A completada con éxito. Tabla becarios y datos institucionales preservados al 100%.',
     );
   }
 
@@ -818,21 +751,18 @@ export class SemillaServicio implements OnModuleInit {
   }
 
   /**
-   * Siembra Completa Institucional (sembrar):
-   * Siembra Administrador Primario, administradores institucionales, supervisores,
-   * catálogos, cuestionarios y los 23 becarios de la nómina oficial.
-   * GARANTIZA QUE NO SE SIEMBRE NINGÚN PASAJE NI RECORRIDO SIMULADO.
+   * Siembra exclusiva de Usuarios Institucionales (Administradores y Supervisores).
+   * REGLA ESTRICTA TAREA-11: NO debe crear registros en la tabla 'usuarios' con rol = 'becario'.
    */
-  async ejecutarSemilla(): Promise<void> {
-    this.logger.log('Iniciando siembra exhaustiva institucional de BUMAND...');
+  async sembrarUsuarios(): Promise<Map<string, Usuario>> {
+    this.logger.log('Sembrando usuarios institucionales (exclusivamente administradores y supervisores)...');
 
     // 1. Asegurar Administrador Primario desde .env
     const admin_primario = await this.asegurarAdministradorPrimario();
+    const mapa_usuarios = new Map<string, Usuario>();
+    mapa_usuarios.set(admin_primario.correo, admin_primario);
 
     // 2. Administradores Institucionales
-    const mapa_administradores = new Map<string, Usuario>();
-    mapa_administradores.set(admin_primario.correo, admin_primario);
-
     for (const admin of ADMINISTRADORES_SEMILLA) {
       let usuario_admin = await this.usuario_repo.findOne({ where: { correo: admin.correo } });
       if (!usuario_admin) {
@@ -852,15 +782,10 @@ export class SemillaServicio implements OnModuleInit {
         usuario_admin.correo_confirmado = true;
         usuario_admin = await this.usuario_repo.save(usuario_admin);
       }
-      mapa_administradores.set(admin.correo, usuario_admin);
+      mapa_usuarios.set(admin.correo, usuario_admin);
     }
 
-    // 3. Catálogos y Cuestionarios
-    await this.sembrarCatalogos();
-    await this.sembrarCuestionarios();
-
-    // 4. Supervisores Institucionales
-    const mapa_supervisores = new Map<string, Usuario>();
+    // 3. Supervisores Institucionales
     for (const sup of SUPERVISORES_SEMILLA) {
       let usuario_sup = await this.usuario_repo.findOne({ where: { correo: sup.correo } });
       if (!usuario_sup) {
@@ -880,7 +805,7 @@ export class SemillaServicio implements OnModuleInit {
         usuario_sup.correo_confirmado = true;
         usuario_sup = await this.usuario_repo.save(usuario_sup);
       }
-      mapa_supervisores.set(sup.correo, usuario_sup);
+      mapa_usuarios.set(sup.correo, usuario_sup);
 
       let evaluador_sup = await this.evaluador_repo.findOne({ where: { correo: sup.correo } });
       if (!evaluador_sup) {
@@ -894,31 +819,32 @@ export class SemillaServicio implements OnModuleInit {
       }
     }
 
-    // 5. Nómina Oficial de Becarios (23 Estudiantes)
-    const supervisor_por_defecto = mapa_supervisores.get('angel.ali@bumand.bo') || Array.from(mapa_supervisores.values())[0];
-    const lugar_central = await this.lugar_repo.findOne({ where: { nombre: 'Oficina Central Diaconía IFD - El Alto' } }) || await this.lugar_repo.findOne({ where: {} });
-    const iglesia_central = await this.iglesia_repo.findOne({ where: { nombre: 'Iglesia Central El Alto' } }) || await this.iglesia_repo.findOne({ where: {} });
+    this.logger.log('Usuarios administradores y supervisores sembrados exitosamente (sin usuarios becarios).');
+    return mapa_usuarios;
+  }
+
+  /**
+   * Siembra o actualización de los 23 becarios de BECARIOS_SEMILLA en la tabla 'becarios'.
+   * REGLA ESTRICTA TAREA-11: Deja usuario_id = null (o preserva el existente si ya se registró).
+   */
+  async sembrarBecarios(): Promise<void> {
+    await this.asegurarEsquemaBase();
+    this.logger.log('Sembrando nómina oficial de 23 becarios en la tabla becarios (con usuario_id = null)...');
+
+    const mapa_supervisores = new Map<string, Usuario>();
+    const supervisores = await this.usuario_repo.find({ where: { rol: Rol.SUPERVISOR } });
+    for (const s of supervisores) {
+      mapa_supervisores.set(s.correo, s);
+    }
+    const supervisor_por_defecto = mapa_supervisores.get('angel.ali@bumand.bo') || supervisores[0];
+    const lugar_central =
+      (await this.lugar_repo.findOne({ where: { nombre: 'Oficina Central Diaconía IFD - El Alto' } })) ||
+      (await this.lugar_repo.findOne({ where: {} }));
+    const iglesia_central =
+      (await this.iglesia_repo.findOne({ where: { nombre: 'Iglesia Central El Alto' } })) ||
+      (await this.iglesia_repo.findOne({ where: {} }));
 
     for (const b_semilla of BECARIOS_SEMILLA) {
-      let usuario_becario = await this.usuario_repo.findOne({ where: { correo: b_semilla.correo } });
-      if (!usuario_becario) {
-        usuario_becario = this.usuario_repo.create({
-          nombre: b_semilla.nombre,
-          correo: b_semilla.correo,
-          contrasena_hash: await hashearContrasena(b_semilla.clave || 'Bumand2026!'),
-          rol: Rol.BECARIO,
-          estado: EstadoUsuario.ACTIVO,
-          correo_confirmado: true,
-        });
-        usuario_becario = await this.usuario_repo.save(usuario_becario);
-      } else {
-        usuario_becario.nombre = b_semilla.nombre;
-        usuario_becario.rol = Rol.BECARIO;
-        usuario_becario.estado = EstadoUsuario.ACTIVO;
-        usuario_becario.correo_confirmado = true;
-        usuario_becario = await this.usuario_repo.save(usuario_becario);
-      }
-
       let supervisor_asignado = b_semilla.supervisor_correo
         ? mapa_supervisores.get(b_semilla.supervisor_correo)
         : null;
@@ -930,12 +856,13 @@ export class SemillaServicio implements OnModuleInit {
       }
       if (!iglesia_asignada) iglesia_asignada = iglesia_central;
 
+      // Buscar becario por CI
       let becario_existente = await this.becario_repo.findOne({
-        where: [{ usuario_id: usuario_becario.id }, { ci: b_semilla.ci }],
+        where: { ci: b_semilla.ci },
       });
 
-      const datos_perfil = {
-        usuario_id: usuario_becario.id,
+      const datos_perfil: Partial<Becario> = {
+        usuario_id: becario_existente?.usuario_id || null,
         nombre: b_semilla.nombre,
         ci: b_semilla.ci,
         lugar_expedicion: b_semilla.lugar_expedicion || null,
@@ -957,6 +884,7 @@ export class SemillaServicio implements OnModuleInit {
         iglesia_id: iglesia_asignada ? iglesia_asignada.id : null,
         supervisor_id: supervisor_asignado ? supervisor_asignado.id : null,
         horario_semanal: b_semilla.horario_semanal || null,
+        modalidad_pasajes: 'ida_y_vuelta',
         datos_confirmados: true,
         datos_validados: true,
         fecha_ultima_confirmacion: new Date('2026-01-15'),
@@ -969,17 +897,14 @@ export class SemillaServicio implements OnModuleInit {
       let becario_guardado: Becario;
       if (!becario_existente) {
         becario_guardado = await this.becario_repo.save(
-          this.becario_repo.create({
-            ...datos_perfil,
-            usuario: usuario_becario,
-          }),
+          this.becario_repo.create(datos_perfil),
         );
       } else {
         Object.assign(becario_existente, datos_perfil);
         becario_guardado = await this.becario_repo.save(becario_existente);
       }
 
-      // Formalización de Horarios de Apoyo
+      // Formalización de Horarios de Apoyo con becario_id
       if (this.horario_repo && b_semilla.horario_semanal) {
         const mapa_dias: Record<string, number> = {
           domingo: 0, dom: 0,
@@ -1017,7 +942,7 @@ export class SemillaServicio implements OnModuleInit {
         }
       }
 
-      // Asignación de práctica
+      // Asignación de práctica con becario_id
       if (this.asignacion_repo && lugar_central) {
         let asignacion_db = await this.asignacion_repo.findOne({
           where: { becario_id: becario_guardado.id, lugar_practica_id: lugar_central.id },
@@ -1048,8 +973,15 @@ export class SemillaServicio implements OnModuleInit {
       }
     }
 
-    // 6. Evento institucional semilla
+    this.logger.log(`Nómina de ${BECARIOS_SEMILLA.length} becarios registrada/actualizada exitosamente con usuario_id = null.`);
+  }
+
+  /**
+   * Siembra del evento institucional semilla
+   */
+  async sembrarEventoSemilla(): Promise<void> {
     if (this.evento_repo) {
+      const admin_primario = await this.asegurarAdministradorPrimario();
       const titulo_evento_semilla = 'Encuentro de Liderazgo y Acción Diaconal';
       let evento_semilla = await this.evento_repo.findOne({ where: { titulo: titulo_evento_semilla } });
       if (!evento_semilla) {
@@ -1070,8 +1002,34 @@ export class SemillaServicio implements OnModuleInit {
         await this.evento_repo.save(evento_semilla);
       }
     }
+  }
 
-    // 7. HIGIENE ESTRICTA: Garantizar que NO se siembren ni existan pasajes simulados
+  /**
+   * Siembra Completa Institucional (sembrarTodo / ejecutarSemilla):
+   * Siembra Administrador Primario, administradores institucionales, supervisores,
+   * catálogos, cuestionarios y los 23 becarios de la nómina oficial (sin crear usuarios becarios).
+   * GARANTIZA QUE NO SE SIEMBRE NINGÚN PASAJE NI RECORRIDO SIMULADO.
+   */
+  async sembrarTodo(): Promise<void> {
+    this.logger.log('Iniciando siembra exhaustiva institucional de BUMAND...');
+
+    // 1. Asegurar estructura de tablas
+    await this.asegurarEsquemaBase();
+
+    // 2. Administradores y supervisores
+    await this.sembrarUsuarios();
+
+    // 3. Catálogos y Cuestionarios
+    await this.sembrarCatalogos();
+    await this.sembrarCuestionarios();
+
+    // 4. Nómina Oficial de 23 Becarios (usuario_id = null)
+    await this.sembrarBecarios();
+
+    // 5. Evento institucional
+    await this.sembrarEventoSemilla();
+
+    // 6. HIGIENE ESTRICTA: Garantizar que NO se siembren ni existan pasajes simulados
     try {
       await this.dataSource.query('TRUNCATE TABLE "recorridos", "solicitudes_pasajes" CASCADE;');
     } catch (_) {
@@ -1085,7 +1043,14 @@ export class SemillaServicio implements OnModuleInit {
     this.logger.log('Higiene de pasajes confirmada: Cero pasajes declarados simulados en la base de datos.');
 
     this.logger.log(
-      `Siembra institucional completada exitosamente. Administrador Primario: ${admin_primario.correo}, ${BECARIOS_SEMILLA.length} becarios registrados.`,
+      `Siembra institucional completada exitosamente. Administradores, supervisores y los ${BECARIOS_SEMILLA.length} becarios registrados.`,
     );
+  }
+
+  /**
+   * Alias de compatibilidad para ejecutarSemilla()
+   */
+  async ejecutarSemilla(): Promise<void> {
+    return this.sembrarTodo();
   }
 }

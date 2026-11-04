@@ -95,19 +95,19 @@ export class JustificacionesControlador {
     };
   }
 
-  @Roles(Rol.BECARIO)
+  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
   @Post()
   @ApiOperation({
     summary: 'Enviar solicitud formal de justificación',
-    description: 'Permite a los becarios enviar justificaciones por inasistencias o demoras en prácticas, eventos o Escuela de Líderes.',
+    description: 'Permite a los becarios y administradores radicar justificaciones por inasistencias o demoras en prácticas, eventos o Escuela de Líderes.',
   })
-  @ApiResponse({ status: 201, description: 'Justificación radicada en estado pendiente.', type: Justificacion })
+  @ApiResponse({ status: 201, description: 'Justificación radicada en estado pendiente o aprobada directamente.', type: Justificacion })
   @ApiResponse({ status: 400, description: 'Datos incompletos o inválidos.' })
   crear(
     @Body() crearJustificacionDto: CrearJustificacionDto,
     @UsuarioActual() usuario: Usuario,
   ): Promise<Justificacion> {
-    return this.justificaciones_servicio.crear(crearJustificacionDto, usuario.id);
+    return this.justificaciones_servicio.crear(crearJustificacionDto, usuario.id, usuario.rol);
   }
 
   @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
@@ -177,10 +177,10 @@ export class JustificacionesControlador {
     return this.justificaciones_servicio.aprobarAdministracion(id, dto, usuario.id);
   }
 
-  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Roles(Rol.ADMINISTRADOR)
   @Patch(':id/resolver')
   @ApiOperation({
-    summary: 'Resolver justificación (Aprobación o Rechazo motivado)',
+    summary: 'Resolver justificación (Aprobación o Rechazo motivado por Administración)',
     description: 'Dictamina de forma motivada la aprobación o el rechazo institucional de la justificación.',
   })
   @ApiParam({ name: 'id', description: 'Identificador de la justificación', type: Number, example: 1 })

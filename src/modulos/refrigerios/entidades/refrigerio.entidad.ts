@@ -45,11 +45,11 @@ export class Refrigerio {
   @Column({ name: 'cantidad_raciones', type: 'int' })
   cantidad_raciones: number;
 
-  @ApiProperty({ example: 6.0, description: 'Costo unitario por ración en bolivianos' })
+  @ApiProperty({ example: 5.0, description: 'Costo unitario por ración en bolivianos' })
   @Column({ name: 'costo_unitario_bs', type: 'decimal', precision: 8, scale: 2 })
   costo_unitario_bs: number;
 
-  @ApiProperty({ example: 138.0, description: 'Costo total consolidado en bolivianos' })
+  @ApiProperty({ example: 115.0, description: 'Costo total consolidado en bolivianos' })
   @Column({ name: 'costo_total_bs', type: 'decimal', precision: 10, scale: 2 })
   costo_total_bs: number;
 
@@ -100,15 +100,15 @@ export class Refrigerio {
   @Column({ name: 'detalle_ingredientes', type: 'jsonb', nullable: true })
   detalle_ingredientes: DetalleIngredienteRefrigerio[] | null;
 
-  @ApiProperty({ example: 138.0, description: 'Presupuesto referencial en bolivianos (23 raciones x Bs 6)' })
-  @Column({ name: 'presupuesto_referencial_bs', type: 'decimal', precision: 10, scale: 2, default: 138.0 })
+  @ApiProperty({ example: 115.0, description: 'Presupuesto referencial en bolivianos (23 raciones x Bs 5)' })
+  @Column({ name: 'presupuesto_referencial_bs', type: 'decimal', precision: 10, scale: 2, default: 115.0 })
   presupuesto_referencial_bs: number;
 
   @ApiProperty({ example: 100.0, description: 'Porcentaje de devolución institucional (100% de reembolso íntegro)' })
   @Column({ name: 'porcentaje_devolucion', type: 'decimal', precision: 5, scale: 2, default: 100.0 })
   porcentaje_devolucion: number;
 
-  @ApiProperty({ example: 138.0, description: 'Monto total a devolver en bolivianos (100% del gasto rendido)' })
+  @ApiProperty({ example: 115.0, description: 'Monto total a devolver en bolivianos (100% del gasto rendido)' })
   @Column({ name: 'monto_devolucion_bs', type: 'decimal', precision: 10, scale: 2, default: 0.0 })
   monto_devolucion_bs: number;
 

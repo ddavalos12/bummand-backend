@@ -44,8 +44,8 @@ export class SortearDuplaDto {
   cantidad_raciones?: number;
 
   @ApiPropertyOptional({
-    example: 138.0,
-    description: 'Presupuesto referencial en bolivianos (por defecto 138.00 Bs = 23 * Bs 6)',
+    example: 115.0,
+    description: 'Presupuesto referencial en bolivianos (por defecto 115.00 Bs = 23 * Bs 5)',
   })
   @IsOptional()
   @IsNumber()

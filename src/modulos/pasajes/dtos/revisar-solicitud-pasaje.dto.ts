@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 import { EstadoSolicitud } from '../entidades/solicitud-pasaje.entidad';
 
 export class RevisarSupervisorPasajeDto {
@@ -20,6 +20,26 @@ export class RevisarSupervisorPasajeDto {
   @IsOptional()
   @IsString()
   observacion_supervisor?: string;
+
+  @ApiPropertyOptional({ description: 'ID del supervisor revisor (opcional)' })
+  @IsOptional()
+  @IsNumber()
+  supervisor_id?: number;
+
+  @ApiPropertyOptional({ description: 'Nombre del supervisor revisor (opcional)' })
+  @IsOptional()
+  @IsString()
+  supervisor_nombre?: string;
+
+  @ApiPropertyOptional({ description: 'Observación general alternativa (opcional)' })
+  @IsOptional()
+  @IsString()
+  observacion?: string;
+
+  @ApiPropertyOptional({ description: 'Motivo de rechazo (opcional)' })
+  @IsOptional()
+  @IsString()
+  motivo_rechazo?: string;
 }
 
 export class AprobarAdminPasajeDto {
@@ -40,4 +60,34 @@ export class AprobarAdminPasajeDto {
   @IsOptional()
   @IsString()
   observacion_admin?: string;
+
+  @ApiPropertyOptional({ description: 'ID del administrador que aprueba (opcional)' })
+  @IsOptional()
+  @IsNumber()
+  administrador_id?: number;
+
+  @ApiPropertyOptional({ description: 'Nombre del administrador que aprueba (opcional)' })
+  @IsOptional()
+  @IsString()
+  administrador_nombre?: string;
+
+  @ApiPropertyOptional({ description: 'ID del supervisor (opcional)' })
+  @IsOptional()
+  @IsNumber()
+  supervisor_id?: number;
+
+  @ApiPropertyOptional({ description: 'Nombre del supervisor (opcional)' })
+  @IsOptional()
+  @IsString()
+  supervisor_nombre?: string;
+
+  @ApiPropertyOptional({ description: 'Observación general alternativa (opcional)' })
+  @IsOptional()
+  @IsString()
+  observacion?: string;
+
+  @ApiPropertyOptional({ description: 'Motivo de rechazo (opcional)' })
+  @IsOptional()
+  @IsString()
+  motivo_rechazo?: string;
 }

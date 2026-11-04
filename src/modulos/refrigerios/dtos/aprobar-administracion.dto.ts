@@ -25,4 +25,19 @@ export class AprobarAdministracionDto {
   @IsOptional()
   @IsString()
   observacion?: string;
+
+  @ApiPropertyOptional({ description: 'ID del administrador que aprueba (opcional)' })
+  @IsOptional()
+  @IsNumber()
+  administrador_id?: number;
+
+  @ApiPropertyOptional({ description: 'Nombre del administrador que aprueba (opcional)' })
+  @IsOptional()
+  @IsString()
+  administrador_nombre?: string;
+
+  @ApiPropertyOptional({ description: 'Motivo de rechazo (opcional)' })
+  @IsOptional()
+  @IsString()
+  motivo_rechazo?: string;
 }

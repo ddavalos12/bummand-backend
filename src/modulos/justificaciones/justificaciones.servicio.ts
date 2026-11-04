@@ -17,6 +17,7 @@ import {
   RevisarSupervisorJustificacionDto,
   AprobarAdminJustificacionDto,
 } from './dtos/revisar-justificacion.dto';
+import { Rol } from '../usuarios/entidades/usuario.entidad';
 import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
 
 @Injectable()
@@ -39,7 +40,11 @@ export class JustificacionesServicio {
     private readonly tiempoRealGateway?: TiempoRealGateway,
   ) {}
 
-  async crear(dto: CrearJustificacionDto, usuario_id?: number): Promise<Justificacion> {
+  async crear(
+    dto: CrearJustificacionDto,
+    usuario_id?: number,
+    usuario_rol?: Rol,
+  ): Promise<Justificacion> {
     let becario: Becario | null = null;
 
     if (dto.becario_id) {
@@ -56,6 +61,8 @@ export class JustificacionesServicio {
       throw new NotFoundException('Perfil de becario no encontrado para registrar la justificación');
     }
 
+    const es_admin = usuario_rol === Rol.ADMINISTRADOR;
+
     const nueva_justificacion = this.justificacion_repo.create({
       becario_id: becario.id,
       tipo_incidencia: dto.tipo_incidencia,
@@ -65,10 +72,21 @@ export class JustificacionesServicio {
       descripcion: dto.descripcion,
       archivo_prueba_url: dto.archivo_prueba_url || null,
       nombre_archivo_prueba: dto.nombre_archivo_prueba || null,
-      estado: EstadoJustificacion.PENDIENTE,
+      estado: es_admin ? EstadoJustificacion.APROBADA : EstadoJustificacion.PENDIENTE,
+      aprobado_por_admin_id: es_admin ? usuario_id : null,
+      fecha_aprobacion_admin: es_admin ? new Date() : null,
+      fecha_resolucion: es_admin ? new Date() : null,
+      observacion_admin: es_admin
+        ? dto.descripcion || 'Permiso creado y aprobado directamente por Administración'
+        : null,
     });
 
     const guardada = await this.justificacion_repo.save(nueva_justificacion);
+
+    if (es_admin) {
+      await this.anularMultasDeViernesSiAplica(guardada);
+    }
+
     this.tiempoRealGateway?.notificarJustificacion({ accion: 'crear', justificacion: guardada });
     return guardada;
   }
@@ -133,34 +151,33 @@ export class JustificacionesServicio {
 
     const obs_sup = dto.observacion_supervisor?.trim();
     const obs_adm = dto.observacion_admin?.trim();
-    if (!obs_sup && !obs_adm) {
-      throw new BadRequestException('La fundamentación u observación obligatoria no puede estar vacía');
+    const obs_gen = dto.observacion?.trim();
+    const obs_rechazo = dto.motivo_rechazo?.trim();
+    const obs_final = obs_adm || obs_sup || obs_gen || obs_rechazo;
+
+    if (!obs_final && dto.estado === EstadoJustificacion.RECHAZADA) {
+      throw new BadRequestException('El motivo u observación de rechazo no puede estar vacío');
     }
 
-    justificacion.estado = dto.estado;
-    justificacion.supervisor_id = usuario_id;
+    const es_aprobacion =
+      dto.estado === EstadoJustificacion.APROBADA ||
+      dto.estado === EstadoJustificacion.APROBADO_ADMINISTRACION;
+
+    justificacion.estado = es_aprobacion ? EstadoJustificacion.APROBADA : dto.estado;
     justificacion.fecha_resolucion = new Date();
 
     if (obs_sup) {
       justificacion.observacion_supervisor = obs_sup;
     }
-    if (obs_adm) {
-      justificacion.observacion_admin = obs_adm;
+    if (obs_adm || obs_gen) {
+      justificacion.observacion_admin = obs_adm || obs_gen || null;
     }
 
-    if (dto.estado === EstadoJustificacion.REVISADO_SUPERVISOR) {
-      justificacion.revisado_por_supervisor_id = usuario_id;
-      justificacion.fecha_revision_supervisor = new Date();
-    }
-
-    if (
-      dto.estado === EstadoJustificacion.APROBADO_ADMINISTRACION ||
-      dto.estado === EstadoJustificacion.APROBADA
-    ) {
+    if (es_aprobacion) {
       justificacion.aprobado_por_admin_id = usuario_id;
       justificacion.fecha_aprobacion_admin = new Date();
-      if (!justificacion.observacion_admin && obs_sup) {
-        justificacion.observacion_admin = obs_sup;
+      if (!justificacion.observacion_admin && obs_final) {
+        justificacion.observacion_admin = obs_final;
       }
 
       await this.anularMultasDeViernesSiAplica(justificacion);
