@@ -18,6 +18,22 @@ export class GuardarFormularioF03Dto {
   @IsNumber()
   becario_id?: number;
 
+  @ApiPropertyOptional({
+    example: 'Noemi Callisaya Alvarez',
+    description: 'Nombre completo del becario evaluado (respaldo de vinculación)',
+  })
+  @IsOptional()
+  @IsString()
+  becario_nombre?: string;
+
+  @ApiPropertyOptional({
+    example: '7093658',
+    description: 'Carnet de identidad del becario evaluado (respaldo de vinculación)',
+  })
+  @IsOptional()
+  @IsString()
+  becario_ci?: string;
+
   @ApiProperty({
     example: 'Pr. Juan Carlos Quispe',
     description: 'Nombre completo del pastor que evalúa',
@@ -45,14 +61,14 @@ export class GuardarFormularioF03Dto {
   @IsString()
   pastor_celular?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Iglesia Cristiana Central',
     description: 'Nombre de la congregación local donde asiste el becario',
     maxLength: 150,
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  iglesia_nombre: string;
+  iglesia_nombre?: string;
 
   @ApiPropertyOptional({
     example: 'Av. Las Américas N° 450, El Alto',

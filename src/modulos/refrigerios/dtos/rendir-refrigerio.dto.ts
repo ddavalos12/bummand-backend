@@ -44,4 +44,14 @@ export class RendirRefrigerioDto {
   @IsNumber()
   @Min(1)
   cantidad_raciones?: number;
+
+  @ApiPropertyOptional({ example: 'Coordinación General BUMAND', description: 'Supervisor o responsable de la entrega' })
+  @IsOptional()
+  @IsString()
+  responsable_entrega?: string;
+
+  @ApiPropertyOptional({ example: 'Detalle de los alimentos entregados a los becarios...', description: 'Observaciones o menú detallado' })
+  @IsOptional()
+  @IsString()
+  observaciones?: string;
 }

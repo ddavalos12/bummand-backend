@@ -57,6 +57,14 @@ export class Refrigerio {
   @Column({ name: 'responsable_id', type: 'int' })
   responsable_id: number;
 
+  @ApiPropertyOptional({ example: 'Coordinación General BUMAND', description: 'Supervisor o responsable de la entrega' })
+  @Column({ type: 'varchar', length: 150, nullable: true, default: 'Coordinación General BUMAND' })
+  responsable_entrega: string | null;
+
+  @ApiPropertyOptional({ example: 'Detalle de los alimentos entregados a los becarios...', description: 'Observaciones o menú detallado' })
+  @Column({ type: 'text', nullable: true })
+  observaciones: string | null;
+
   // Dupla de becarios encargados
   @ApiPropertyOptional({ example: 4, description: 'ID del primer becario encargado de la dupla' })
   @Column({ name: 'becario_encargado_1_id', type: 'int', nullable: true })

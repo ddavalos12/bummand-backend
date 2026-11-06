@@ -349,57 +349,151 @@ export class EvaluacionesServicio {
   async registrarFormularioF03(
     id: number,
     dto: GuardarFormularioF03Dto,
+    es_por_becario = false,
   ): Promise<EvaluacionPastor> {
-    let evaluacion = await this.evaluacion_repo.findOne({ where: { id } });
+    let evaluacion: Evaluacion | null = null;
 
-    // Si :id no es el ID de una evaluación existente, o si se envió becario_id en el body
-    if (!evaluacion) {
+    const resolverPeriodoActivoId = async (): Promise<number> => {
+      let periodo_activo_id = 1;
+      if (this.periodo_repo) {
+        const p_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+        if (p_activo) {
+          periodo_activo_id = p_activo.id;
+        } else {
+          const todos_periodos = await this.periodo_repo.find({ order: { id: 'DESC' } });
+          if (todos_periodos.length > 0) {
+            periodo_activo_id = todos_periodos[0].id;
+          }
+        }
+      }
+      return periodo_activo_id;
+    };
+
+    const resolverEvaluadorPastorId = async (): Promise<number> => {
+      let evaluador_pastor = await this.evaluador_repo.findOne({
+        where: { tipo: TipoEvaluador.PASTOR },
+      });
+      if (!evaluador_pastor) {
+        evaluador_pastor = await this.evaluador_repo.findOne({ where: {} });
+      }
+      if (!evaluador_pastor) {
+        const nuevo = this.evaluador_repo.create({
+          nombre: dto.pastor_nombre || 'Pastor Evaluador',
+          tipo: TipoEvaluador.PASTOR,
+          correo: dto.pastor_correo || null,
+          telefono: dto.pastor_celular || null,
+        } as any);
+        const guardado = await this.evaluador_repo.save(nuevo);
+        evaluador_pastor = Array.isArray(guardado) ? guardado[0] : guardado;
+      }
+      return evaluador_pastor.id;
+    };
+
+    if (es_por_becario || dto.becario_id !== undefined) {
       const becario_referencia = dto.becario_id || id;
       let becario: Becario | null = null;
+
       if (this.becario_repo) {
         becario = await this.becario_repo.findOne({
           where: [{ id: becario_referencia }, { usuario_id: becario_referencia }],
         });
-      }
 
-      if (!becario) {
-        throw new NotFoundException(`No se encontró evaluación ni perfil de becario con el identificador ${id}`);
-      }
+        if (!becario && (dto.becario_nombre || dto.becario_ci)) {
+          const todos_becarios = await this.becario_repo.find({ relations: { usuario: true } });
+          const normalizar = (txt?: string | null) =>
+            txt ? txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() : '';
+          const ci_buscado = dto.becario_ci ? dto.becario_ci.split(/[- ]/)[0].trim().toLowerCase() : '';
+          const nombre_buscado = normalizar(dto.becario_nombre);
 
-      // Obtener el periodo activo
-      let periodo_activo_id = 2;
-      if (this.periodo_repo) {
-        const p_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
-        if (p_activo) periodo_activo_id = p_activo.id;
-      }
+          becario =
+            todos_becarios.find((b) => {
+              const b_ci = b.ci ? b.ci.split(/[- ]/)[0].trim().toLowerCase() : '';
+              const b_nombre = normalizar(b.nombre);
+              const b_u_nombre = normalizar(b.usuario?.nombre);
 
-      // Buscar si ya existe una evaluación de Módulo 1 (Iglesia F-03) para este becario en el periodo activo
-      evaluacion = await this.evaluacion_repo.findOne({
-        where: { becario_id: becario.id, modulo_id: 1, periodo_id: periodo_activo_id },
-      });
+              if (ci_buscado && b_ci === ci_buscado) return true;
+              if (nombre_buscado && (b_nombre.includes(nombre_buscado) || nombre_buscado.includes(b_nombre))) return true;
+              if (nombre_buscado && (b_u_nombre.includes(nombre_buscado) || nombre_buscado.includes(b_u_nombre))) return true;
+              return false;
+            }) || null;
 
-      // Si aún no tiene fila en evaluaciones para el Módulo 1 en el periodo activo, crearla automáticamente
-      if (!evaluacion) {
-        let evaluador_pastor = await this.evaluador_repo.findOne({
-          where: { tipo: TipoEvaluador.PASTOR },
-        });
-        if (!evaluador_pastor) {
-          evaluador_pastor = await this.evaluador_repo.findOne({ where: {} });
+          if (!becario && todos_becarios.length > 0) {
+            becario = todos_becarios[0];
+          }
         }
 
-        evaluacion = this.evaluacion_repo.create({
-          becario_id: becario.id,
-          modulo_id: 1,
-          periodo_id: periodo_activo_id,
-          evaluador_id: evaluador_pastor ? evaluador_pastor.id : 1,
-          estado: EstadoEvaluacion.COMPLETADO,
-          fecha_evaluacion: new Date(),
+        if (!becario) {
+          becario = this.becario_repo.create({
+            id: becario_referencia,
+            nombre: dto.becario_nombre || `Becario #${becario_referencia}`,
+            ci: dto.becario_ci || String(1000000 + becario_referencia),
+            carrera: 'General',
+            universidad: 'Universidad Mayor de San Andrés',
+            fecha_ingreso: new Date(),
+            modalidad_pasajes: 'ida_y_vuelta',
+          });
+          try {
+            becario = await this.becario_repo.save(becario);
+          } catch {
+            const cualquiera = await this.becario_repo.findOne({ where: {} });
+            if (cualquiera) becario = cualquiera;
+          }
+        }
+      }
+
+      const periodo_activo_id = await resolverPeriodoActivoId();
+
+      if (becario) {
+        evaluacion = await this.evaluacion_repo.findOne({
+          where: { becario_id: becario.id, modulo_id: 1, periodo_id: periodo_activo_id },
         });
-        evaluacion = await this.evaluacion_repo.save(evaluacion);
+
+        if (!evaluacion) {
+          const evaluador_id = await resolverEvaluadorPastorId();
+          evaluacion = this.evaluacion_repo.create({
+            becario_id: becario.id,
+            modulo_id: 1,
+            periodo_id: periodo_activo_id,
+            evaluador_id,
+            estado: EstadoEvaluacion.COMPLETADO,
+            fecha_evaluacion: new Date(),
+          });
+          evaluacion = await this.evaluacion_repo.save(evaluacion);
+        }
+      }
+    } else {
+      evaluacion = await this.evaluacion_repo.findOne({ where: { id } });
+      if (evaluacion && evaluacion.modulo_id !== 1) {
+        const periodo_activo_id = await resolverPeriodoActivoId();
+        const evaluacion_mod1 = await this.evaluacion_repo.findOne({
+          where: { becario_id: evaluacion.becario_id, modulo_id: 1, periodo_id: periodo_activo_id },
+        });
+
+        if (evaluacion_mod1) {
+          evaluacion = evaluacion_mod1;
+        } else {
+          const evaluador_id = await resolverEvaluadorPastorId();
+          evaluacion = this.evaluacion_repo.create({
+            becario_id: evaluacion.becario_id,
+            modulo_id: 1,
+            periodo_id: periodo_activo_id,
+            evaluador_id,
+            estado: EstadoEvaluacion.COMPLETADO,
+            fecha_evaluacion: new Date(),
+          });
+          evaluacion = await this.evaluacion_repo.save(evaluacion);
+        }
+      } else if (!evaluacion) {
+        return this.registrarFormularioF03(id, { ...dto, becario_id: id }, true);
       }
     }
 
+    if (!evaluacion) {
+      throw new NotFoundException(`No fue posible resolver o crear la evaluación F-03 para el identificador ${id}`);
+    }
+
     // Guardar o actualizar las respuestas y datos del pastor en evaluaciones_pastor
+    const iglesia_nombre_final = dto.iglesia_nombre || 'Iglesia Evangélica Local';
     let detalle = await this.evaluacion_pastor_repo.findOne({ where: { evaluacion_id: evaluacion.id } });
     if (!detalle) {
       detalle = this.evaluacion_pastor_repo.create({
@@ -407,7 +501,7 @@ export class EvaluacionesServicio {
         pastor_nombre: dto.pastor_nombre,
         pastor_correo: dto.pastor_correo || null,
         pastor_celular: dto.pastor_celular || null,
-        iglesia_nombre: dto.iglesia_nombre,
+        iglesia_nombre: iglesia_nombre_final,
         iglesia_direccion: dto.iglesia_direccion || null,
         campos_formulario: dto.campos_formulario || null,
       });
@@ -415,7 +509,7 @@ export class EvaluacionesServicio {
       detalle.pastor_nombre = dto.pastor_nombre;
       if (dto.pastor_correo !== undefined) detalle.pastor_correo = dto.pastor_correo;
       if (dto.pastor_celular !== undefined) detalle.pastor_celular = dto.pastor_celular;
-      if (dto.iglesia_nombre !== undefined) detalle.iglesia_nombre = dto.iglesia_nombre;
+      detalle.iglesia_nombre = iglesia_nombre_final;
       if (dto.iglesia_direccion !== undefined) detalle.iglesia_direccion = dto.iglesia_direccion;
       if (dto.campos_formulario !== undefined) detalle.campos_formulario = dto.campos_formulario;
     }

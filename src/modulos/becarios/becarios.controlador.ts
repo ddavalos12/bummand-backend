@@ -167,7 +167,7 @@ export class BecariosControlador {
   }
 
   @Patch(':id/configuracion-pasajes')
-  @Roles(Rol.ADMINISTRADOR)
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
   @ApiOperation({
     summary: 'Configurar modalidad de registro de pasajes para un becario',
     description: 'Permite a la administración definir si el becario puede registrar Solo Ida o Ida y Vuelta de forma global o por actividad.',

@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsObject, IsOptional } from 'class-validator';
+import { IsIn, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class ActualizarConfiguracionPasajesDto {
   @ApiPropertyOptional({
@@ -30,4 +30,28 @@ export class ActualizarConfiguracionPasajesDto {
     escuela_lideres?: 'ida_y_vuelta' | 'solo_ida';
     acciones_servicio?: 'ida_y_vuelta' | 'solo_ida';
   };
+
+  @ApiPropertyOptional({
+    example: '7093658',
+    description: 'Carnet de identidad del becario (respaldo de identificación)',
+  })
+  @IsOptional()
+  @IsString()
+  ci?: string;
+
+  @ApiPropertyOptional({
+    example: 'Noemi Callisaya Alvarez',
+    description: 'Nombre completo del becario (respaldo de identificación)',
+  })
+  @IsOptional()
+  @IsString()
+  nombre?: string;
+
+  @ApiPropertyOptional({
+    example: 12,
+    description: 'Identificador de usuario del becario (respaldo de identificación)',
+  })
+  @IsOptional()
+  @IsNumber()
+  usuario_id?: number;
 }

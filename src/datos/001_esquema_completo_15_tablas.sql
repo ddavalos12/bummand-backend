@@ -357,6 +357,49 @@ CREATE INDEX IF NOT EXISTS idx_reportes_generados_becario_periodo
     ON reportes_generados (becario_id, periodo);
 
 -- ---------------------------------------------------------------------------
+-- 7b. GESTIÓN Y RENDICIÓN DE REFRIGERIOS
+-- ---------------------------------------------------------------------------
+
+-- Tabla: refrigerios
+CREATE TABLE IF NOT EXISTS refrigerios (
+    id                                  SERIAL PRIMARY KEY,
+    fecha                               DATE               NOT NULL,
+    evento_id                           INTEGER,
+    lugar_practica_id                   INTEGER            REFERENCES lugares_practica(id) ON DELETE SET NULL,
+    descripcion                         VARCHAR(255)       NOT NULL,
+    cantidad_raciones                   INTEGER            NOT NULL,
+    costo_unitario_bs                   DECIMAL(8,2)       NOT NULL,
+    costo_total_bs                      DECIMAL(10,2)      NOT NULL,
+    responsable_id                      INTEGER            NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
+    responsable_entrega                 VARCHAR(150)       DEFAULT 'Coordinación General BUMAND',
+    observaciones                       TEXT,
+    becario_encargado_1_id              INTEGER,
+    becario_encargado_1_nombre          VARCHAR(150),
+    becario_encargado_2_id              INTEGER,
+    becario_encargado_2_nombre          VARCHAR(150),
+    becario_id                          INTEGER,
+    becario_nombre                      VARCHAR(150),
+    modalidad_preparacion               VARCHAR(50)        NOT NULL DEFAULT 'cocina_diaconia',
+    detalle_ingredientes                JSONB,
+    presupuesto_referencial_bs          DECIMAL(10,2)      NOT NULL DEFAULT 115.00,
+    porcentaje_devolucion               DECIMAL(5,2)       NOT NULL DEFAULT 100.00,
+    monto_devolucion_bs                 DECIMAL(10,2)      NOT NULL DEFAULT 0.00,
+    becario_receptor_devolucion_id      INTEGER,
+    becario_receptor_devolucion_nombre  VARCHAR(150),
+    fecha_entrega_devolucion            TIMESTAMP,
+    entregado_por_usuario_id            INTEGER,
+    estado_reposicion                   VARCHAR(50)        NOT NULL DEFAULT 'sorteado_programado',
+    revisado_por_supervisor_id          INTEGER,
+    fecha_revision_supervisor           TIMESTAMP,
+    observacion_supervisor              TEXT,
+    firmas_conformidad                  JSONB,
+    created_at                          TIMESTAMP          NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_refrigerios_fecha
+    ON refrigerios (fecha);
+
+-- ---------------------------------------------------------------------------
 -- 8. DATOS SEMILLA BASE (SEEDING)
 -- ---------------------------------------------------------------------------
 

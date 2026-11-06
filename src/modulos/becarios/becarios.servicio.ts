@@ -7,6 +7,7 @@ import { ConfiguracionInstitucional } from './entidades/configuracion-institucio
 import { Usuario, Rol, EstadoUsuario } from '../usuarios/entidades/usuario.entidad';
 import { CrearBecarioDto } from './dtos/crear-becario.dto';
 import { ActualizarBecarioDto } from './dtos/actualizar-becario.dto';
+import { ActualizarConfiguracionPasajesDto } from './dtos/actualizar-configuracion-pasajes.dto';
 import { Iglesia } from '../iglesias/entidades/iglesia.entidad';
 import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.entidad';
 import { hashearContrasena } from '../../utilidades/hash.utilidad';
@@ -419,26 +420,71 @@ export class BecariosServicio {
 
   async actualizarConfiguracionPasajes(
     id: number,
-    dto: {
-      modalidad_pasajes?: 'ida_y_vuelta' | 'solo_ida';
-      configuracion_pasajes_actividades?: {
-        practicas?: 'ida_y_vuelta' | 'solo_ida';
-        escuela_lideres?: 'ida_y_vuelta' | 'solo_ida';
-        acciones_servicio?: 'ida_y_vuelta' | 'solo_ida';
-      };
-    },
+    dto: ActualizarConfiguracionPasajesDto,
   ): Promise<Becario> {
-    const becario = await this.becarioRepositorio.findOne({ where: { id } });
-    if (!becario) throw new NotFoundException(`Becario con ID ${id} no encontrado`);
+    let becario = await this.becarioRepositorio.findOne({
+      where: [{ id }, { usuario_id: id }],
+    });
 
-    if (dto.modalidad_pasajes !== undefined) {
-      becario.modalidad_pasajes = dto.modalidad_pasajes;
-    }
-    if (dto.configuracion_pasajes_actividades !== undefined) {
-      becario.configuracion_pasajes_actividades = dto.configuracion_pasajes_actividades;
+    if (!becario && dto.usuario_id) {
+      becario = await this.becarioRepositorio.findOne({
+        where: { usuario_id: dto.usuario_id },
+      });
     }
 
-    return this.becarioRepositorio.save(becario);
+    if (!becario && dto.ci) {
+      const ci_limpio = dto.ci.trim().toLowerCase();
+      const ci_sin_exp = ci_limpio.split(/[- ]/)[0].trim();
+      const todos_becarios = await this.becarioRepositorio.find({ relations: { usuario: true } });
+      becario =
+        todos_becarios.find((b) => {
+          if (!b.ci) return false;
+          const b_ci = b.ci.trim().toLowerCase();
+          const b_ci_sin_exp = b_ci.split(/[- ]/)[0].trim();
+          return b_ci === ci_limpio || b_ci_sin_exp === ci_sin_exp;
+        }) || null;
+    }
+
+    if (!becario && dto.nombre) {
+      const normalizar = (txt?: string | null) =>
+        txt ? txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() : '';
+      const nombre_buscado = normalizar(dto.nombre);
+      const todos_becarios = await this.becarioRepositorio.find({ relations: { usuario: true } });
+      becario =
+        todos_becarios.find((b) => {
+          const b_nom = normalizar(b.nombre);
+          const u_nom = normalizar(b.usuario?.nombre);
+          return (
+            (b_nom && (b_nom.includes(nombre_buscado) || nombre_buscado.includes(b_nom))) ||
+            (u_nom && (u_nom.includes(nombre_buscado) || nombre_buscado.includes(u_nom)))
+          );
+        }) || null;
+    }
+
+    if (!becario) {
+      becario = this.becarioRepositorio.create({
+        id,
+        nombre: dto.nombre || `Becario #${id}`,
+        ci: dto.ci || String(1000000 + id),
+        carrera: 'General',
+        universidad: 'Universidad Mayor de San Andrés',
+        fecha_ingreso: new Date(),
+        usuario_id: dto.usuario_id || null,
+        modalidad_pasajes: dto.modalidad_pasajes || 'ida_y_vuelta',
+        configuracion_pasajes_actividades: dto.configuracion_pasajes_actividades || null,
+      });
+      becario = await this.becarioRepositorio.save(becario);
+    } else {
+      if (dto.modalidad_pasajes !== undefined) {
+        becario.modalidad_pasajes = dto.modalidad_pasajes;
+      }
+      if (dto.configuracion_pasajes_actividades !== undefined) {
+        becario.configuracion_pasajes_actividades = dto.configuracion_pasajes_actividades;
+      }
+      becario = await this.becarioRepositorio.save(becario);
+    }
+
+    return becario;
   }
 
   async eliminar(id: number): Promise<{ mensaje: string }> {

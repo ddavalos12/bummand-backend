@@ -482,7 +482,7 @@ export class EvaluacionesControlador {
     @Param('becario_id', ParseIntPipe) becario_id: number,
     @Body() dto: GuardarFormularioF03Dto,
   ): Promise<EvaluacionPastor> {
-    return this.evaluaciones_servicio.registrarFormularioF03(becario_id, dto);
+    return this.evaluaciones_servicio.registrarFormularioF03(becario_id, { ...dto, becario_id }, true);
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)

@@ -63,6 +63,8 @@ export interface PlanillaReposicionRefrigerio {
   total_registros_conformidad?: number;
   estado_reposicion: string;
   moneda: 'BOB (Bolivianos)';
+  responsable_entrega?: string | null;
+  observaciones?: string | null;
   fecha_emision_planilla: string;
 }
 
@@ -135,6 +137,8 @@ export class RefrigeriosServicio {
       porcentaje_devolucion: porcentaje_dev,
       monto_devolucion_bs: monto_dev,
       responsable_id: dto.responsable_id,
+      responsable_entrega: dto.responsable_entrega || 'Coordinación General BUMAND',
+      observaciones: dto.observaciones ?? null,
       becario_encargado_1_id: dto.becario_encargado_1_id || dto.becario_id || null,
       becario_encargado_1_nombre: dto.becario_encargado_1_nombre || dto.becario_nombre || null,
       becario_encargado_2_id: dto.becario_encargado_2_id || null,
@@ -250,6 +254,8 @@ export class RefrigeriosServicio {
     if (dto.becario_receptor_devolucion_id !== undefined) refrigerio.becario_receptor_devolucion_id = dto.becario_receptor_devolucion_id || null;
     if (dto.becario_receptor_devolucion_nombre !== undefined) refrigerio.becario_receptor_devolucion_nombre = dto.becario_receptor_devolucion_nombre || null;
     if (dto.estado_reposicion !== undefined) refrigerio.estado_reposicion = dto.estado_reposicion;
+    if (dto.responsable_entrega !== undefined) refrigerio.responsable_entrega = dto.responsable_entrega || 'Coordinación General BUMAND';
+    if (dto.observaciones !== undefined) refrigerio.observaciones = dto.observaciones ?? null;
     if (dto.firmas_conformidad !== undefined) refrigerio.firmas_conformidad = dto.firmas_conformidad || null;
 
     return this.refrigerio_repo.save(refrigerio);
@@ -380,6 +386,8 @@ export class RefrigeriosServicio {
       becario_id: becario_1.id,
       becario_nombre: becario_1.nombre,
       responsable_id: responsable_id || 1,
+      responsable_entrega: 'Coordinación General BUMAND',
+      observaciones: null,
       estado_reposicion: 'sorteado_programado',
     });
 
@@ -504,6 +512,12 @@ export class RefrigeriosServicio {
 
     refrigerio.porcentaje_devolucion = 100.0;
     refrigerio.monto_devolucion_bs = refrigerio.costo_total_bs;
+    if (dto.responsable_entrega !== undefined) {
+      refrigerio.responsable_entrega = dto.responsable_entrega || 'Coordinación General BUMAND';
+    }
+    if (dto.observaciones !== undefined) {
+      refrigerio.observaciones = dto.observaciones ?? null;
+    }
     refrigerio.estado_reposicion = 'rendido_pendiente';
 
     return this.refrigerio_repo.save(refrigerio);
@@ -650,6 +664,8 @@ export class RefrigeriosServicio {
       total_registros_conformidad: firmas.length,
       estado_reposicion: refrigerio.estado_reposicion || 'LISTO_PARA_DESEMBOLSO',
       moneda: 'BOB (Bolivianos)',
+      responsable_entrega: refrigerio.responsable_entrega || 'Coordinación General BUMAND',
+      observaciones: refrigerio.observaciones || null,
       fecha_emision_planilla: new Date().toISOString(),
     };
   }

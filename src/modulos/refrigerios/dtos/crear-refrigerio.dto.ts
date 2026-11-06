@@ -152,6 +152,16 @@ export class CrearRefrigerioDto {
   @IsNumber()
   responsable_id: number;
 
+  @ApiPropertyOptional({ example: 'Coordinación General BUMAND', description: 'Supervisor o responsable de la entrega' })
+  @IsOptional()
+  @IsString()
+  responsable_entrega?: string;
+
+  @ApiPropertyOptional({ example: 'Detalle de los alimentos entregados a los becarios...', description: 'Observaciones o menú detallado' })
+  @IsOptional()
+  @IsString()
+  observaciones?: string;
+
   @ApiPropertyOptional({
     description: 'Listado de registros de recepción y conformidad de entrega en sistema',
     example: [{ becario_id: 1, nombre: 'Nilda Churata', conforme: true }],
