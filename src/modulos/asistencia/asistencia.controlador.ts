@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, ParseIntPipe, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, Post, Patch, Body, Param, Query, ParseIntPipe, UseGuards, Req } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { AsistenciaServicio } from './asistencia.servicio';
 import { RegistroAsistencia } from './entidades/registro-asistencia.entidad';
 import { Multa } from './entidades/multa.entidad';
@@ -159,6 +159,58 @@ export class AsistenciaControlador {
   @ApiResponse({ status: 200, description: 'Listado personal de multas.', type: [Multa] })
   obtenerMisMultas(@UsuarioActual() usuario: Usuario): Promise<Multa[]> {
     return this.asistenciaServicio.obtenerMisMultas(usuario.id);
+  }
+
+  @Get('extracto-mensual')
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'Consultar extracto mensual de asistencia estilo bancario del usuario en sesión',
+    description: 'Devuelve el extracto mensual con desglose cronológico diario de entradas, salidas, horas y saldo acumulado para el becario autenticado.',
+  })
+  @ApiQuery({
+    name: 'mes',
+    required: false,
+    description: 'Filtro opcional por periodo (ej. 2026-05) o nombre de mes (ej. mayo)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Extracto mensual de asistencia estructurado en formato bancario.',
+  })
+  obtenerMiExtractoMensual(
+    @UsuarioActual() usuario: Usuario,
+    @Req() req: any,
+    @Query('mes') mes?: string,
+  ) {
+    const usuario_id = req?.user?.id || req?.user?.sub || usuario?.id;
+    return this.asistenciaServicio.obtenerExtractoMensual(usuario_id, mes, true);
+  }
+
+  @Get('extracto-mensual/:becario_id')
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @ApiOperation({
+    summary: 'Consultar extracto mensual de asistencia estilo bancario por ID de becario',
+    description: 'Devuelve el extracto mensual con desglose diario, horas del día y saldo acumulado para un becario específico.',
+  })
+  @ApiParam({
+    name: 'becario_id',
+    type: Number,
+    description: 'ID del becario a consultar',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'mes',
+    required: false,
+    description: 'Filtro opcional por periodo o nombre de mes',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Extracto mensual de asistencia estructurado en formato bancario.',
+  })
+  obtenerExtractoMensualPorBecario(
+    @Param('becario_id', ParseIntPipe) becario_id: number,
+    @Query('mes') mes?: string,
+  ) {
+    return this.asistenciaServicio.obtenerExtractoMensual(becario_id, mes, false);
   }
 
   @Get('mis-asistencias')
