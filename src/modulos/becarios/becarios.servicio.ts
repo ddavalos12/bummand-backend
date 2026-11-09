@@ -338,7 +338,11 @@ export class BecariosServicio {
     }
 
     if (activa) {
-      await this.becarioRepositorio.update({}, { datos_confirmados: false });
+      await this.becarioRepositorio
+        .createQueryBuilder()
+        .update(Becario)
+        .set({ datos_confirmados: false, fecha_ultima_confirmacion: null })
+        .execute();
     }
 
     return {
