@@ -10,7 +10,7 @@ import { Usuario } from '../usuarios/entidades/usuario.entidad';
 @ApiTags('Notificaciones')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtGuardia)
-@Controller('notificaciones')
+@Controller(['notificaciones', 'api/notificaciones'])
 export class NotificacionesControlador {
   constructor(private readonly servicio: NotificacionesServicio) {}
 

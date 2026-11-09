@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import { Refrigerio, DetalleIngredienteRefrigerio } from './entidades/refrigerio.entidad';
@@ -8,8 +8,9 @@ import { SortearDuplaDto } from './dtos/sortear-dupla.dto';
 import { RendirRefrigerioDto } from './dtos/rendir-refrigerio.dto';
 import { RevisarSupervisorDto } from './dtos/revisar-supervisor.dto';
 import { AprobarAdministracionDto } from './dtos/aprobar-administracion.dto';
+import { ConfirmarRecojoDto } from './dtos/confirmar-recojo.dto';
 import { Becario } from '../becarios/entidades/becario.entidad';
-import { Usuario } from '../usuarios/entidades/usuario.entidad';
+import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 import { NotificacionesServicio } from '../notificaciones/notificaciones.servicio';
 
 export const COSTO_RACION_POR_PERSONA_BS = 5.0;
@@ -86,7 +87,7 @@ export interface RespuestaMiTurno {
 }
 
 @Injectable()
-export class RefrigeriosServicio {
+export class RefrigeriosServicio implements OnModuleInit {
   constructor(
     @InjectRepository(Refrigerio)
     private readonly refrigerio_repo: Repository<Refrigerio>,
@@ -99,6 +100,150 @@ export class RefrigeriosServicio {
     @Optional()
     private readonly notificaciones_servicio?: NotificacionesServicio,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    try {
+      await this.sembrarRefrigeriosInicialesSiEstaVacio();
+    } catch {
+      // Continuar si la sincronización de tablas aún está en proceso
+    }
+  }
+
+  async sembrarRefrigeriosInicialesSiEstaVacio(): Promise<void> {
+    const conteo = await this.refrigerio_repo.count();
+    if (conteo > 0) return;
+
+    let becarios_db: Becario[] = [];
+    if (this.becario_repo) {
+      becarios_db = await this.becario_repo.find({
+        relations: { usuario: true },
+        order: { id: 'ASC' },
+        take: 10,
+      });
+    }
+
+    const obtenerBecario = (indice: number, nombre_respaldo: string) => {
+      if (becarios_db.length > indice) {
+        return {
+          id: becarios_db[indice].id,
+          nombre: becarios_db[indice].nombre || becarios_db[indice].usuario?.nombre || nombre_respaldo,
+        };
+      }
+      return { id: indice + 1, nombre: nombre_respaldo };
+    };
+
+    const dupla1_a = obtenerBecario(0, 'Adai Belen Huayta Cardozo');
+    const dupla1_b = obtenerBecario(1, 'Alejandro Roberth Paredes Tarquino');
+
+    const dupla2_a = obtenerBecario(2, 'Aydee Ruth Ali Condori');
+    const dupla2_b = obtenerBecario(3, 'Carlos Oscar Luna Lizarraga');
+
+    const dupla3_a = obtenerBecario(4, 'Daniel Davalos Quiñoñez');
+    const dupla3_b = obtenerBecario(5, 'Nilda Amalia Churata Paye');
+
+    const dupla4_a = obtenerBecario(6, 'Edgar Elias Alarcon Huanca');
+    const dupla4_b = obtenerBecario(7, 'Isaias Daniel Herrera Mamani');
+
+    let responsable_id = 1;
+    if (this.usuario_repo) {
+      const admin = await this.usuario_repo.findOne({ where: { rol: Rol.ADMINISTRADOR } });
+      if (admin) responsable_id = admin.id;
+    }
+
+    const registros_semilla = [
+      {
+        fecha: new Date('2026-10-30'),
+        descripcion: 'Viernes Formativo - Escuela de Líderes',
+        cantidad_raciones: 23,
+        costo_unitario_bs: 5.0,
+        costo_total_bs: 115.0,
+        presupuesto_referencial_bs: 115.0,
+        porcentaje_devolucion: 100.0,
+        monto_devolucion_bs: 115.0,
+        responsable_id,
+        responsable_entrega: 'Administración Central',
+        observaciones: 'Programado para Escuela de Líderes (Oficina Central El Alto - Bloque B Auditorio)',
+        becario_encargado_1_id: dupla4_a.id,
+        becario_encargado_1_nombre: dupla4_a.nombre,
+        becario_encargado_2_id: dupla4_b.id,
+        becario_encargado_2_nombre: dupla4_b.nombre,
+        becario_id: dupla4_a.id,
+        becario_nombre: `${dupla4_a.nombre} y ${dupla4_b.nombre}`,
+        modalidad_preparacion: 'cocina_diaconia',
+        estado_reposicion: 'sorteado_programado',
+      },
+      {
+        fecha: new Date('2026-10-23'),
+        descripcion: 'Viernes Formativo - Escuela de Líderes',
+        cantidad_raciones: 23,
+        costo_unitario_bs: 5.0,
+        costo_total_bs: 115.0,
+        presupuesto_referencial_bs: 115.0,
+        porcentaje_devolucion: 100.0,
+        monto_devolucion_bs: 115.0,
+        responsable_id,
+        responsable_entrega: 'Administración Central',
+        observaciones: 'Refrigerio preparado para la jornada de Escuela de Líderes (Oficina Central El Alto - Bloque B Auditorio)',
+        becario_encargado_1_id: dupla1_a.id,
+        becario_encargado_1_nombre: dupla1_a.nombre,
+        becario_encargado_2_id: dupla1_b.id,
+        becario_encargado_2_nombre: dupla1_b.nombre,
+        becario_id: dupla1_a.id,
+        becario_nombre: `${dupla1_a.nombre} y ${dupla1_b.nombre}`,
+        modalidad_preparacion: 'cocina_diaconia',
+        estado_reposicion: 'rendido_pendiente',
+      },
+      {
+        fecha: new Date('2026-10-16'),
+        descripcion: 'Viernes Formativo - Escuela de Líderes',
+        cantidad_raciones: 23,
+        costo_unitario_bs: 5.0,
+        costo_total_bs: 115.0,
+        presupuesto_referencial_bs: 115.0,
+        porcentaje_devolucion: 100.0,
+        monto_devolucion_bs: 115.0,
+        responsable_id,
+        responsable_entrega: 'Claudia Cabrera',
+        observaciones: 'Refrigerio casero servido puntualmente (Oficina Central El Alto - Bloque A Administración)',
+        becario_encargado_1_id: dupla2_a.id,
+        becario_encargado_1_nombre: dupla2_a.nombre,
+        becario_encargado_2_id: dupla2_b.id,
+        becario_encargado_2_nombre: dupla2_b.nombre,
+        becario_id: dupla2_a.id,
+        becario_nombre: `${dupla2_a.nombre} y ${dupla2_b.nombre}`,
+        modalidad_preparacion: 'traido_de_casa',
+        becario_receptor_devolucion_id: dupla2_b.id,
+        becario_receptor_devolucion_nombre: dupla2_b.nombre,
+        fecha_entrega_devolucion: new Date('2026-10-17T15:00:00Z'),
+        estado_reposicion: 'aprobado_administracion',
+      },
+      {
+        fecha: new Date('2026-10-09'),
+        descripcion: 'Viernes Formativo - Escuela de Líderes',
+        cantidad_raciones: 23,
+        costo_unitario_bs: 5.0,
+        costo_total_bs: 115.0,
+        presupuesto_referencial_bs: 115.0,
+        porcentaje_devolucion: 100.0,
+        monto_devolucion_bs: 115.0,
+        responsable_id,
+        responsable_entrega: 'Administración Central',
+        observaciones: 'Refrigerio adquirido y distribuido (Oficina Central El Alto - Bloque B Auditorio)',
+        becario_encargado_1_id: dupla3_a.id,
+        becario_encargado_1_nombre: dupla3_a.nombre,
+        becario_encargado_2_id: dupla3_b.id,
+        becario_encargado_2_nombre: dupla3_b.nombre,
+        becario_id: dupla3_a.id,
+        becario_nombre: `${dupla3_a.nombre} y ${dupla3_b.nombre}`,
+        modalidad_preparacion: 'compra_directa',
+        estado_reposicion: 'aprobado_administracion',
+      },
+    ];
+
+    for (const r of registros_semilla) {
+      await this.refrigerio_repo.save(this.refrigerio_repo.create(r));
+    }
+  }
 
   async crear(dto: CrearRefrigerioDto): Promise<Refrigerio> {
     const raciones = Number(dto.cantidad_raciones || 23);
@@ -125,26 +270,49 @@ export class RefrigeriosServicio {
       ? Number(dto.monto_devolucion_bs)
       : total;
 
+    const descripcion_final =
+      dto.descripcion ||
+      dto.evento_vinculado ||
+      dto.actividad_viernes ||
+      dto.menu_descripcion ||
+      'Viernes Formativo - Escuela de Líderes';
+
+    let obs = dto.observaciones ?? dto.menu_descripcion ?? null;
+    if (dto.sede || dto.sede_nombre || dto.bloque) {
+      const detalle_lugar = [dto.sede || dto.sede_nombre, dto.bloque].filter(Boolean).join(' - ');
+      obs = obs ? `${obs} (${detalle_lugar})` : detalle_lugar;
+    }
+
+    let resp_id = dto.responsable_id || 1;
+    if (this.usuario_repo && !dto.responsable_id) {
+      const admin = await this.usuario_repo.findOne({ where: { rol: Rol.ADMINISTRADOR } });
+      if (admin) resp_id = admin.id;
+    }
+
     const nuevo_refrigerio = this.refrigerio_repo.create({
       fecha: new Date(dto.fecha),
       evento_id: dto.evento_id || null,
       lugar_practica_id: dto.lugar_practica_id || null,
-      descripcion: dto.descripcion,
+      descripcion: descripcion_final,
       cantidad_raciones: raciones,
       costo_unitario_bs: unitario,
       costo_total_bs: total,
       presupuesto_referencial_bs: presupuesto_ref,
       porcentaje_devolucion: porcentaje_dev,
       monto_devolucion_bs: monto_dev,
-      responsable_id: dto.responsable_id,
+      responsable_id: resp_id,
       responsable_entrega: dto.responsable_entrega || 'Coordinación General BUMAND',
-      observaciones: dto.observaciones ?? null,
+      observaciones: obs,
       becario_encargado_1_id: dto.becario_encargado_1_id || dto.becario_id || null,
       becario_encargado_1_nombre: dto.becario_encargado_1_nombre || dto.becario_nombre || null,
       becario_encargado_2_id: dto.becario_encargado_2_id || null,
       becario_encargado_2_nombre: dto.becario_encargado_2_nombre || null,
       becario_id: dto.becario_encargado_1_id || dto.becario_id || null,
-      becario_nombre: dto.becario_encargado_1_nombre || dto.becario_nombre || null,
+      becario_nombre:
+        dto.becario_nombre ||
+        (dto.becario_encargado_1_nombre && dto.becario_encargado_2_nombre
+          ? `${dto.becario_encargado_1_nombre} y ${dto.becario_encargado_2_nombre}`
+          : dto.becario_encargado_1_nombre || null),
       modalidad_preparacion: dto.modalidad_preparacion || 'cocina_diaconia',
       detalle_ingredientes: dto.detalle_ingredientes || null,
       becario_receptor_devolucion_id: dto.becario_receptor_devolucion_id || null,
@@ -157,6 +325,11 @@ export class RefrigeriosServicio {
   }
 
   async listar(filtros?: { fecha_inicio?: string; fecha_fin?: string }): Promise<Refrigerio[]> {
+    const conteo = await this.refrigerio_repo.count();
+    if (conteo === 0) {
+      await this.sembrarRefrigeriosInicialesSiEstaVacio();
+    }
+
     const where: Record<string, unknown> = {};
 
     if (filtros?.fecha_inicio && filtros?.fecha_fin) {
@@ -176,6 +349,62 @@ export class RefrigeriosServicio {
       },
       order: { fecha: 'DESC', id: 'DESC' },
     });
+  }
+
+  async confirmarRecojo(
+    id: number,
+    dto: ConfirmarRecojoDto,
+    usuario?: Usuario,
+  ): Promise<Refrigerio> {
+    const refrigerio = await this.obtenerPorId(id);
+
+    let becario_id = dto.becario_id;
+    let nombre_becario = dto.nombre_becario;
+
+    if (!becario_id && usuario) {
+      if (usuario.rol === Rol.BECARIO && this.becario_repo) {
+        const b = await this.becario_repo.findOne({ where: { usuario_id: usuario.id } });
+        if (b) {
+          becario_id = b.id;
+          nombre_becario = nombre_becario || b.nombre || usuario.nombre;
+        }
+      }
+      if (!becario_id) {
+        becario_id = usuario.id;
+        nombre_becario = nombre_becario || usuario.nombre;
+      }
+    }
+
+    const fecha_hora_actual = dto.fecha_hora || new Date().toISOString();
+    const hora_actual =
+      dto.hora_recojo ||
+      new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
+
+    const nuevo_registro = {
+      becario_id: becario_id || 1,
+      nombre_becario: nombre_becario || 'Becario Participante',
+      fecha_hora: fecha_hora_actual,
+      hora_recojo: hora_actual,
+      recogido: dto.recogido !== undefined ? dto.recogido : true,
+      comentario: dto.comentario || 'Ración recogida y confirmada en sistema',
+    };
+
+    let firmas = Array.isArray(refrigerio.firmas_conformidad)
+      ? [...refrigerio.firmas_conformidad]
+      : [];
+
+    const indice_existente = firmas.findIndex(
+      (f: any) => f && Number(f.becario_id) === Number(nuevo_registro.becario_id),
+    );
+    if (indice_existente >= 0) {
+      firmas[indice_existente] = { ...firmas[indice_existente], ...nuevo_registro };
+    } else {
+      firmas.push(nuevo_registro);
+    }
+
+    refrigerio.firmas_conformidad = firmas;
+
+    return this.refrigerio_repo.save(refrigerio);
   }
 
   async obtenerPorId(id: number): Promise<Refrigerio> {

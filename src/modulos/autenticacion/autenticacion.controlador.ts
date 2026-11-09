@@ -9,7 +9,7 @@ import { UsuarioActual } from './usuario-actual.decorador';
 import { Usuario } from '../usuarios/entidades/usuario.entidad';
 
 @ApiTags('Autenticación')
-@Controller('autenticacion')
+@Controller(['autenticacion', 'api/autenticacion'])
 export class AutenticacionControlador {
   constructor(private readonly autenticacionServicio: AutenticacionServicio) {}
 

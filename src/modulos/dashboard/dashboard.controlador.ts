@@ -10,7 +10,7 @@ import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 @ApiTags('Dashboard')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtGuardia, RolesGuardia)
-@Controller('dashboard')
+@Controller(['dashboard', 'api/dashboard'])
 export class DashboardControlador {
   constructor(private readonly dashboard_servicio: DashboardServicio) {}
 

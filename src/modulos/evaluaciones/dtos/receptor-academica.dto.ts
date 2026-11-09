@@ -1,19 +1,23 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import { IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class ReceptorAcademicaDto {
   @ApiProperty({ example: 1, description: 'Identificador del becario evaluado' })
   @IsNotEmpty()
+  @Type(() => Number)
   @IsNumber()
   becario_id: number;
 
   @ApiProperty({ example: 1, description: 'Identificador del periodo académico' })
   @IsNotEmpty()
+  @Type(() => Number)
   @IsNumber()
   periodo_id: number;
 
   @ApiProperty({ example: 82.5, description: 'Promedio general de calificaciones (0 - 100)' })
   @IsNotEmpty()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   @Max(100)
@@ -34,4 +38,15 @@ export class ReceptorAcademicaDto {
   @IsOptional()
   @IsString()
   archivo_historial_academico?: string;
+
+  @ApiPropertyOptional({ description: 'Observaciones adicionales' })
+  @IsOptional()
+  @IsString()
+  observaciones?: string;
+
+  @ApiPropertyOptional({ description: 'Puntaje opcional directo' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  puntaje?: number;
 }

@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsNumber, IsObject } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsOptional, IsString, IsNumber, IsObject } from 'class-validator';
 
 export class GuardarFormularioF03Dto {
   @ApiPropertyOptional({
@@ -7,6 +8,7 @@ export class GuardarFormularioF03Dto {
     description: 'ID de la evaluación asociada (opcional si se envía en la URL)',
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   evaluacion_id?: number;
 
@@ -15,6 +17,7 @@ export class GuardarFormularioF03Dto {
     description: 'ID del becario evaluado (permite auto-crear o vincular la evaluación F-03)',
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   becario_id?: number;
 
@@ -34,14 +37,14 @@ export class GuardarFormularioF03Dto {
   @IsString()
   becario_ci?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Pr. Juan Carlos Quispe',
     description: 'Nombre completo del pastor que evalúa',
     maxLength: 150,
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  pastor_nombre: string;
+  pastor_nombre?: string;
 
   @ApiPropertyOptional({
     example: 'pastor.quispe@iglesia.bo',
@@ -112,6 +115,7 @@ export class GuardarFormularioF03Dto {
     description: 'Puntaje asignado al becario en escala 0-100 (actualiza la evaluación)',
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   puntaje?: number;
 

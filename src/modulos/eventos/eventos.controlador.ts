@@ -32,7 +32,7 @@ import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 @ApiTags('Eventos')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtGuardia, RolesGuardia)
-@Controller('eventos')
+@Controller(['eventos', 'api/eventos'])
 export class EventosControlador {
   constructor(private readonly eventos_servicio: EventosServicio) {}
 

@@ -56,7 +56,7 @@ const almacenamientoComprobantes = diskStorage({
 @ApiTags('Justificaciones')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtGuardia, RolesGuardia)
-@Controller('justificaciones')
+@Controller(['justificaciones', 'api/justificaciones'])
 export class JustificacionesControlador {
   constructor(private readonly justificaciones_servicio: JustificacionesServicio) {}
 

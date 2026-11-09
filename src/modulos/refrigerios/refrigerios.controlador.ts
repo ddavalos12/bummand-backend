@@ -30,6 +30,7 @@ import { SortearDuplaDto } from './dtos/sortear-dupla.dto';
 import { RendirRefrigerioDto } from './dtos/rendir-refrigerio.dto';
 import { RevisarSupervisorDto } from './dtos/revisar-supervisor.dto';
 import { AprobarAdministracionDto } from './dtos/aprobar-administracion.dto';
+import { ConfirmarRecojoDto } from './dtos/confirmar-recojo.dto';
 import { Refrigerio } from './entidades/refrigerio.entidad';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
@@ -39,7 +40,7 @@ import { UsuarioActual } from '../autenticacion/usuario-actual.decorador';
 
 @ApiTags('Refrigerios')
 @ApiBearerAuth('JWT-auth')
-@Controller('refrigerios')
+@Controller(['refrigerios', 'api/refrigerios'])
 @UseGuards(JwtGuardia, RolesGuardia)
 export class RefrigeriosControlador {
   constructor(private readonly refrigerios_servicio: RefrigeriosServicio) {}
@@ -73,7 +74,7 @@ export class RefrigeriosControlador {
   }
 
   @Post()
-  @Roles(Rol.ADMINISTRADOR)
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
   @ApiOperation({
     summary: 'Registrar nueva rendición o suministro de refrigerio',
     description: 'Registra los gastos y distribución de raciones para eventos o sedes operativas.',
@@ -127,6 +128,23 @@ export class RefrigeriosControlador {
     @Body() dto: RendirRefrigerioDto,
   ): Promise<Refrigerio> {
     return this.refrigerios_servicio.rendirRefrigerio(id, dto);
+  }
+
+  @Patch(':id/confirmar-recojo')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @ApiOperation({
+    summary: 'Confirmar recepción y recojo de ración de refrigerio por un becario',
+    description:
+      'Registra en firmas_conformidad el recojo del becario con fecha, hora, estado conforme y observaciones.',
+  })
+  @ApiParam({ name: 'id', description: 'ID del refrigerio', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Recojo de ración confirmado.', type: Refrigerio })
+  confirmarRecojo(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ConfirmarRecojoDto,
+    @UsuarioActual() usuario?: Usuario,
+  ): Promise<Refrigerio> {
+    return this.refrigerios_servicio.confirmarRecojo(id, dto, usuario);
   }
 
   @Patch(':id/revisar-supervisor')

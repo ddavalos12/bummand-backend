@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { DetalleIngredienteRefrigerio } from '../entidades/refrigerio.entidad';
 
@@ -32,6 +33,7 @@ export class RendirRefrigerioDto {
     description: 'Costo total efectivamente gastado y a ser reembolsado al 100%',
   })
   @IsNotEmpty()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   costo_total_bs: number;
@@ -41,6 +43,7 @@ export class RendirRefrigerioDto {
     description: 'Cantidad real de raciones distribuidas a los becarios',
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   cantidad_raciones?: number;

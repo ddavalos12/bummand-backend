@@ -27,7 +27,7 @@ import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 @ApiTags('Devocionales y Seguimiento Pastoral')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtGuardia, RolesGuardia)
-@Controller('devocionales')
+@Controller(['devocionales', 'api/devocionales'])
 export class DevocionalesControlador {
   constructor(private readonly devocionalesServicio: DevocionalesServicio) {}
 

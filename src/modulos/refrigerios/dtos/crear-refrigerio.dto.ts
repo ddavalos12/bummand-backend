@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import { IsArray, IsDateString, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { DetalleIngredienteRefrigerio } from '../entidades/refrigerio.entidad';
 
@@ -16,30 +17,81 @@ export class CrearRefrigerioDto {
     description: 'Identificador del evento institucional vinculado (opcional)',
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   evento_id?: number;
+
+  @ApiPropertyOptional({
+    example: 'Viernes Formativo - Escuela de Líderes',
+    description: 'Nombre de la actividad o evento institucional vinculado',
+  })
+  @IsOptional()
+  @IsString()
+  evento_vinculado?: string;
+
+  @ApiPropertyOptional({
+    example: 'Escuela de Líderes',
+    description: 'Actividad de formación de los viernes',
+  })
+  @IsOptional()
+  @IsString()
+  actividad_viernes?: string;
 
   @ApiPropertyOptional({
     example: 2,
     description: 'Identificador de la sede o lugar de práctica vinculado (opcional)',
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   lugar_practica_id?: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
+    example: 'Oficina Central El Alto',
+    description: 'Nombre de la sede institucional',
+  })
+  @IsOptional()
+  @IsString()
+  sede?: string;
+
+  @ApiPropertyOptional({
+    example: 'Oficina Central El Alto',
+    description: 'Nombre de la sede institucional (alias)',
+  })
+  @IsOptional()
+  @IsString()
+  sede_nombre?: string;
+
+  @ApiPropertyOptional({
+    example: 'Bloque B (Auditorio)',
+    description: 'Bloque o sala donde se entrega el refrigerio',
+  })
+  @IsOptional()
+  @IsString()
+  bloque?: string;
+
+  @ApiPropertyOptional({
     example: 'Refrigerio para Escuela de Líderes (Empanadas y refresco de mocochinchi)',
     description: 'Descripción detallada de los alimentos adquiridos',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  descripcion: string;
+  descripcion?: string;
+
+  @ApiPropertyOptional({
+    example: 'Empanadas de queso y jugo natural de fruta',
+    description: 'Descripción del menú del refrigerio',
+  })
+  @IsOptional()
+  @IsString()
+  menu_descripcion?: string;
 
   @ApiProperty({
     example: 23,
     description: 'Cantidad de raciones distribuidas a los becarios',
   })
   @IsNotEmpty()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   cantidad_raciones: number;
@@ -49,6 +101,7 @@ export class CrearRefrigerioDto {
     description: 'Costo unitario en Bolivianos (Bs) por cada ración (opcional si se envía costo total)',
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   costo_unitario_bs?: number;
@@ -58,12 +111,14 @@ export class CrearRefrigerioDto {
     description: 'Costo total calculado en Bs (opcional si se envía costo unitario)',
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   costo_total_bs?: number;
 
   // Dupla encargada
   @ApiPropertyOptional({ example: 4, description: 'ID del primer becario de la dupla' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   becario_encargado_1_id?: number;
 
@@ -74,6 +129,7 @@ export class CrearRefrigerioDto {
 
   @ApiPropertyOptional({ example: 5, description: 'ID del segundo becario de la dupla' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   becario_encargado_2_id?: number;
 
@@ -87,6 +143,7 @@ export class CrearRefrigerioDto {
     description: 'Identificador del becario encargado principal (compatibilidad)',
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   becario_id?: number;
 
@@ -116,21 +173,25 @@ export class CrearRefrigerioDto {
 
   @ApiPropertyOptional({ example: 138.0, description: 'Presupuesto referencial en Bs' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   presupuesto_referencial_bs?: number;
 
   @ApiPropertyOptional({ example: 100.0, description: 'Porcentaje de devolución' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   porcentaje_devolucion?: number;
 
   @ApiPropertyOptional({ example: 138.0, description: 'Monto de devolución en Bs' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   monto_devolucion_bs?: number;
 
   @ApiPropertyOptional({ example: 4, description: 'ID del único becario receptor del reembolso 100%' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   becario_receptor_devolucion_id?: number;
 
@@ -144,13 +205,14 @@ export class CrearRefrigerioDto {
   @IsString()
   estado_reposicion?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 2,
     description: 'Identificador del usuario responsable de la compra o entrega',
   })
-  @IsNotEmpty()
+  @IsOptional()
+  @Type(() => Number)
   @IsNumber()
-  responsable_id: number;
+  responsable_id?: number;
 
   @ApiPropertyOptional({ example: 'Coordinación General BUMAND', description: 'Supervisor o responsable de la entrega' })
   @IsOptional()

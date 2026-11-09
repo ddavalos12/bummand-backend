@@ -85,7 +85,7 @@ const almacenamiento_lideres = diskStorage({
 @ApiTags('Evaluaciones')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtGuardia, RolesGuardia)
-@Controller('evaluaciones')
+@Controller(['evaluaciones', 'api/evaluaciones'])
 export class EvaluacionesControlador {
   constructor(private readonly evaluaciones_servicio: EvaluacionesServicio) {}
 
@@ -459,7 +459,7 @@ export class EvaluacionesControlador {
     return this.evaluaciones_servicio.resolverCasoPastoral(id, conclusion);
   }
 
-  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
   @Get('f03/nomina')
   @ApiOperation({
     summary: 'Nómina de becarios y estado de su evaluación F-03',
@@ -468,6 +468,45 @@ export class EvaluacionesControlador {
   @ApiResponse({ status: 200, description: 'Nómina F-03 de becarios.' })
   obtenerNominaF03() {
     return this.evaluaciones_servicio.obtenerNominaF03();
+  }
+
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @Get('f03')
+  @ApiOperation({
+    summary: 'Listado general de evaluaciones pastorales F-03',
+    description: 'Retorna la nómina completa de becarios con sus formularios F-03 y 13 respuestas.',
+  })
+  @ApiResponse({ status: 200, description: 'Nómina F-03 de becarios.' })
+  obtenerF03General() {
+    return this.evaluaciones_servicio.obtenerNominaF03();
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('f03/becario/:becario_id')
+  @ApiOperation({
+    summary: 'Obtener Formulario F-03 por ID de becario',
+    description: 'Consulta los datos del pastor y las 13 respuestas ministeriales para un becario específico.',
+  })
+  @ApiParam({ name: 'becario_id', description: 'Identificador del becario', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Detalle de la evaluación F-03 del becario.', type: EvaluacionPastor })
+  obtenerFormularioF03PorBecario(
+    @Param('becario_id', ParseIntPipe) becario_id: number,
+  ) {
+    return this.evaluaciones_servicio.obtenerFormularioF03PorBecario(becario_id);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('receptor/f03')
+  @ApiOperation({
+    summary: 'Receptor de evaluación pastoral Formulario F-03 (Módulo 1)',
+    description: 'Recibe y procesa respuestas del Formulario F-03 pastoral.',
+  })
+  @ApiResponse({ status: 201, description: 'Formulario F-03 procesado con éxito.', type: EvaluacionPastor })
+  procesarReceptorF03(
+    @Body() dto: GuardarFormularioF03Dto,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.evaluaciones_servicio.procesarReceptorF03(dto, usuario);
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)

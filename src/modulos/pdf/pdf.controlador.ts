@@ -8,7 +8,7 @@ import { JwtGuardia } from '../autenticacion/jwt.guardia';
 @ApiTags('PDF')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtGuardia)
-@Controller('pdf')
+@Controller(['pdf', 'api/pdf'])
 export class PdfControlador {
   constructor(
     private readonly pdf_servicio: PdfServicio,

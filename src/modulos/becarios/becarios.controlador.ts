@@ -16,7 +16,7 @@ import { UsuarioActual } from '../autenticacion/usuario-actual.decorador';
 
 @ApiTags('Becarios')
 @ApiBearerAuth('JWT-auth')
-@Controller('becarios')
+@Controller(['becarios', 'api/becarios'])
 @UseGuards(JwtGuardia, RolesGuardia)
 export class BecariosControlador {
   constructor(private readonly becariosServicio: BecariosServicio) {}

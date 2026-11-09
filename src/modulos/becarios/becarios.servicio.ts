@@ -433,56 +433,87 @@ export class BecariosServicio {
     }
 
     if (!becario && dto.ci) {
-      const ci_limpio = dto.ci.trim().toLowerCase();
+      const ci_limpio = dto.ci.trim();
       const ci_sin_exp = ci_limpio.split(/[- ]/)[0].trim();
-      const todos_becarios = await this.becarioRepositorio.find({ relations: { usuario: true } });
-      becario =
-        todos_becarios.find((b) => {
-          if (!b.ci) return false;
-          const b_ci = b.ci.trim().toLowerCase();
-          const b_ci_sin_exp = b_ci.split(/[- ]/)[0].trim();
-          return b_ci === ci_limpio || b_ci_sin_exp === ci_sin_exp;
-        }) || null;
+      becario = await this.becarioRepositorio
+        .createQueryBuilder('b')
+        .where('b.ci = :ci_limpio', { ci_limpio })
+        .orWhere('b.ci ILIKE :ci_exp', { ci_exp: `${ci_sin_exp}%` })
+        .getOne();
+
+      if (!becario) {
+        const todos_becarios = await this.becarioRepositorio.find({ relations: { usuario: true } });
+        becario =
+          todos_becarios.find((b) => {
+            if (!b.ci) return false;
+            const b_ci = b.ci.trim().toLowerCase();
+            const b_ci_sin_exp = b_ci.split(/[- ]/)[0].trim();
+            return b_ci === ci_limpio.toLowerCase() || b_ci_sin_exp === ci_sin_exp.toLowerCase();
+          }) || null;
+      }
     }
 
     if (!becario && dto.nombre) {
-      const normalizar = (txt?: string | null) =>
-        txt ? txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() : '';
-      const nombre_buscado = normalizar(dto.nombre);
-      const todos_becarios = await this.becarioRepositorio.find({ relations: { usuario: true } });
-      becario =
-        todos_becarios.find((b) => {
-          const b_nom = normalizar(b.nombre);
-          const u_nom = normalizar(b.usuario?.nombre);
-          return (
-            (b_nom && (b_nom.includes(nombre_buscado) || nombre_buscado.includes(b_nom))) ||
-            (u_nom && (u_nom.includes(nombre_buscado) || nombre_buscado.includes(u_nom)))
-          );
-        }) || null;
+      const nombre_limpio = dto.nombre.trim();
+      becario = await this.becarioRepositorio
+        .createQueryBuilder('b')
+        .leftJoinAndSelect('b.usuario', 'usuario')
+        .where('b.nombre ILIKE :nom', { nom: `%${nombre_limpio}%` })
+        .orWhere('usuario.nombre ILIKE :nom', { nom: `%${nombre_limpio}%` })
+        .getOne();
+
+      if (!becario) {
+        const normalizar = (txt?: string | null) =>
+          txt ? txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() : '';
+        const nombre_buscado = normalizar(dto.nombre);
+        const todos_becarios = await this.becarioRepositorio.find({ relations: { usuario: true } });
+        becario =
+          todos_becarios.find((b) => {
+            const b_nom = normalizar(b.nombre);
+            const u_nom = normalizar(b.usuario?.nombre);
+            return (
+              (b_nom && (b_nom.includes(nombre_buscado) || nombre_buscado.includes(b_nom))) ||
+              (u_nom && (u_nom.includes(nombre_buscado) || nombre_buscado.includes(u_nom)))
+            );
+          }) || null;
+      }
     }
 
     if (!becario) {
-      becario = this.becarioRepositorio.create({
-        id,
-        nombre: dto.nombre || `Becario #${id}`,
-        ci: dto.ci || String(1000000 + id),
-        carrera: 'General',
-        universidad: 'Universidad Mayor de San Andrés',
-        fecha_ingreso: new Date(),
-        usuario_id: dto.usuario_id || null,
-        modalidad_pasajes: dto.modalidad_pasajes || 'ida_y_vuelta',
-        configuracion_pasajes_actividades: dto.configuracion_pasajes_actividades || null,
-      });
-      becario = await this.becarioRepositorio.save(becario);
-    } else {
-      if (dto.modalidad_pasajes !== undefined) {
-        becario.modalidad_pasajes = dto.modalidad_pasajes;
+      let ci_final = dto.ci?.trim();
+      if (ci_final) {
+        const existente_por_ci = await this.becarioRepositorio.findOne({ where: { ci: ci_final } });
+        if (existente_por_ci) {
+          becario = existente_por_ci;
+        }
       }
-      if (dto.configuracion_pasajes_actividades !== undefined) {
-        becario.configuracion_pasajes_actividades = dto.configuracion_pasajes_actividades;
+
+      if (!becario) {
+        if (!ci_final) {
+          ci_final = `GEN-${id}-${Date.now().toString().slice(-4)}`;
+        }
+        becario = this.becarioRepositorio.create({
+          nombre: dto.nombre || `Becario #${id}`,
+          ci: ci_final,
+          carrera: 'General',
+          universidad: 'Universidad Mayor de San Andrés',
+          fecha_ingreso: new Date(),
+          usuario_id: dto.usuario_id || null,
+          modalidad_pasajes: dto.modalidad_pasajes || 'ida_y_vuelta',
+          configuracion_pasajes_actividades: dto.configuracion_pasajes_actividades || null,
+        });
+        becario = await this.becarioRepositorio.save(becario);
+        return becario;
       }
-      becario = await this.becarioRepositorio.save(becario);
     }
+
+    if (dto.modalidad_pasajes !== undefined) {
+      becario.modalidad_pasajes = dto.modalidad_pasajes;
+    }
+    if (dto.configuracion_pasajes_actividades !== undefined) {
+      becario.configuracion_pasajes_actividades = dto.configuracion_pasajes_actividades;
+    }
+    becario = await this.becarioRepositorio.save(becario);
 
     return becario;
   }

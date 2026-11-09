@@ -1,7 +1,17 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import { IsIn, IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class ActualizarConfiguracionPasajesDto {
+  @ApiPropertyOptional({
+    description: 'Identificador opcional del becario',
+    example: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  id?: number;
+
   @ApiPropertyOptional({
     enum: ['ida_y_vuelta', 'solo_ida'],
     example: 'ida_y_vuelta',
@@ -52,6 +62,7 @@ export class ActualizarConfiguracionPasajesDto {
     description: 'Identificador de usuario del becario (respaldo de identificación)',
   })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   usuario_id?: number;
 }
