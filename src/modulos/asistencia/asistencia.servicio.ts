@@ -546,11 +546,12 @@ export class AsistenciaServicio {
     registro_abierto.lat_salida = dto.latitud;
     registro_abierto.lng_salida = dto.longitud;
     
-    // Cálculo básico de horas
+    // Cálculo básico de horas (Escuela de Líderes no suma horas de práctica)
     const [h_i, m_i] = registro_abierto.hora_ingreso.split(':').map(Number);
     const [h_s, m_s] = registro_abierto.hora_salida.split(':').map(Number);
     const horas = (h_s + m_s / 60) - (h_i + m_i / 60);
-    registro_abierto.horas_trabajadas = parseFloat(horas.toFixed(2));
+    registro_abierto.horas_trabajadas =
+      tipo === TipoAsistencia.ESCUELA_LIDERES ? 0 : parseFloat(horas.toFixed(2));
 
     await this.asistenciaRepositorio.save(registro_abierto);
 
@@ -633,7 +634,9 @@ export class AsistenciaServicio {
     const hora_salida = hora_salida_raw ? (hora_salida_raw.length === 5 ? `${hora_salida_raw}:00` : hora_salida_raw) : null;
 
     let horas_trabajadas: number | null = null;
-    if (hora_salida) {
+    if (tipo === TipoAsistencia.ESCUELA_LIDERES) {
+      horas_trabajadas = 0;
+    } else if (hora_salida) {
       const [h_i, m_i] = hora_ingreso.split(':').map(Number);
       const [h_s, m_s] = hora_salida.split(':').map(Number);
       const horas = (h_s + m_s / 60) - (h_i + m_i / 60);
@@ -777,6 +780,7 @@ export class AsistenciaServicio {
 
       for (const registro of becario.registros_asistencia || []) {
         if (!registro.horas_trabajadas || !registro.fecha) continue;
+        if (registro.tipo === TipoAsistencia.ESCUELA_LIDERES) continue;
         const fecha_str = typeof registro.fecha === 'string'
           ? (registro.fecha as string).substring(0, 7)
           : (registro.fecha as Date).toISOString().substring(0, 7);
@@ -1030,20 +1034,22 @@ export class AsistenciaServicio {
           const dia_semana = NOMBRES_DIAS_SEMANA[dt.getUTCDay()];
 
           let horas_dia = 0;
-          if (reg.horas_trabajadas !== null && reg.horas_trabajadas !== undefined && Number(reg.horas_trabajadas) > 0) {
+          if (reg.tipo === TipoAsistencia.ESCUELA_LIDERES) {
+            horas_dia = 0;
+          } else if (reg.horas_trabajadas !== null && reg.horas_trabajadas !== undefined && Number(reg.horas_trabajadas) > 0) {
             horas_dia = Number(reg.horas_trabajadas);
           } else if (reg.hora_ingreso && reg.hora_salida) {
             const [h_i, m_i] = reg.hora_ingreso.split(':').map(Number);
             const [h_s, m_s] = reg.hora_salida.split(':').map(Number);
             const diff = (h_s + m_s / 60) - (h_i + m_i / 60);
             horas_dia = diff > 0 ? parseFloat(diff.toFixed(2)) : 0;
-          } else if (reg.tipo === TipoAsistencia.ESCUELA_LIDERES) {
-            horas_dia = 3.0;
           } else {
             horas_dia = 4.25;
           }
 
-          saldo_acumulado_progresivo = Number((saldo_acumulado_progresivo + horas_dia).toFixed(2));
+          if (reg.tipo !== TipoAsistencia.ESCUELA_LIDERES) {
+            saldo_acumulado_progresivo = Number((saldo_acumulado_progresivo + horas_dia).toFixed(2));
+          }
 
           const tipo_etiqueta_map: Record<string, string> = {
             [TipoAsistencia.PRACTICAS]: 'Prácticas Preprofesionales',

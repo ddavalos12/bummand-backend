@@ -802,7 +802,7 @@ export class PdfServicio {
       const previsto = r.hora_prevista || '08:00';
       const real = r.hora_ingreso || '08:00';
       const retraso_m = r.minutos_retraso || 0;
-      const horas = Number(r.horas_trabajadas || 4.0);
+      const horas = r.tipo === TipoAsistencia.ESCUELA_LIDERES ? 0 : Number(r.horas_trabajadas || 4.0);
       const estado =
         retraso_m > 0
           ? `Tardanza (+${retraso_m}m)`
@@ -1825,7 +1825,7 @@ export class PdfServicio {
       const ingreso = a.hora_ingreso || '08:00';
       const salida = a.hora_salida || '12:00';
       const retraso_m = a.minutos_retraso || 0;
-      const horas = Number(a.horas_trabajadas) || 4.0;
+      const horas = a.tipo === TipoAsistencia.ESCUELA_LIDERES ? 0 : (Number(a.horas_trabajadas) || 4.0);
       const dist_gps = a.dentro_de_radio ? 'Conforme (<50m)' : 'Fuera Geocerca';
       const estado =
         retraso_m > 0
@@ -3685,7 +3685,7 @@ export class PdfServicio {
         const sede_val = a.becario?.ubicacion || 'Sede Central';
         const hora_prev = a.tipo === TipoAsistencia.ESCUELA_LIDERES ? '14:30' : '08:00';
         const hora_real = a.hora_ingreso || '08:00';
-        const horas_val = Number(a.horas_trabajadas) || 4.0;
+        const horas_val = a.tipo === TipoAsistencia.ESCUELA_LIDERES ? 0 : (Number(a.horas_trabajadas) || 4.0);
         const retraso_val = Number(a.minutos_retraso) || 0;
         const estado_str =
           retraso_val > 0
