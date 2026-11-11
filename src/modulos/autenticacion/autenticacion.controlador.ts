@@ -1,8 +1,9 @@
-import { Controller, Post, Get, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Patch, Get, Param, Body, Headers, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { InicioSesionDto } from './dtos/inicio-sesion.dto';
 import { ConfirmarCorreoDto } from './dtos/confirmar-correo.dto';
 import { RegistroBecarioDto } from './dtos/registro-becario.dto';
+import { CambiarContrasenaDto } from '../usuarios/dtos/cambiar-contrasena.dto';
 import { AutenticacionServicio } from './autenticacion.servicio';
 import { JwtGuardia } from './jwt.guardia';
 import { UsuarioActual } from './usuario-actual.decorador';
@@ -109,5 +110,53 @@ export class AutenticacionControlador {
   })
   registrar(@Body() dto: RegistroBecarioDto) {
     return this.autenticacionServicio.registrarBecario(dto);
+  }
+
+  @UseGuards(JwtGuardia)
+  @Patch('cambiar-contrasena')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Cambiar contraseña del usuario autenticado (PATCH)',
+  })
+  cambiarContrasenaPatch(
+    @UsuarioActual() usuario: Usuario,
+    @Body() dto: CambiarContrasenaDto,
+  ) {
+    return this.autenticacionServicio.cambiarContrasena(usuario, dto);
+  }
+
+  @UseGuards(JwtGuardia)
+  @Post('cambiar-contrasena')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Cambiar contraseña del usuario autenticado (POST)',
+  })
+  cambiarContrasenaPost(
+    @UsuarioActual() usuario: Usuario,
+    @Body() dto: CambiarContrasenaDto,
+  ) {
+    return this.autenticacionServicio.cambiarContrasena(usuario, dto);
+  }
+
+  @Post('cerrar-sesion')
+  @ApiOperation({
+    summary: 'Cerrar sesión institucional y limpiar token FCM',
+  })
+  cerrarSesion(
+    @Headers('authorization') autorizacion?: string,
+    @Body() cuerpo?: Record<string, unknown>,
+  ) {
+    return this.autenticacionServicio.cerrarSesion(autorizacion, cuerpo);
+  }
+
+  @Post('logout')
+  @ApiOperation({
+    summary: 'Alias de cierre de sesión institucional',
+  })
+  logout(
+    @Headers('authorization') autorizacion?: string,
+    @Body() cuerpo?: Record<string, unknown>,
+  ) {
+    return this.autenticacionServicio.cerrarSesion(autorizacion, cuerpo);
   }
 }

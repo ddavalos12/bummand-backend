@@ -14,10 +14,13 @@ export class JwtEstrategia extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    const usuario = await this.usuariosServicio.obtenerPorId(payload.sub);
+    let usuario = await this.usuariosServicio.obtenerPorId(payload.sub);
+    if (!usuario && payload?.correo) {
+      usuario = await this.usuariosServicio.obtenerPorCorreoConRelaciones(payload.correo);
+    }
     if (!usuario) {
       throw new UnauthorizedException();
     }
-    return usuario; // Inyectado en req.user (que tiparemos como req.usuario)
+    return usuario;
   }
 }

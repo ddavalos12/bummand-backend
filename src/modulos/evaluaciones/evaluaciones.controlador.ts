@@ -12,10 +12,11 @@ import {
   Query,
   UseInterceptors,
   UploadedFile,
+  UploadedFiles,
   BadRequestException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -42,9 +43,13 @@ import { GuardarNotasEstudianteDto, SubirDocumentoAcademicoDto } from './dtos/gu
 import { PreEvaluarSupervisorDto } from './dtos/pre-evaluar-supervisor.dto';
 import { ConvalidarAdministracionDto } from './dtos/convalidar-administracion.dto';
 import { ReceptorMentorQrDto } from './dtos/receptor-mentor-qr.dto';
-import { ReceptorSocioeconomicaDto } from './dtos/receptor-socioeconomica.dto';
+import { ReceptorSocioeconomicaDto, RevisarSocioeconomicaDto } from './dtos/receptor-socioeconomica.dto';
 import { SolicitarCodigoTutorDto, VerificarCodigoTutorDto } from './dtos/verificacion-tutor.dto';
-import { EntregarTareaLideresDto, RevisarEntregaLideresDto } from './dtos/escuela-lideres.dto';
+import {
+  EntregarTareaLideresDto,
+  GuardarTareaCatalogoLideresDto,
+  RevisarEntregaLideresDto,
+} from './dtos/escuela-lideres.dto';
 import { EntregaTareaLideres } from './entidades/entrega-tarea-lideres.entidad';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
 import { RolesGuardia } from '../autenticacion/roles.guardia';
@@ -306,6 +311,96 @@ export class EvaluacionesControlador {
   @ApiResponse({ status: 200, description: 'Consolidado semestral obtenido con éxito.' })
   obtenerConsolidadoSemestral(@Query('periodo') periodo?: string) {
     return this.evaluaciones_servicio.obtenerConsolidadoSemestral(periodo);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('estructura-calificacion')
+  @ApiOperation({
+    summary: 'Obtener configuración de puntajes de los 5 módulos y sub-escalas',
+    description: 'Retorna la estructura de calificación semestral (100 pts) y las escalas de cada módulo.',
+  })
+  obtenerEstructuraCalificacion() {
+    return this.evaluaciones_servicio.obtenerEstructuraCalificacion();
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Put('estructura-calificacion')
+  @ApiOperation({
+    summary: 'Guardar configuración de puntajes de los 5 módulos y sub-escalas',
+    description: 'Actualiza los pesos de los 5 módulos (suma = 100 pts) y sus sub-escalas, sincronizando el periodo activo.',
+  })
+  guardarEstructuraCalificacion(@Body() payload: any) {
+    return this.evaluaciones_servicio.guardarEstructuraCalificacion(payload);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('estructura-calificacion')
+  @ApiOperation({
+    summary: 'Alias POST para guardar configuración de puntajes de los 5 módulos y sub-escalas',
+  })
+  guardarEstructuraCalificacionPost(@Body() payload: any) {
+    return this.evaluaciones_servicio.guardarEstructuraCalificacion(payload);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('socioeconomica/nomina')
+  @ApiOperation({
+    summary: 'Obtener nómina completa de becarios para Evaluación Socioeconómica (Módulo 5)',
+    description: 'Retorna todos los becarios con su puntaje sobre 20 y 100, semáforo, estado, respuestas detalladas y convalidación.',
+  })
+  @ApiQuery({ name: 'periodo_id', required: false, type: Number })
+  obtenerNominaSocioeconomica(@Query('periodo_id') periodo_id?: number) {
+    return this.evaluaciones_servicio.obtenerNominaSocioeconomica(
+      periodo_id ? Number(periodo_id) : undefined,
+    );
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Patch('socioeconomica/:becario_id/revisar')
+  @ApiOperation({
+    summary: 'Revisar o calificar evaluación socioeconómica de un becario',
+  })
+  revisarSocioeconomica(
+    @Param('becario_id', ParseIntPipe) becario_id: number,
+    @Body() dto: RevisarSocioeconomicaDto,
+  ) {
+    return this.evaluaciones_servicio.revisarEvaluacionSocioeconomica(becario_id, dto, false);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('socioeconomica/:becario_id/revisar')
+  @ApiOperation({
+    summary: 'Alias POST para revisar o calificar evaluación socioeconómica de un becario',
+  })
+  revisarSocioeconomicaPost(
+    @Param('becario_id', ParseIntPipe) becario_id: number,
+    @Body() dto: RevisarSocioeconomicaDto,
+  ) {
+    return this.evaluaciones_servicio.revisarEvaluacionSocioeconomica(becario_id, dto, false);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Patch('socioeconomica/:becario_id/aprobar')
+  @ApiOperation({
+    summary: 'Aprobar y convalidar evaluación socioeconómica de un becario',
+  })
+  aprobarSocioeconomica(
+    @Param('becario_id', ParseIntPipe) becario_id: number,
+    @Body() dto: RevisarSocioeconomicaDto,
+  ) {
+    return this.evaluaciones_servicio.aprobarEvaluacionSocioeconomica(becario_id, dto);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('socioeconomica/:becario_id/aprobar')
+  @ApiOperation({
+    summary: 'Alias POST para aprobar y convalidar evaluación socioeconómica de un becario',
+  })
+  aprobarSocioeconomicaPost(
+    @Param('becario_id', ParseIntPipe) becario_id: number,
+    @Body() dto: RevisarSocioeconomicaDto,
+  ) {
+    return this.evaluaciones_servicio.aprobarEvaluacionSocioeconomica(becario_id, dto);
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
@@ -832,10 +927,53 @@ export class EvaluacionesControlador {
   // ==============================================================
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('escuela-lideres/catalogo-tareas')
+  @ApiOperation({
+    summary: 'Obtener catálogo global de tareas de Escuela de Líderes CETI',
+    description: 'Retorna el catálogo dinámico de tareas configuradas para todos los becarios.',
+  })
+  obtenerCatalogoTareasLideres() {
+    return this.evaluaciones_servicio.obtenerCatalogoTareasEscuelaLideres();
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('escuela-lideres/catalogo-tareas')
+  @ApiOperation({
+    summary: 'Crear o publicar una nueva tarea en el catálogo de Escuela de Líderes para todos los becarios',
+  })
+  crearTareaCatalogoLideres(@Body() dto: GuardarTareaCatalogoLideresDto) {
+    return this.evaluaciones_servicio.guardarTareaCatalogoEscuelaLideres(dto);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Put('escuela-lideres/catalogo-tareas/:numero')
+  @ApiOperation({
+    summary: 'Editar una tarea existente del catálogo de Escuela de Líderes para todos los becarios',
+  })
+  actualizarTareaCatalogoLideres(
+    @Param('numero', ParseIntPipe) numero: number,
+    @Body() dto: GuardarTareaCatalogoLideresDto,
+  ) {
+    return this.evaluaciones_servicio.guardarTareaCatalogoEscuelaLideres(dto, numero);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('escuela-lideres/catalogo-tareas/:numero')
+  @ApiOperation({
+    summary: 'Alias POST para editar una tarea existente del catálogo de Escuela de Líderes',
+  })
+  actualizarTareaCatalogoLideresPost(
+    @Param('numero', ParseIntPipe) numero: number,
+    @Body() dto: GuardarTareaCatalogoLideresDto,
+  ) {
+    return this.evaluaciones_servicio.guardarTareaCatalogoEscuelaLideres(dto, numero);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get('escuela-lideres/tareas')
   @ApiOperation({
-    summary: 'Listar las 12 tareas CETI y estado de entrega del becario',
-    description: 'Retorna las 12 tareas formativas del semestre y el estado de entrega y calificación del becario.',
+    summary: 'Listar las tareas CETI y estado de entrega del becario',
+    description: 'Retorna las tareas formativas del semestre y el estado de entrega y calificación del becario.',
   })
   @ApiQuery({ name: 'becario_id', required: false, description: 'ID del becario (opcional para supervisor/admin)' })
   @ApiQuery({ name: 'periodo_id', required: false, description: 'ID del periodo académico' })
@@ -851,15 +989,16 @@ export class EvaluacionesControlador {
     );
   }
 
-  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('escuela-lideres/tareas/subir-evidencia')
-  @UseInterceptors(FileInterceptor('archivo', { storage: almacenamiento_lideres }))
+  @UseInterceptors(AnyFilesInterceptor({ storage: almacenamiento_lideres }))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Subir evidencia documental de tarea de Escuela de Líderes',
     description: 'Almacena el archivo en ./uploads/escuela-lideres y retorna la URL.',
   })
-  subirEvidenciaLideres(@UploadedFile() archivo: any) {
+  subirEvidenciaLideres(@UploadedFiles() archivos: any[]) {
+    const archivo = Array.isArray(archivos) && archivos.length > 0 ? archivos[0] : null;
     if (!archivo) {
       throw new BadRequestException('Se requiere adjuntar un archivo de evidencia');
     }
@@ -872,7 +1011,47 @@ export class EvaluacionesControlador {
     };
   }
 
-  @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('escuela-lideres/tarea/:numero/evidencia')
+  @UseInterceptors(AnyFilesInterceptor({ storage: almacenamiento_lideres }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Alias APK: Subir evidencia documental de una tarea específica de Escuela de Líderes',
+  })
+  async subirEvidenciaTareaPorNumeroLideres(
+    @Param('numero', ParseIntPipe) numero: number,
+    @UploadedFiles() archivos: any[],
+    @Body() body: any,
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    const archivo = Array.isArray(archivos) && archivos.length > 0 ? archivos[0] : null;
+    if (!archivo) {
+      throw new BadRequestException('Se requiere adjuntar un archivo de evidencia');
+    }
+    const url = `/uploads/escuela-lideres/${archivo.filename}`;
+    const tamano_archivo = `${(archivo.size / 1024).toFixed(1)} KB`;
+    const entrega = await this.evaluaciones_servicio.entregarTareaEscuelaLideres(
+      {
+        tarea_numero: numero,
+        becario_id: body?.becario_id ? Number(body.becario_id) : undefined,
+        periodo_id: body?.periodo_id ? Number(body.periodo_id) : undefined,
+        archivo_evidencia_url: url,
+        nombre_archivo: archivo.originalname,
+        tamano_archivo,
+        comentario_becario: body?.comentario_becario || body?.comentario,
+      },
+      usuario,
+    );
+    return {
+      url,
+      archivo_evidencia_url: url,
+      nombre_archivo: archivo.originalname,
+      tamano_archivo,
+      entrega,
+    };
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('escuela-lideres/tareas/entregar')
   @ApiOperation({
     summary: 'Entregar tarea de Escuela de Líderes CETI',
@@ -884,6 +1063,22 @@ export class EvaluacionesControlador {
     @UsuarioActual() usuario: Usuario,
   ): Promise<EntregaTareaLideres> {
     return this.evaluaciones_servicio.entregarTareaEscuelaLideres(dto, usuario);
+  }
+
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('escuela-lideres/tarea/:numero/entregar')
+  @ApiOperation({
+    summary: 'Alias APK: Entregar tarea por número de Escuela de Líderes CETI',
+  })
+  entregarTareaPorNumeroLideres(
+    @Param('numero', ParseIntPipe) numero: number,
+    @Body() dto: EntregarTareaLideresDto,
+    @UsuarioActual() usuario: Usuario,
+  ): Promise<EntregaTareaLideres> {
+    return this.evaluaciones_servicio.entregarTareaEscuelaLideres(
+      { ...dto, tarea_numero: numero },
+      usuario,
+    );
   }
 
   @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
@@ -899,5 +1094,44 @@ export class EvaluacionesControlador {
     @UsuarioActual() usuario: Usuario,
   ) {
     return this.evaluaciones_servicio.revisarEntregaEscuelaLideres(id, dto, usuario);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('escuela-lideres/entregas/:id/revisar')
+  @ApiOperation({
+    summary: 'Alias POST para revisar y calificar entrega de tarea CETI por ID',
+  })
+  revisarEntregaLideresPost(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: RevisarEntregaLideresDto,
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    return this.evaluaciones_servicio.revisarEntregaEscuelaLideres(id, dto, usuario);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('escuela-lideres/tarea/:numero/revisar')
+  @ApiOperation({
+    summary: 'Alias APK/Web: Revisar y calificar tarea de Escuela de Líderes por número de tarea y becario',
+  })
+  revisarTareaPorNumeroLideresPost(
+    @Param('numero', ParseIntPipe) numero: number,
+    @Body() dto: RevisarEntregaLideresDto,
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    return this.evaluaciones_servicio.revisarTareaPorNumeroEscuelaLideres(numero, dto, usuario);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Patch('escuela-lideres/tarea/:numero/revisar')
+  @ApiOperation({
+    summary: 'Alias PATCH: Revisar y calificar tarea de Escuela de Líderes por número de tarea y becario',
+  })
+  revisarTareaPorNumeroLideresPatch(
+    @Param('numero', ParseIntPipe) numero: number,
+    @Body() dto: RevisarEntregaLideresDto,
+    @UsuarioActual() usuario: Usuario,
+  ) {
+    return this.evaluaciones_servicio.revisarTareaPorNumeroEscuelaLideres(numero, dto, usuario);
   }
 }

@@ -19,4 +19,20 @@ export class CambiarContrasenaDto {
   @IsString()
   @MinLength(6, { message: 'La nueva contraseña debe tener al menos 6 caracteres' })
   nueva_contrasena: string;
+
+  @ApiPropertyOptional({
+    example: 'NuevaClaveSegura2026*',
+    description: 'Confirmación opcional de la nueva contraseña',
+  })
+  @IsOptional()
+  @IsString()
+  confirmar_contrasena?: string;
+
+  @ApiPropertyOptional({
+    example: 'usuario@diaconia.bo',
+    description: 'Correo electrónico opcional de respaldo para identificar al usuario',
+  })
+  @IsOptional()
+  @IsString()
+  correo?: string;
 }

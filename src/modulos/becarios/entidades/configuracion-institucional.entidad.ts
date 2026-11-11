@@ -14,6 +14,12 @@ export class ConfiguracionInstitucional {
   @Column({ name: 'emitida_por_usuario_id', type: 'int', nullable: true })
   emitida_por_usuario_id: number | null;
 
+  @Column({ name: 'clave', type: 'varchar', length: 100, nullable: true })
+  clave?: string | null;
+
+  @Column({ name: 'valor_json', type: 'jsonb', nullable: true })
+  valor_json?: Record<string, unknown> | unknown[] | null;
+
   @UpdateDateColumn({ name: 'fecha_actualizacion' })
   fecha_actualizacion: Date;
 }

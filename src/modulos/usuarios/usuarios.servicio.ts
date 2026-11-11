@@ -475,19 +475,58 @@ export class UsuariosServicio {
     return this.obtenerMiPerfilCompleto(usuario_id);
   }
 
-  async cambiarMiContrasena(usuario_id: number, dto: CambiarContrasenaDto) {
-    const usuario = await this.usuarioRepositorio.findOne({
+  async cambiarContrasenaPropia(
+    usuario_id: number,
+    dto: CambiarContrasenaDto,
+    correo_usuario?: string,
+  ) {
+    return this.cambiarMiContrasena(usuario_id, dto, correo_usuario);
+  }
+
+  async cambiarMiContrasena(
+    usuario_id: number,
+    dto: CambiarContrasenaDto,
+    correo_usuario?: string,
+  ) {
+    let usuario = await this.usuarioRepositorio.findOne({
       where: { id: usuario_id },
       select: {
         id: true,
+        correo: true,
         contrasena_hash: true,
       },
     });
+
     if (!usuario) {
-      throw new NotFoundException('Usuario no encontrado');
+      const correo_busqueda = (correo_usuario || dto.correo || '').trim().toLowerCase();
+      if (correo_busqueda) {
+        usuario = await this.usuarioRepositorio.findOne({
+          where: [
+            { correo: correo_busqueda },
+            { correo_alternativo: correo_busqueda },
+          ],
+          select: {
+            id: true,
+            correo: true,
+            contrasena_hash: true,
+          },
+        });
+      }
     }
 
-    if (dto.contrasena_actual) {
+    if (!usuario) {
+      throw new NotFoundException('No se encontró la cuenta de usuario en el sistema.');
+    }
+
+    if (
+      dto.confirmar_contrasena !== undefined &&
+      dto.confirmar_contrasena.trim() !== '' &&
+      dto.confirmar_contrasena.trim() !== (dto.nueva_contrasena || '').trim()
+    ) {
+      throw new BadRequestException('La confirmación de contraseña no coincide con la nueva contraseña.');
+    }
+
+    if (dto.contrasena_actual && dto.contrasena_actual.trim() !== '') {
       const coincide = await verificarContrasena(dto.contrasena_actual, usuario.contrasena_hash);
       if (!coincide) {
         throw new BadRequestException('La contraseña actual ingresada es incorrecta.');
@@ -502,6 +541,7 @@ export class UsuariosServicio {
     await this.usuarioRepositorio.save(usuario);
 
     return {
+      exito: true,
       mensaje: 'Contraseña actualizada exitosamente.',
       actualizado: true,
     };

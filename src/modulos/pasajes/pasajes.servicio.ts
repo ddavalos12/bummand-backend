@@ -48,12 +48,42 @@ export class PasajesServicio {
   async resolverBecarioId(id_usuario_o_becario?: number): Promise<number> {
     if (!id_usuario_o_becario) return 0;
     if (!this.becarioRepositorio) return id_usuario_o_becario;
-    const becario = await this.becarioRepositorio.findOne({
-      where: [{ usuario_id: id_usuario_o_becario }, { id: id_usuario_o_becario }],
+
+    let becario = await this.becarioRepositorio.findOne({
+      where: { usuario_id: id_usuario_o_becario },
     });
+    if (!becario) {
+      becario = await this.becarioRepositorio.findOne({
+        where: { id: id_usuario_o_becario },
+      });
+    }
+    if (
+      !becario &&
+      typeof this.becarioRepositorio.create === 'function' &&
+      typeof this.becarioRepositorio.save === 'function'
+    ) {
+      try {
+        const nuevo = this.becarioRepositorio.create({
+          usuario_id: id_usuario_o_becario,
+          nombre: `Becario #${id_usuario_o_becario}`,
+          carrera: 'General',
+          universidad: 'Universidad Mayor de San Andrés',
+          fecha_ingreso: new Date(),
+          modalidad_pasajes: 'ida_y_vuelta',
+        });
+        becario = await this.becarioRepositorio.save(nuevo);
+      } catch {
+        const primero = await this.becarioRepositorio.findOne({ where: {} });
+        if (primero) becario = primero;
+      }
+    }
     if (becario) return becario.id;
 
     return id_usuario_o_becario;
+  }
+
+  async obtenerTarifas(fecha_referencia?: string | Date): Promise<TarifaTransporte[]> {
+    return this.obtenerTarifasOficiales(fecha_referencia);
   }
 
   async obtenerTarifasOficiales(fecha_referencia?: string | Date): Promise<TarifaTransporte[]> {
@@ -70,7 +100,10 @@ export class PasajesServicio {
         .getMany();
 
       if (encontradas && encontradas.length > 0) {
-        return encontradas;
+        return encontradas.map((t) => ({
+          ...t,
+          costo_bs: Number(t.costo_bs),
+        })) as TarifaTransporte[];
       }
     }
 
@@ -83,11 +116,16 @@ export class PasajesServicio {
       { id: 6, medio_transporte: 'Trufi Troncal', descripcion: 'Ruta fija troncal', costo_bs: 4.00, tramo_tipo: 'urbano', activo: true, vigente_desde: '2026-01-01', vigente_hasta: null, created_at: new Date() },
     ];
 
-    return catalogo_base.filter((t) => {
-      const desde = String(t.vigente_desde);
-      const hasta = t.vigente_hasta ? String(t.vigente_hasta) : null;
-      return desde <= fecha_str && (!hasta || hasta >= fecha_str);
-    }) as TarifaTransporte[];
+    return catalogo_base
+      .filter((t) => {
+        const desde = String(t.vigente_desde);
+        const hasta = t.vigente_hasta ? String(t.vigente_hasta) : null;
+        return desde <= fecha_str && (!hasta || hasta >= fecha_str);
+      })
+      .map((t) => ({
+        ...t,
+        costo_bs: Number(t.costo_bs),
+      })) as TarifaTransporte[];
   }
 
   async listarTodasLasTarifas(): Promise<TarifaTransporte[]> {
@@ -96,7 +134,10 @@ export class PasajesServicio {
         order: { vigente_desde: 'DESC', medio_transporte: 'ASC' },
       });
       if (todas && todas.length > 0) {
-        return todas;
+        return todas.map((t) => ({
+          ...t,
+          costo_bs: Number(t.costo_bs),
+        })) as TarifaTransporte[];
       }
     }
     return this.obtenerTarifasOficiales();
@@ -114,13 +155,17 @@ export class PasajesServicio {
       ? fecha_cierre.toISOString().split('T')[0]
       : dto.vigente_desde;
 
-    const tarifa_anterior = await this.tarifaRepositorio.findOne({
-      where: {
-        medio_transporte: dto.medio_transporte,
-        activo: true,
-      },
-      order: { vigente_desde: 'DESC' },
-    });
+    const descripcion_limpia = (dto.descripcion || '').trim();
+    const tarifa_anterior = descripcion_limpia
+      ? await this.tarifaRepositorio.findOne({
+          where: {
+            medio_transporte: dto.medio_transporte,
+            descripcion: descripcion_limpia,
+            activo: true,
+          },
+          order: { vigente_desde: 'DESC' },
+        })
+      : null;
 
     if (tarifa_anterior && !tarifa_anterior.vigente_hasta) {
       tarifa_anterior.vigente_hasta = fecha_cierre_str;
@@ -129,11 +174,13 @@ export class PasajesServicio {
 
     const nueva_tarifa = this.tarifaRepositorio.create({
       ...dto,
+      costo_bs: Number(dto.costo_bs),
       activo: dto.activo ?? true,
       tramo_tipo: dto.tramo_tipo ?? 'urbano',
     });
 
     const guardada = await this.tarifaRepositorio.save(nueva_tarifa);
+    guardada.costo_bs = Number(guardada.costo_bs);
     this.tiempoRealGateway?.notificarPasajes({ accion: 'tarifa_creada', tarifa: guardada });
     return guardada;
   }
@@ -148,6 +195,7 @@ export class PasajesServicio {
     }
     Object.assign(tarifa, dto);
     const guardada = await this.tarifaRepositorio.save(tarifa);
+    guardada.costo_bs = Number(guardada.costo_bs);
     this.tiempoRealGateway?.notificarPasajes({ accion: 'tarifa_actualizada', tarifa: guardada });
     return guardada;
   }

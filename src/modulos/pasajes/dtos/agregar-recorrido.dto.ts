@@ -61,11 +61,11 @@ export class AgregarRecorridoDto {
   @ApiPropertyOptional({
     example: 'Apoyo en digitalización de expedientes de cartera en Agencia Central',
     description: 'Detalle o justificación de las actividades formativas realizadas',
-    maxLength: 255,
+    maxLength: 2000,
   })
   @IsOptional()
   @IsString()
-  @MaxLength(255)
+  @MaxLength(2000)
   apoyo_realizado?: string;
 
   @ApiPropertyOptional({
@@ -74,7 +74,7 @@ export class AgregarRecorridoDto {
   })
   @IsOptional()
   @IsString()
-  @MaxLength(255)
+  @MaxLength(2000)
   apoyoRealizado?: string;
 
   @ApiPropertyOptional({
@@ -164,6 +164,7 @@ export class AgregarRecorridoDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   calles_declaradas?: string;
 
   @ApiPropertyOptional({
@@ -172,6 +173,7 @@ export class AgregarRecorridoDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   callesDeclaradas?: string;
 
   @ApiPropertyOptional({

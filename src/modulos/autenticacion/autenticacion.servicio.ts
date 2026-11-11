@@ -13,6 +13,7 @@ import { Usuario, Rol, EstadoUsuario } from '../usuarios/entidades/usuario.entid
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { InicioSesionDto } from './dtos/inicio-sesion.dto';
 import { RegistroBecarioDto } from './dtos/registro-becario.dto';
+import { CambiarContrasenaDto } from '../usuarios/dtos/cambiar-contrasena.dto';
 import { compararContrasena, hashearContrasena } from '../../utilidades/hash.utilidad';
 
 @Injectable()
@@ -222,6 +223,62 @@ export class AutenticacionServicio {
         rol: usuario_guardado.rol,
         becario_id: becario_coincidente.id,
       },
+    };
+  }
+
+  async cambiarContrasena(usuario: Usuario, dto: CambiarContrasenaDto) {
+    return this.usuariosServicio.cambiarContrasenaPropia(
+      usuario.id,
+      dto,
+      usuario.correo,
+    );
+  }
+
+  async cerrarSesion(autorizacion?: string, cuerpo?: Record<string, unknown>) {
+    try {
+      let usuario_id =
+        typeof cuerpo?.usuario_id === 'number'
+          ? cuerpo.usuario_id
+          : typeof cuerpo?.id === 'number'
+            ? cuerpo.id
+            : undefined;
+      let correo = typeof cuerpo?.correo === 'string' ? cuerpo.correo : undefined;
+
+      if (!usuario_id && autorizacion && autorizacion.startsWith('Bearer ')) {
+        const token = autorizacion.slice(7).trim();
+        const decodificado = this.jwtService.decode(token) as Record<string, unknown> | null;
+        if (decodificado) {
+          if (typeof decodificado.sub === 'number') {
+            usuario_id = decodificado.sub;
+          }
+          if (typeof decodificado.correo === 'string') {
+            correo = decodificado.correo;
+          }
+        }
+      }
+
+      if (usuario_id) {
+        const usuario = await this.usuarioRepositorio.findOne({ where: { id: usuario_id } });
+        if (usuario && usuario.fcm_token) {
+          usuario.fcm_token = null as any;
+          await this.usuarioRepositorio.save(usuario);
+        }
+      } else if (correo) {
+        const usuario = await this.usuarioRepositorio.findOne({
+          where: { correo: correo.trim().toLowerCase() },
+        });
+        if (usuario && usuario.fcm_token) {
+          usuario.fcm_token = null as any;
+          await this.usuarioRepositorio.save(usuario);
+        }
+      }
+    } catch {
+      // Cierre de sesión resiliente incluso si el token ya expiró
+    }
+
+    return {
+      exito: true,
+      mensaje: 'Sesión cerrada correctamente',
     };
   }
 }

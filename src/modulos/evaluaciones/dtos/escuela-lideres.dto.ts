@@ -1,22 +1,27 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 import { EstadoEntregaTarea } from '../entidades/entrega-tarea-lideres.entidad';
 
 export class EntregarTareaLideresDto {
-  @ApiProperty({ example: 2, description: 'ID del periodo de evaluación' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ example: 2, description: 'ID del periodo de evaluación' })
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  periodo_id: number;
+  periodo_id?: number;
 
-  @ApiProperty({ example: 1, description: 'Número de la tarea CETI (1 a 12)' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ example: 1, description: 'Número de la tarea CETI' })
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)
-  @Max(12)
-  tarea_numero: number;
+  @Max(100)
+  tarea_numero?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  numero?: number;
 
   @ApiPropertyOptional({ example: 1, description: 'ID del becario (opcional si es becario autenticado)' })
   @IsOptional()
@@ -24,18 +29,18 @@ export class EntregarTareaLideresDto {
   @IsNumber()
   becario_id?: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: '/uploads/escuela-lideres/tarea-1.pdf',
     description: 'URL o ruta del archivo de evidencia subido',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  archivo_evidencia_url: string;
+  archivo_evidencia_url?: string;
 
-  @ApiProperty({ example: 'Informe_Mision_Integral.pdf', description: 'Nombre original del archivo de evidencia' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ example: 'Informe_Mision_Integral.pdf', description: 'Nombre original del archivo de evidencia' })
+  @IsOptional()
   @IsString()
-  nombre_archivo: string;
+  nombre_archivo?: string;
 
   @ApiPropertyOptional({ example: '1.2 MB', description: 'Tamaño legible del archivo' })
   @IsOptional()
@@ -49,27 +54,51 @@ export class EntregarTareaLideresDto {
   @IsOptional()
   @IsString()
   comentario_becario?: string;
+
+  @IsOptional()
+  @IsString()
+  respuesta_texto?: string;
+
+  @IsOptional()
+  @IsString()
+  enlace_externo?: string;
+
+  @IsOptional()
+  @IsString()
+  archivo_adjunto?: string;
 }
 
 export class RevisarEntregaLideresDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: EstadoEntregaTarea.REVISADO,
     enum: [EstadoEntregaTarea.REVISADO, EstadoEntregaTarea.OBSERVADO],
     description: 'Dictamen de revisión: revisado u observado',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsEnum(EstadoEntregaTarea)
-  estado: EstadoEntregaTarea;
+  estado?: EstadoEntregaTarea;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 8.33,
     description: 'Calificación obtenida en la tarea (escala de la tarea hasta 8.33/8.37 o base 100)',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  puntaje_obtenido: number;
+  puntaje_obtenido?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  calificacion?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  puntaje?: number;
 
   @ApiPropertyOptional({
     example: 'Excelente fundamentación teológica y aplicabilidad práctica en la iglesia local.',
@@ -78,4 +107,71 @@ export class RevisarEntregaLideresDto {
   @IsOptional()
   @IsString()
   comentario_revisor?: string;
+
+  @IsOptional()
+  @IsString()
+  retroalimentacion_supervisor?: string;
+
+  @IsOptional()
+  @IsString()
+  observaciones?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  becario_id?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  periodo_id?: number;
+}
+
+export class GuardarTareaCatalogoLideresDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  numero?: number;
+
+  @IsOptional()
+  @IsString()
+  codigo?: string;
+
+  @IsOptional()
+  @IsString()
+  titulo?: string;
+
+  @IsOptional()
+  @IsString()
+  modulo?: string;
+
+  @IsOptional()
+  @IsString()
+  descripcion?: string;
+
+  @IsOptional()
+  @IsString()
+  instrucciones?: string;
+
+  @IsOptional()
+  @IsString()
+  fecha_limite?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  ponderacion?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  puntaje_maximo?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  publicada_apk?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enviar_apk?: boolean;
 }

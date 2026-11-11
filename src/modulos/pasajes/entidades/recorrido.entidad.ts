@@ -41,7 +41,7 @@ export class Recorrido {
   @Column({ name: 'lng_destino', type: 'decimal', precision: 9, scale: 6, nullable: true })
   lng_destino: number;
 
-  @Column({ name: 'apoyo_realizado', type: 'varchar', length: 255, nullable: true })
+  @Column({ name: 'apoyo_realizado', type: 'text', nullable: true })
   apoyo_realizado: string;
 
   @Column({ name: 'tipo_actividad', type: 'varchar', length: 50, default: 'practicas' })

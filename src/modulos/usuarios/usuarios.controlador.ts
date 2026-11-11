@@ -113,7 +113,27 @@ export class UsuariosControlador {
     @UsuarioActual() usuarioAutenticado: Usuario,
     @Body() dto: CambiarContrasenaDto,
   ) {
-    return this.usuariosServicio.cambiarMiContrasena(usuarioAutenticado.id, dto);
+    return this.usuariosServicio.cambiarContrasenaPropia(
+      usuarioAutenticado.id,
+      dto,
+      usuarioAutenticado.correo,
+    );
+  }
+
+  @Post('mi-perfil/contrasena')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @ApiOperation({
+    summary: 'Cambiar mi contraseña institucional (alias POST)',
+  })
+  cambiarMiContrasenaPost(
+    @UsuarioActual() usuarioAutenticado: Usuario,
+    @Body() dto: CambiarContrasenaDto,
+  ) {
+    return this.usuariosServicio.cambiarContrasenaPropia(
+      usuarioAutenticado.id,
+      dto,
+      usuarioAutenticado.correo,
+    );
   }
 
   @Get('mi-perfil/correos')

@@ -13,6 +13,7 @@ import { Cuestionario } from './entidades/cuestionario.entidad';
 import { PreguntaCuestionario } from './entidades/pregunta-cuestionario.entidad';
 import { EntregaTareaLideres } from './entidades/entrega-tarea-lideres.entidad';
 import { DocumentoSemestralBecario } from '../becarios/entidades/documento-semestral-becario.entidad';
+import { ConfiguracionInstitucional } from '../becarios/entidades/configuracion-institucional.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { Usuario } from '../usuarios/entidades/usuario.entidad';
 import { BibliaModulo } from '../biblia/biblia.modulo';
@@ -33,6 +34,7 @@ import { TiempoRealModulo } from '../tiempo-real/tiempo-real.modulo';
       PreguntaCuestionario,
       EntregaTareaLideres,
       DocumentoSemestralBecario,
+      ConfiguracionInstitucional,
       Becario,
       Usuario,
     ]),

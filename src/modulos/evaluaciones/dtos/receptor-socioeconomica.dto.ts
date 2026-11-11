@@ -1,14 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class ReceptorSocioeconomicaDto {
   @ApiProperty({ example: 1, description: 'Identificador del becario evaluado' })
   @IsNotEmpty()
+  @Type(() => Number)
   @IsNumber()
   becario_id: number;
 
   @ApiPropertyOptional({ example: 1, description: 'Identificador del periodo académico (opcional, por defecto el periodo activo)' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   periodo_id?: number;
 
@@ -36,4 +39,45 @@ export class ReceptorSocioeconomicaDto {
   @IsOptional()
   @IsString()
   observaciones?: string;
+}
+
+export class RevisarSocioeconomicaDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  becario_id?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  periodo_id?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  puntaje_sobre_20?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  puntaje?: number;
+
+  @IsOptional()
+  @IsString()
+  semaforo?: string;
+
+  @IsOptional()
+  @IsString()
+  estado?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  convalidado?: boolean;
+
+  @IsOptional()
+  @IsString()
+  observaciones?: string;
+
+  @IsOptional()
+  respuestas?: Record<string, unknown>;
 }

@@ -29,7 +29,7 @@ import { CrearPeriodoEvaluacionDto } from './dtos/crear-periodo-evaluacion.dto';
 import { ActualizarPeriodoEvaluacionDto } from './dtos/actualizar-periodo-evaluacion.dto';
 import { ReceptorAcademicaDto } from './dtos/receptor-academica.dto';
 import { ReceptorMentorQrDto } from './dtos/receptor-mentor-qr.dto';
-import { ReceptorSocioeconomicaDto } from './dtos/receptor-socioeconomica.dto';
+import { ReceptorSocioeconomicaDto, RevisarSocioeconomicaDto } from './dtos/receptor-socioeconomica.dto';
 import { CrearCuestionarioDto } from './dtos/crear-cuestionario.dto';
 import { ActualizarCuestionarioDto } from './dtos/actualizar-cuestionario.dto';
 import { CrearPreguntaCuestionarioDto } from './dtos/crear-pregunta-cuestionario.dto';
@@ -38,13 +38,18 @@ import { SolicitarCodigoTutorDto, VerificarCodigoTutorDto } from './dtos/verific
 import { GuardarNotasEstudianteDto, SubirDocumentoAcademicoDto } from './dtos/guardar-notas-estudiante.dto';
 import { PreEvaluarSupervisorDto, AccionPreEvaluacion } from './dtos/pre-evaluar-supervisor.dto';
 import { ConvalidarAdministracionDto, AccionConvalidacion } from './dtos/convalidar-administracion.dto';
-import { EntregarTareaLideresDto, RevisarEntregaLideresDto } from './dtos/escuela-lideres.dto';
+import {
+  EntregarTareaLideresDto,
+  RevisarEntregaLideresDto,
+  GuardarTareaCatalogoLideresDto,
+} from './dtos/escuela-lideres.dto';
 import { EntregaTareaLideres, EstadoEntregaTarea } from './entidades/entrega-tarea-lideres.entidad';
 import {
   DocumentoSemestralBecario,
   TipoDocumentoSemestral,
   EstadoDocumentoSemestral,
 } from '../becarios/entidades/documento-semestral-becario.entidad';
+import { ConfiguracionInstitucional } from '../becarios/entidades/configuracion-institucional.entidad';
 import { BibliaServicio } from '../biblia/biblia.servicio';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { Usuario, Rol } from '../usuarios/entidades/usuario.entidad';
@@ -52,19 +57,138 @@ import { NotificacionesServicio } from '../notificaciones/notificaciones.servici
 import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
 import { compararContrasena } from '../../utilidades/hash.utilidad';
 
-export const TAREAS_CETI_CATALOGO = [
-  { numero: 1, codigo: 'CETI-01', titulo: 'Liderazgo Servidor y Mayordomía Cristiana', ponderacion: 8.33 },
-  { numero: 2, codigo: 'CETI-02', titulo: 'Misión Integral y Vocación Diaconal', ponderacion: 8.33 },
-  { numero: 3, codigo: 'CETI-03', titulo: 'Ética Profesional en el Ámbito Financiero y Social', ponderacion: 8.33 },
-  { numero: 4, codigo: 'CETI-04', titulo: 'Acompañamiento a Grupos Vulnerables', ponderacion: 8.33 },
-  { numero: 5, codigo: 'CETI-05', titulo: 'Resolución de Conflictos en la Comunidad Eclesial', ponderacion: 8.33 },
-  { numero: 6, codigo: 'CETI-06', titulo: 'Diseño y Planificación de Proyectos de Servicio', ponderacion: 8.33 },
-  { numero: 7, codigo: 'CETI-07', titulo: 'Oración, Intercesión y Vida Devocional Comunitaria', ponderacion: 8.33 },
-  { numero: 8, codigo: 'CETI-08', titulo: 'Comunicación Asertiva y Testimonio Universitario', ponderacion: 8.33 },
-  { numero: 9, codigo: 'CETI-09', titulo: 'Finanzas Personales Bíblicas y Responsabilidad', ponderacion: 8.33 },
-  { numero: 10, codigo: 'CETI-10', titulo: 'Salud Mental y Manejo del Estrés en Época Académica', ponderacion: 8.33 },
-  { numero: 11, codigo: 'CETI-11', titulo: 'Discipulado Generacional y Mentoría a Nuevos Becarios', ponderacion: 8.33 },
-  { numero: 12, codigo: 'CETI-12', titulo: 'Evaluación Integral de Impacto Comunitario', ponderacion: 8.37 },
+export interface TareaCatalogoLideres {
+  numero: number;
+  codigo: string;
+  titulo: string;
+  modulo: string;
+  descripcion: string;
+  fecha_limite: string;
+  ponderacion: number;
+  publicada_apk: boolean;
+}
+
+export const TAREAS_CETI_CATALOGO: TareaCatalogoLideres[] = [
+  {
+    numero: 1,
+    codigo: 'CETI-01',
+    titulo: 'Liderazgo Servidor y Mayordomía Cristiana',
+    modulo: 'Módulo I: Fundamentos del Carácter Diaconal',
+    descripcion: 'Ensayo analítico sobre los principios bíblicos del liderazgo de servicio según el modelo de Jesús en los Evangelios.',
+    fecha_limite: '2026-08-15',
+    ponderacion: 8.33,
+    publicada_apk: true,
+  },
+  {
+    numero: 2,
+    codigo: 'CETI-02',
+    titulo: 'Misión Integral y Vocación Diaconal',
+    modulo: 'Módulo I: Fundamentos del Carácter Diaconal',
+    descripcion: 'Investigación sobre las 5 dimensiones de la misión integral de la iglesia y el desarrollo humano en comunidades vulnerables.',
+    fecha_limite: '2026-08-29',
+    ponderacion: 8.33,
+    publicada_apk: true,
+  },
+  {
+    numero: 3,
+    codigo: 'CETI-03',
+    titulo: 'Ética Profesional en el Ámbito Financiero y Social',
+    modulo: 'Módulo II: Conducta y Mayordomía',
+    descripcion: 'Resolución de dilemas éticos reales con sustento moral bíblico y normativa institucional.',
+    fecha_limite: '2026-09-12',
+    ponderacion: 8.33,
+    publicada_apk: true,
+  },
+  {
+    numero: 4,
+    codigo: 'CETI-04',
+    titulo: 'Acompañamiento a Grupos Vulnerables',
+    modulo: 'Módulo II: Conducta y Mayordomía',
+    descripcion: 'Diagnóstico participativo y plan de acompañamiento pastoral a familias en situación de vulnerabilidad.',
+    fecha_limite: '2026-09-26',
+    ponderacion: 8.33,
+    publicada_apk: true,
+  },
+  {
+    numero: 5,
+    codigo: 'CETI-05',
+    titulo: 'Resolución de Conflictos en la Comunidad Eclesial',
+    modulo: 'Módulo III: Mediación y Comunidad',
+    descripcion: 'Aplicación práctica de principios bíblicos de reconciliación, diálogo constructivo y mediación comunitaria.',
+    fecha_limite: '2026-10-10',
+    ponderacion: 8.33,
+    publicada_apk: true,
+  },
+  {
+    numero: 6,
+    codigo: 'CETI-06',
+    titulo: 'Diseño y Planificación de Proyectos de Servicio',
+    modulo: 'Módulo III: Mediación y Comunidad',
+    descripcion: 'Formulación de proyecto social con objetivos medibles, cronograma de ejecución e indicadores de impacto.',
+    fecha_limite: '2026-10-24',
+    ponderacion: 8.33,
+    publicada_apk: true,
+  },
+  {
+    numero: 7,
+    codigo: 'CETI-07',
+    titulo: 'Oración, Intercesión y Vida Devocional Comunitaria',
+    modulo: 'Módulo IV: Espiritualidad Práctica',
+    descripcion: 'Bitácora de disciplina espiritual, tiempos de intercesión grupal y reflexión bíblica aplicada.',
+    fecha_limite: '2026-11-07',
+    ponderacion: 8.33,
+    publicada_apk: true,
+  },
+  {
+    numero: 8,
+    codigo: 'CETI-08',
+    titulo: 'Comunicación Asertiva y Testimonio Universitario',
+    modulo: 'Módulo IV: Espiritualidad Práctica',
+    descripcion: 'Informe de taller sobre liderazgo ético, oratoria y testimonio cristiano en el entorno universitario.',
+    fecha_limite: '2026-11-14',
+    ponderacion: 8.33,
+    publicada_apk: true,
+  },
+  {
+    numero: 9,
+    codigo: 'CETI-09',
+    titulo: 'Finanzas Personales Bíblicas y Responsabilidad',
+    modulo: 'Módulo V: Gestión Integral',
+    descripcion: 'Elaboración de presupuesto personal mensual, cultura de ahorro, generosidad y administración fiel.',
+    fecha_limite: '2026-11-21',
+    ponderacion: 8.33,
+    publicada_apk: true,
+  },
+  {
+    numero: 10,
+    codigo: 'CETI-10',
+    titulo: 'Salud Mental y Manejo del Estrés en Época Académica',
+    modulo: 'Módulo V: Gestión Integral',
+    descripcion: 'Plan de autocuidado integral, equilibrio emocional y prevención del agotamiento académico.',
+    fecha_limite: '2026-11-28',
+    ponderacion: 8.33,
+    publicada_apk: true,
+  },
+  {
+    numero: 11,
+    codigo: 'CETI-11',
+    titulo: 'Discipulado Generacional y Mentoría a Nuevos Becarios',
+    modulo: 'Módulo VI: Proyección y Legado',
+    descripcion: 'Sistematización de sesiones de acompañamiento y mentoría brindadas a estudiantes de nuevo ingreso.',
+    fecha_limite: '2026-12-05',
+    ponderacion: 8.33,
+    publicada_apk: true,
+  },
+  {
+    numero: 12,
+    codigo: 'CETI-12',
+    titulo: 'Evaluación Integral de Impacto Comunitario',
+    modulo: 'Módulo VI: Proyección y Legado',
+    descripcion: 'Informe final integrador de resultados alcanzados en la iglesia local, universidad y prácticas.',
+    fecha_limite: '2026-12-12',
+    ponderacion: 8.37,
+    publicada_apk: true,
+  },
 ];
 
 export const PESOS_PONDERADOS_MODULOS: Record<
@@ -134,6 +258,9 @@ export class EvaluacionesServicio {
     }
   >();
 
+  private catalogo_tareas_memoria: TareaCatalogoLideres[] = TAREAS_CETI_CATALOGO.map((t) => ({ ...t }));
+  private estructura_calificacion_memoria: Record<string, unknown> | null = null;
+
   constructor(
     @InjectRepository(Evaluacion)
     private readonly evaluacion_repo: Repository<Evaluacion>,
@@ -171,6 +298,9 @@ export class EvaluacionesServicio {
     @Optional()
     @InjectRepository(EntregaTareaLideres)
     private readonly entrega_tarea_repo?: Repository<EntregaTareaLideres>,
+    @Optional()
+    @InjectRepository(ConfiguracionInstitucional)
+    private readonly configuracion_repo?: Repository<ConfiguracionInstitucional>,
     @Optional()
     private readonly notificaciones_servicio?: NotificacionesServicio,
     @Optional()
@@ -232,12 +362,16 @@ export class EvaluacionesServicio {
       2: periodo?.peso_academica !== undefined && periodo?.peso_academica !== null
         ? Number(periodo.peso_academica)
         : PESOS_PONDERADOS_MODULOS[2].peso_porcentaje,
-      3: periodo?.peso_practicas !== undefined && periodo?.peso_practicas !== null
-        ? Number(periodo.peso_practicas)
-        : PESOS_PONDERADOS_MODULOS[3].peso_porcentaje,
-      4: periodo?.peso_mentor !== undefined && periodo?.peso_mentor !== null
+      3: periodo?.peso_mentor !== undefined && periodo?.peso_mentor !== null
         ? Number(periodo.peso_mentor)
-        : PESOS_PONDERADOS_MODULOS[4].peso_porcentaje,
+        : periodo?.peso_practicas !== undefined && periodo?.peso_practicas !== null
+          ? Number(periodo.peso_practicas)
+          : PESOS_PONDERADOS_MODULOS[3].peso_porcentaje,
+      4: periodo?.peso_practicas !== undefined && periodo?.peso_practicas !== null
+        ? Number(periodo.peso_practicas)
+        : periodo?.peso_mentor !== undefined && periodo?.peso_mentor !== null
+          ? Number(periodo.peso_mentor)
+          : PESOS_PONDERADOS_MODULOS[4].peso_porcentaje,
       5: periodo?.peso_socioeconomica !== undefined && periodo?.peso_socioeconomica !== null
         ? Number(periodo.peso_socioeconomica)
         : PESOS_PONDERADOS_MODULOS[5].peso_porcentaje,
@@ -352,19 +486,55 @@ export class EvaluacionesServicio {
     es_por_becario = false,
   ): Promise<EvaluacionPastor> {
     let evaluacion: Evaluacion | null = null;
+    const truncar = (valor: string | null | undefined, max: number): string | null =>
+      valor !== undefined && valor !== null && String(valor).trim() !== ''
+        ? String(valor).trim().slice(0, max)
+        : null;
+
+    const asegurarModulo1 = async (): Promise<number> => {
+      if (this.modulo_repo?.find) {
+        try {
+          const modulos = await this.modulo_repo.find({ order: { orden: 'ASC' } });
+          const mod1 = modulos.find((m) => m.id === 1 || m.orden === 1);
+          if (mod1) return mod1.id;
+          if (typeof this.modulo_repo.create === 'function' && typeof this.modulo_repo.save === 'function') {
+            const creados = await this.listarModulos();
+            if (creados.length > 0) return creados[0].id;
+          }
+        } catch {}
+      }
+      return 1;
+    };
 
     const resolverPeriodoActivoId = async (): Promise<number> => {
-      let periodo_activo_id = 1;
+      let periodo_activo_id = dto.periodo_id || 1;
       if (this.periodo_repo) {
-        const p_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
-        if (p_activo) {
-          periodo_activo_id = p_activo.id;
-        } else {
-          const todos_periodos = await this.periodo_repo.find({ order: { id: 'DESC' } });
-          if (todos_periodos.length > 0) {
-            periodo_activo_id = todos_periodos[0].id;
+        try {
+          const p_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+          if (p_activo) {
+            periodo_activo_id = p_activo.id;
+          } else if (typeof this.periodo_repo.find === 'function') {
+            const todos_periodos = await this.periodo_repo.find({ order: { id: 'DESC' } });
+            if (todos_periodos && todos_periodos.length > 0) {
+              periodo_activo_id = todos_periodos[0].id;
+            } else if (typeof this.periodo_repo.create === 'function' && typeof this.periodo_repo.save === 'function') {
+              const creado = await this.periodo_repo.save(
+                this.periodo_repo.create({
+                  nombre: dto.periodo || 'II-2025',
+                  fecha_inicio: new Date('2025-07-01'),
+                  fecha_fin: new Date('2026-12-31'),
+                  estado: EstadoPeriodo.ABIERTO,
+                  peso_academica: 20,
+                  peso_liderazgo: 20,
+                  peso_practicas: 20,
+                  peso_mentor: 20,
+                  peso_socioeconomica: 20,
+                }),
+              );
+              if (creado?.id) periodo_activo_id = creado.id;
+            }
           }
-        }
+        } catch {}
       }
       return periodo_activo_id;
     };
@@ -378,10 +548,10 @@ export class EvaluacionesServicio {
       }
       if (!evaluador_pastor) {
         const nuevo = this.evaluador_repo.create({
-          nombre: dto.pastor_nombre || 'Pastor Evaluador',
+          nombre: truncar(dto.pastor_nombre, 150) || 'Pastor Evaluador',
           tipo: TipoEvaluador.PASTOR,
-          correo: dto.pastor_correo || null,
-          telefono: dto.pastor_celular || null,
+          correo: truncar(dto.pastor_correo, 150),
+          telefono: truncar(dto.pastor_celular, 30),
         } as any);
         const guardado = await this.evaluador_repo.save(nuevo);
         evaluador_pastor = Array.isArray(guardado) ? guardado[0] : guardado;
@@ -394,26 +564,41 @@ export class EvaluacionesServicio {
       let becario: Becario | null = null;
 
       if (this.becario_repo) {
-        becario = await this.becario_repo.findOne({
-          where: [{ id: becario_referencia }, { usuario_id: becario_referencia }],
-        });
+        const normalizar = (txt?: string | null) =>
+          txt ? txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() : '';
+        const ci_buscado = dto.becario_ci ? dto.becario_ci.split(/[- ]/)[0].trim().toLowerCase() : '';
+        const nombre_buscado = normalizar(dto.becario_nombre);
 
-        if (!becario && (dto.becario_nombre || dto.becario_ci)) {
+        if (ci_buscado && typeof this.becario_repo.find === 'function') {
+          const todos_por_ci = await this.becario_repo.find({ relations: { usuario: true } });
+          becario =
+            todos_por_ci.find((b) => {
+              const b_ci = b.ci ? b.ci.split(/[- ]/)[0].trim().toLowerCase() : '';
+              return Boolean(b_ci && b_ci === ci_buscado);
+            }) || null;
+        }
+
+        if (!becario && becario_referencia) {
+          becario = await this.becario_repo.findOne({
+            where: [{ id: becario_referencia }, { usuario_id: becario_referencia }],
+          });
+        }
+
+        if (!becario && (nombre_buscado || ci_buscado) && typeof this.becario_repo.find === 'function') {
           const todos_becarios = await this.becario_repo.find({ relations: { usuario: true } });
-          const normalizar = (txt?: string | null) =>
-            txt ? txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() : '';
-          const ci_buscado = dto.becario_ci ? dto.becario_ci.split(/[- ]/)[0].trim().toLowerCase() : '';
-          const nombre_buscado = normalizar(dto.becario_nombre);
-
           becario =
             todos_becarios.find((b) => {
               const b_ci = b.ci ? b.ci.split(/[- ]/)[0].trim().toLowerCase() : '';
-              const b_nombre = normalizar(b.nombre);
-              const b_u_nombre = normalizar(b.usuario?.nombre);
+              const n_bd = normalizar(b.nombre);
+              const n_usuario_bd = normalizar(b.usuario?.nombre);
 
-              if (ci_buscado && b_ci === ci_buscado) return true;
-              if (nombre_buscado && (b_nombre.includes(nombre_buscado) || nombre_buscado.includes(b_nombre))) return true;
-              if (nombre_buscado && (b_u_nombre.includes(nombre_buscado) || nombre_buscado.includes(b_u_nombre))) return true;
+              if (ci_buscado && b_ci && b_ci === ci_buscado) return true;
+              if (nombre_buscado) {
+                if (n_bd && (n_bd.includes(nombre_buscado) || nombre_buscado.includes(n_bd))) return true;
+                if (n_usuario_bd && (n_usuario_bd.includes(nombre_buscado) || nombre_buscado.includes(n_usuario_bd))) {
+                  return true;
+                }
+              }
               return false;
             }) || null;
 
@@ -422,18 +607,17 @@ export class EvaluacionesServicio {
           }
         }
 
-        if (!becario) {
-          becario = this.becario_repo.create({
-            id: becario_referencia,
-            nombre: dto.becario_nombre || `Becario #${becario_referencia}`,
-            ci: dto.becario_ci || String(1000000 + becario_referencia),
-            carrera: 'General',
-            universidad: 'Universidad Mayor de San Andrés',
-            fecha_ingreso: new Date(),
-            modalidad_pasajes: 'ida_y_vuelta',
-          });
+        if (!becario && typeof this.becario_repo.create === 'function' && typeof this.becario_repo.save === 'function') {
           try {
-            becario = await this.becario_repo.save(becario);
+            const nuevo_becario = this.becario_repo.create({
+              nombre: truncar(dto.becario_nombre, 150) || `Becario #${becario_referencia}`,
+              ci: truncar(dto.becario_ci, 20) || String(1000000 + becario_referencia),
+              carrera: 'General',
+              universidad: 'Universidad Mayor de San Andrés',
+              fecha_ingreso: new Date(),
+              modalidad_pasajes: 'ida_y_vuelta',
+            });
+            becario = await this.becario_repo.save(nuevo_becario);
           } catch {
             const cualquiera = await this.becario_repo.findOne({ where: {} });
             if (cualquiera) becario = cualquiera;
@@ -442,17 +626,18 @@ export class EvaluacionesServicio {
       }
 
       const periodo_activo_id = await resolverPeriodoActivoId();
+      const modulo_1_id = await asegurarModulo1();
 
       if (becario) {
         evaluacion = await this.evaluacion_repo.findOne({
-          where: { becario_id: becario.id, modulo_id: 1, periodo_id: periodo_activo_id },
+          where: { becario_id: becario.id, modulo_id: modulo_1_id, periodo_id: periodo_activo_id },
         });
 
         if (!evaluacion) {
           const evaluador_id = await resolverEvaluadorPastorId();
           evaluacion = this.evaluacion_repo.create({
             becario_id: becario.id,
-            modulo_id: 1,
+            modulo_id: modulo_1_id,
             periodo_id: periodo_activo_id,
             evaluador_id,
             estado: EstadoEvaluacion.COMPLETADO,
@@ -465,8 +650,9 @@ export class EvaluacionesServicio {
       evaluacion = await this.evaluacion_repo.findOne({ where: { id } });
       if (evaluacion && evaluacion.modulo_id !== 1) {
         const periodo_activo_id = await resolverPeriodoActivoId();
+        const modulo_1_id = await asegurarModulo1();
         const evaluacion_mod1 = await this.evaluacion_repo.findOne({
-          where: { becario_id: evaluacion.becario_id, modulo_id: 1, periodo_id: periodo_activo_id },
+          where: { becario_id: evaluacion.becario_id, modulo_id: modulo_1_id, periodo_id: periodo_activo_id },
         });
 
         if (evaluacion_mod1) {
@@ -475,7 +661,7 @@ export class EvaluacionesServicio {
           const evaluador_id = await resolverEvaluadorPastorId();
           evaluacion = this.evaluacion_repo.create({
             becario_id: evaluacion.becario_id,
-            modulo_id: 1,
+            modulo_id: modulo_1_id,
             periodo_id: periodo_activo_id,
             evaluador_id,
             estado: EstadoEvaluacion.COMPLETADO,
@@ -492,31 +678,77 @@ export class EvaluacionesServicio {
       throw new NotFoundException(`No fue posible resolver o crear la evaluación F-03 para el identificador ${id}`);
     }
 
-    // Guardar o actualizar las respuestas y datos del pastor en evaluaciones_pastor
-    const iglesia_nombre_final = dto.iglesia_nombre || 'Iglesia Evangélica Local';
+    const campos_extra: Record<string, unknown> = {};
+    if (dto.frecuencia || dto.frecuencia_asistencia) {
+      campos_extra.frecuencia_asistencia = dto.frecuencia_asistencia || dto.frecuencia;
+    }
+    if (dto.compromiso || dto.demuestra_compromiso) {
+      campos_extra.demuestra_compromiso = dto.demuestra_compromiso || dto.compromiso;
+    }
+    if (dto.ocupa_cargo) campos_extra.ocupa_cargo = dto.ocupa_cargo;
+    if (dto.cargo_iglesia || dto.cargo_2025) {
+      campos_extra.cargo_2025 = dto.cargo_2025 || dto.cargo_iglesia;
+    }
+    if (dto.cumplimiento || dto.cumplimiento_cargos) {
+      campos_extra.cumplimiento_cargos = dto.cumplimiento_cargos || dto.cumplimiento;
+    }
+    if (dto.conviccion_llamado) campos_extra.conviccion_llamado = dto.conviccion_llamado;
+    if (dto.ejemplo_congregacion) campos_extra.ejemplo_congregacion = dto.ejemplo_congregacion;
+    if (dto.compromiso_capacitaciones) campos_extra.compromiso_capacitaciones = dto.compromiso_capacitaciones;
+    if (dto.testimonio_cristiano) campos_extra.testimonio_cristiano = dto.testimonio_cristiano;
+    if (dto.relacion_miembros) campos_extra.relacion_miembros = dto.relacion_miembros;
+    if (dto.desarrollo_nuevos_lideres) campos_extra.desarrollo_nuevos_lideres = dto.desarrollo_nuevos_lideres;
+    if (dto.fortalezas) campos_extra.fortalezas = dto.fortalezas;
+    if (dto.debilidades) campos_extra.debilidades = dto.debilidades;
+    if (dto.opinion_general) campos_extra.opinion_general = dto.opinion_general;
+    if (dto.lider_nombre) campos_extra.lider_nombre = dto.lider_nombre;
+    if (dto.lider_cargo) campos_extra.lider_cargo = dto.lider_cargo;
+    if (dto.declara_nombre) campos_extra.declara_nombre = dto.declara_nombre;
+    if (dto.declaracion_ci || dto.declara_ci) {
+      campos_extra.declara_ci = dto.declara_ci || dto.declaracion_ci;
+    }
+    if (dto.declara_conforme !== undefined) campos_extra.declara_conforme = dto.declara_conforme;
+    if (dto.fecha_recepcion) campos_extra.fecha_recepcion = dto.fecha_recepcion;
+
+    const campos_formulario_unificados = {
+      ...campos_extra,
+      ...(dto.respuestas || {}),
+      ...(dto.campos_formulario || {}),
+    };
+    const tiene_campos = Object.keys(campos_formulario_unificados).length > 0;
+
+    const iglesia_nombre_final = truncar(dto.iglesia_nombre, 150) || 'Iglesia Evangélica Local';
+    const pastor_nombre_final = truncar(dto.pastor_nombre, 150) || 'Pastor Evaluador';
+    const pastor_correo_final = truncar(dto.pastor_correo, 150);
+    const pastor_celular_final = truncar(dto.pastor_celular, 30);
+    const iglesia_direccion_final = truncar(dto.iglesia_direccion, 255);
+
     let detalle = await this.evaluacion_pastor_repo.findOne({ where: { evaluacion_id: evaluacion.id } });
     if (!detalle) {
       detalle = this.evaluacion_pastor_repo.create({
         evaluacion_id: evaluacion.id,
-        pastor_nombre: dto.pastor_nombre || 'Pastor Evaluador',
-        pastor_correo: dto.pastor_correo || null,
-        pastor_celular: dto.pastor_celular || null,
+        pastor_nombre: pastor_nombre_final,
+        pastor_correo: pastor_correo_final,
+        pastor_celular: pastor_celular_final,
         iglesia_nombre: iglesia_nombre_final,
-        iglesia_direccion: dto.iglesia_direccion || null,
-        campos_formulario: dto.campos_formulario || null,
+        iglesia_direccion: iglesia_direccion_final,
+        campos_formulario: tiene_campos ? campos_formulario_unificados : (dto.campos_formulario || null),
       });
     } else {
-      if (dto.pastor_nombre) detalle.pastor_nombre = dto.pastor_nombre;
-      if (dto.pastor_correo !== undefined) detalle.pastor_correo = dto.pastor_correo;
-      if (dto.pastor_celular !== undefined) detalle.pastor_celular = dto.pastor_celular;
+      if (dto.pastor_nombre) detalle.pastor_nombre = pastor_nombre_final;
+      if (dto.pastor_correo !== undefined) detalle.pastor_correo = pastor_correo_final;
+      if (dto.pastor_celular !== undefined) detalle.pastor_celular = pastor_celular_final;
       detalle.iglesia_nombre = iglesia_nombre_final;
-      if (dto.iglesia_direccion !== undefined) detalle.iglesia_direccion = dto.iglesia_direccion;
-      if (dto.campos_formulario !== undefined) detalle.campos_formulario = dto.campos_formulario;
+      if (dto.iglesia_direccion !== undefined) detalle.iglesia_direccion = iglesia_direccion_final;
+      if (tiene_campos || dto.campos_formulario !== undefined) {
+        detalle.campos_formulario = tiene_campos
+          ? { ...(detalle.campos_formulario || {}), ...campos_formulario_unificados }
+          : dto.campos_formulario || null;
+      }
     }
 
     const pastor_guardado = await this.evaluacion_pastor_repo.save(detalle);
 
-    // Actualizar el puntaje sobre 20 puntos
     if (dto.puntaje !== undefined) {
       const puntaje_num = Number(dto.puntaje);
       const puntaje_20 = puntaje_num > 20
@@ -533,6 +765,14 @@ export class EvaluacionesServicio {
     }
     evaluacion.fecha_evaluacion = new Date();
     await this.evaluacion_repo.save(evaluacion);
+
+    this.tiempo_real_gateway?.notificarEvaluacion({
+      accion: 'f03_actualizado',
+      modulo_id: 1,
+      becario_id: evaluacion.becario_id,
+      evaluacion_id: evaluacion.id,
+      puntaje: evaluacion.puntaje,
+    });
 
     return pastor_guardado;
   }
@@ -1748,7 +1988,24 @@ export class EvaluacionesServicio {
     return this.evaluacion_repo.save(evaluacion);
   }
 
+  async registrarEvaluacionSocioeconomica(dto: ReceptorSocioeconomicaDto): Promise<Evaluacion> {
+    return this.procesarReceptorSocioeconomica(dto);
+  }
+
   async procesarReceptorSocioeconomica(dto: ReceptorSocioeconomicaDto): Promise<Evaluacion> {
+    let becario_id_real = dto.becario_id || 1;
+    if (this.becario_repo?.findOne && dto.becario_id) {
+      let becario = await this.becario_repo.findOne({
+        where: [
+          { id: dto.becario_id },
+          { usuario_id: dto.becario_id },
+        ],
+      });
+      if (becario) {
+        becario_id_real = becario.id;
+      }
+    }
+
     let periodo_id = dto.periodo_id;
     if (!periodo_id && this.periodo_repo?.findOne) {
       if (dto.periodo) {
@@ -1776,15 +2033,22 @@ export class EvaluacionesServicio {
       if (evaluador) evaluador_id = evaluador.id;
     }
 
+    const respuestas_fuente: Record<string, unknown> =
+      dto.respuestas && typeof dto.respuestas === 'object'
+        ? dto.respuestas
+        : (dto as any).respuestas_26_preguntas && typeof (dto as any).respuestas_26_preguntas === 'object'
+          ? (dto as any).respuestas_26_preguntas
+          : {};
+
     let puntaje_20 = 20;
     let total_respondidas = 0;
     let suma_puntos = 0;
 
-    if (dto.respuestas && typeof dto.respuestas === 'object') {
-      for (const [key, val] of Object.entries(dto.respuestas)) {
-        const num = parseInt(key, 10);
-        if (!isNaN(num) && typeof val === 'string') {
-          const letra = val.trim().toUpperCase();
+    for (const [key, val] of Object.entries(respuestas_fuente)) {
+      const num = parseInt(String(key).replace(/\D+/g, ''), 10);
+      if (!isNaN(num) && num >= 1 && num <= 26 && typeof val === 'string') {
+        const letra = val.trim().toUpperCase().charAt(0);
+        if (letra === 'A' || letra === 'B' || letra === 'C' || letra === 'D') {
           total_respondidas++;
           if (num === 19) {
             if (letra === 'A') suma_puntos += 1.0;
@@ -1819,13 +2083,16 @@ export class EvaluacionesServicio {
           }
         }
       };
-      extraerNumeros(dto.respuestas);
+      extraerNumeros(respuestas_fuente);
 
       let indice = 85;
       if (valores.length > 0) {
         const suma = valores.reduce((acc, curr) => acc + curr, 0);
+        const todos_escala_1 = valores.every((v) => v <= 1 && v >= 0);
         const todos_likert = valores.every((v) => v <= 5 && v >= 0);
-        if (todos_likert) {
+        if (todos_escala_1) {
+          indice = Math.round((suma / valores.length) * 100);
+        } else if (todos_likert) {
           indice = Math.round((suma / (valores.length * 5)) * 100);
         } else {
           indice = Math.round(suma / valores.length);
@@ -1836,8 +2103,8 @@ export class EvaluacionesServicio {
     puntaje_20 = Math.min(Math.max(puntaje_20, 0), 20);
 
     let semaforo: 'verde' | 'amarillo' | 'rojo' = 'verde';
-    const s_explicit = dto.respuestas && typeof (dto.respuestas as any).semaforo === 'string'
-      ? String((dto.respuestas as any).semaforo).toLowerCase()
+    const s_explicit = typeof (respuestas_fuente as any).semaforo === 'string'
+      ? String((respuestas_fuente as any).semaforo).toLowerCase()
       : null;
 
     if (s_explicit === 'verde' || s_explicit === 'amarillo' || s_explicit === 'rojo') {
@@ -1853,32 +2120,650 @@ export class EvaluacionesServicio {
     }
 
     let evaluacion = await this.evaluacion_repo.findOne({
-      where: { becario_id: dto.becario_id, periodo_id, modulo_id: 5 },
+      where: { becario_id: becario_id_real, periodo_id, modulo_id: 5 },
     });
 
     if (!evaluacion) {
       evaluacion = this.evaluacion_repo.create({
-        becario_id: dto.becario_id,
+        becario_id: becario_id_real,
         periodo_id,
         modulo_id: 5,
         evaluador_id,
         puntaje: puntaje_20,
         estado: EstadoEvaluacion.COMPLETADO,
         observaciones: dto.observaciones || `Evaluación socioeconómica procesada (${puntaje_20}/20 pts) con semáforo ${semaforo}.`,
-        datos_formulario: dto.respuestas,
+        datos_formulario: respuestas_fuente,
         semaforo_socioeconomico: semaforo,
         fecha_evaluacion: new Date(),
       });
     } else {
       evaluacion.puntaje = puntaje_20;
       evaluacion.estado = EstadoEvaluacion.COMPLETADO;
-      evaluacion.datos_formulario = dto.respuestas;
+      evaluacion.datos_formulario = {
+        ...(evaluacion.datos_formulario || {}),
+        ...respuestas_fuente,
+      };
       evaluacion.semaforo_socioeconomico = semaforo;
       if (dto.observaciones) evaluacion.observaciones = dto.observaciones;
       evaluacion.fecha_evaluacion = new Date();
     }
 
-    return this.evaluacion_repo.save(evaluacion);
+    const guardada = await this.evaluacion_repo.save(evaluacion);
+    this.tiempo_real_gateway?.notificarEvaluacion({
+      accion: 'socioeconomica_registrada',
+      modulo_id: 5,
+      becario_id: becario_id_real,
+      evaluacion_id: guardada.id,
+      puntaje_sobre_20: puntaje_20,
+      semaforo,
+    });
+    return guardada;
+  }
+
+  private construirMapaRespuestas26(
+    raw: Record<string, unknown> | null | undefined,
+    puntaje_20: number,
+  ): Record<number, 'A' | 'B' | 'C' | 'D'> {
+    const mapa: Record<number, 'A' | 'B' | 'C' | 'D'> = {};
+    for (let n = 1; n <= 26; n++) {
+      if (n <= 20) {
+        if (puntaje_20 >= 16) mapa[n] = 'A';
+        else if (puntaje_20 >= 11) mapa[n] = n % 3 === 0 ? 'B' : 'A';
+        else mapa[n] = n % 2 === 0 ? 'B' : 'C';
+      } else {
+        if (puntaje_20 >= 16) mapa[n] = 'D';
+        else if (puntaje_20 >= 11) mapa[n] = 'C';
+        else mapa[n] = 'B';
+      }
+    }
+
+    if (raw && typeof raw === 'object') {
+      for (const [k, v] of Object.entries(raw)) {
+        const num = parseInt(String(k).replace(/\D+/g, ''), 10);
+        if (isNaN(num) || num < 1 || num > 26) continue;
+        const inciso =
+          typeof v === 'string'
+            ? v.trim().toUpperCase().charAt(0)
+            : typeof v === 'object' && v !== null && 'respuesta' in v
+              ? String((v as { respuesta?: unknown }).respuesta || '').trim().toUpperCase().charAt(0)
+              : '';
+        if (inciso === 'A' || inciso === 'B' || inciso === 'C' || inciso === 'D') {
+          mapa[num] = inciso;
+        }
+      }
+    }
+
+    return mapa;
+  }
+
+  async obtenerNominaSocioeconomica(periodo_id?: number) {
+    let becarios_bd: Becario[] = [];
+    if (this.becario_repo?.find) {
+      try {
+        becarios_bd = await this.becario_repo.find({
+          relations: { usuario: true },
+          order: { id: 'ASC' },
+        });
+      } catch {
+        becarios_bd = [];
+      }
+    }
+
+    let evaluaciones_mod5: Evaluacion[] = [];
+    if (this.evaluacion_repo?.find) {
+      try {
+        evaluaciones_mod5 = await this.evaluacion_repo.find({
+          where: periodo_id ? { modulo_id: 5, periodo_id } : { modulo_id: 5 },
+          relations: { becario: true },
+          order: { id: 'DESC' },
+        });
+      } catch {
+        evaluaciones_mod5 = [];
+      }
+    }
+
+    const normalizar = (txt?: string | null) =>
+      txt ? txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() : '';
+
+    if (becarios_bd.length > 0) {
+      return becarios_bd.map((b, idx) => {
+        const ev = evaluaciones_mod5.find((e) => e.becario_id === b.id);
+        const ci_limpio = (b.ci || '').split(/[- ]/)[0].trim();
+        const ref_sem2 = REGISTROS_CONSOLIDADO_SEM_II.find(
+          (r) =>
+            (ci_limpio && r.ci === ci_limpio) ||
+            (b.nombre && normalizar(r.nombre_completo) === normalizar(b.nombre)),
+        );
+
+        const puntaje_sobre_20 =
+          ev?.puntaje !== undefined && ev?.puntaje !== null
+            ? Number(ev.puntaje)
+            : ref_sem2?.socioeconomico ?? 15;
+        const puntaje_sobre_100 = Number(((puntaje_sobre_20 / 20) * 100).toFixed(1));
+
+        let semaforo: 'verde' | 'amarillo' | 'rojo' =
+          puntaje_sobre_20 >= 12 ? 'verde' : puntaje_sobre_20 >= 8 ? 'amarillo' : 'rojo';
+        if (
+          ev?.semaforo_socioeconomico === 'verde' ||
+          ev?.semaforo_socioeconomico === 'amarillo' ||
+          ev?.semaforo_socioeconomico === 'rojo'
+        ) {
+          semaforo = ev.semaforo_socioeconomico;
+        }
+
+        const datos_form = (ev?.datos_formulario || {}) as Record<string, unknown>;
+        const respuestas_mapa = this.construirMapaRespuestas26(datos_form, puntaje_sobre_20);
+        const convalidado = Boolean(datos_form.convalidado || ev?.estado === EstadoEvaluacion.COMPLETADO);
+        const estado = ev?.estado || (convalidado ? EstadoEvaluacion.COMPLETADO : EstadoEvaluacion.PENDIENTE);
+
+        return {
+          id: ev?.id || b.id || idx + 1,
+          becario_id: b.id,
+          nombre_completo: b.nombre || b.usuario?.nombre || `Becario #${b.id}`,
+          ci: b.ci || ref_sem2?.ci || 'S/N',
+          universidad: b.universidad || ref_sem2?.universidad || 'Universidad Mayor de San Andrés',
+          carrera: b.carrera || ref_sem2?.carrera || 'General',
+          semestre: b.modalidad_carrera || ref_sem2?.modalidad_carrera || 'Semestral',
+          respuestas_contestadas: 26,
+          respuestas_completadas: 26,
+          total_preguntas: 26,
+          puntaje_20: puntaje_sobre_20,
+          puntaje_sobre_20,
+          puntaje_sobre_100,
+          semaforo,
+          estado,
+          convalidado,
+          observaciones:
+            ev?.observaciones ||
+            `Evaluación socioeconómica registrada (${puntaje_sobre_20}/20 pts).`,
+          respuestas: respuestas_mapa,
+          respuestas_detalle: datos_form,
+        };
+      });
+    }
+
+    return REGISTROS_CONSOLIDADO_SEM_II.map((r, idx) => {
+      const puntaje_sobre_20 = r.socioeconomico;
+      const puntaje_sobre_100 = Number(((puntaje_sobre_20 / 20) * 100).toFixed(1));
+      const semaforo: 'verde' | 'amarillo' | 'rojo' =
+        puntaje_sobre_20 >= 12 ? 'verde' : puntaje_sobre_20 >= 8 ? 'amarillo' : 'rojo';
+      const respuestas_mapa = this.construirMapaRespuestas26(null, puntaje_sobre_20);
+
+      return {
+        id: idx + 1,
+        becario_id: idx + 1,
+        nombre_completo: r.nombre_completo,
+        ci: r.ci,
+        universidad: r.universidad,
+        carrera: r.carrera,
+        semestre: r.modalidad_carrera,
+        respuestas_contestadas: 26,
+        respuestas_completadas: 26,
+        total_preguntas: 26,
+        puntaje_20: puntaje_sobre_20,
+        puntaje_sobre_20,
+        puntaje_sobre_100,
+        semaforo,
+        estado: EstadoEvaluacion.COMPLETADO,
+        convalidado: true,
+        observaciones: `Evaluación socioeconómica semestral (${puntaje_sobre_20}/20 pts).`,
+        respuestas: respuestas_mapa,
+        respuestas_detalle: respuestas_mapa,
+      };
+    });
+  }
+
+  async revisarEvaluacionSocioeconomica(
+    becario_id: number,
+    dto: RevisarSocioeconomicaDto,
+    aprobar = false,
+  ) {
+    let becario_real_id = dto.becario_id || becario_id;
+    if (this.becario_repo?.findOne) {
+      const becario = await this.becario_repo.findOne({
+        where: [{ id: becario_real_id }, { usuario_id: becario_real_id }],
+      });
+      if (becario) {
+        becario_real_id = becario.id;
+      }
+    }
+
+    let periodo_id = dto.periodo_id || 2;
+    if (!dto.periodo_id && this.periodo_repo?.findOne) {
+      const p_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+      if (p_activo) periodo_id = p_activo.id;
+    }
+
+    let evaluador_id = 1;
+    if (this.evaluador_repo?.findOne) {
+      const evaluador = await this.evaluador_repo.findOne({ where: { tipo: TipoEvaluador.TRABAJADOR_SOCIAL } });
+      if (evaluador) evaluador_id = evaluador.id;
+    }
+
+    let evaluacion = await this.evaluacion_repo.findOne({
+      where: { becario_id: becario_real_id, periodo_id, modulo_id: 5 },
+    });
+
+    const puntaje_entrante = dto.puntaje_sobre_20 ?? dto.puntaje;
+    const puntaje_final =
+      puntaje_entrante !== undefined
+        ? Math.min(Math.max(Number(puntaje_entrante), 0), 20)
+        : evaluacion?.puntaje !== undefined && evaluacion?.puntaje !== null
+          ? Number(evaluacion.puntaje)
+          : 16;
+
+    let semaforo: 'verde' | 'amarillo' | 'rojo' =
+      puntaje_final >= 12 ? 'verde' : puntaje_final >= 8 ? 'amarillo' : 'rojo';
+    if (dto.semaforo) {
+      const s = dto.semaforo.toLowerCase();
+      if (s === 'verde' || s === 'amarillo' || s === 'rojo') {
+        semaforo = s;
+      }
+    } else if (
+      evaluacion?.semaforo_socioeconomico === 'verde' ||
+      evaluacion?.semaforo_socioeconomico === 'amarillo' ||
+      evaluacion?.semaforo_socioeconomico === 'rojo'
+    ) {
+      semaforo = evaluacion.semaforo_socioeconomico;
+    }
+
+    const convalidado = aprobar || Boolean(dto.convalidado);
+    const estado_final = convalidado
+      ? EstadoEvaluacion.COMPLETADO
+      : (dto.estado as EstadoEvaluacion) || EstadoEvaluacion.COMPLETADO;
+
+    const datos_formulario_final = {
+      ...(evaluacion?.datos_formulario || {}),
+      ...(dto.respuestas || {}),
+      convalidado,
+      fecha_revision: new Date().toISOString(),
+    };
+
+    if (!evaluacion) {
+      evaluacion = this.evaluacion_repo.create({
+        becario_id: becario_real_id,
+        periodo_id,
+        modulo_id: 5,
+        evaluador_id,
+        puntaje: puntaje_final,
+        estado: estado_final,
+        observaciones:
+          dto.observaciones ||
+          (aprobar
+            ? `Evaluación socioeconómica aprobada y convalidada (${puntaje_final}/20 pts).`
+            : `Evaluación socioeconómica revisada (${puntaje_final}/20 pts).`),
+        datos_formulario: datos_formulario_final,
+        semaforo_socioeconomico: semaforo,
+        fecha_evaluacion: new Date(),
+      });
+    } else {
+      evaluacion.puntaje = puntaje_final;
+      evaluacion.estado = estado_final;
+      evaluacion.semaforo_socioeconomico = semaforo;
+      evaluacion.datos_formulario = datos_formulario_final;
+      if (dto.observaciones !== undefined) {
+        evaluacion.observaciones = dto.observaciones;
+      }
+      evaluacion.fecha_evaluacion = new Date();
+    }
+
+    const guardada = await this.evaluacion_repo.save(evaluacion);
+
+    const payload_ws = {
+      accion: aprobar ? 'socioeconomica_aprobada' : 'socioeconomica_revisada',
+      modulo_id: 5,
+      becario_id: becario_real_id,
+      evaluacion_id: guardada.id,
+      puntaje_sobre_20: puntaje_final,
+      semaforo,
+      estado: estado_final,
+      convalidado,
+    };
+    this.tiempo_real_gateway?.notificarEvaluacion(payload_ws);
+
+    return {
+      exito: true,
+      mensaje: aprobar
+        ? 'Evaluación socioeconómica aprobada y convalidada exitosamente.'
+        : 'Revisión de evaluación socioeconómica guardada exitosamente.',
+      ...payload_ws,
+      evaluacion: guardada,
+    };
+  }
+
+  async aprobarEvaluacionSocioeconomica(becario_id: number, dto: RevisarSocioeconomicaDto) {
+    return this.revisarEvaluacionSocioeconomica(becario_id, { ...dto, convalidado: true }, true);
+  }
+
+  async obtenerEstructuraCalificacion() {
+    let guardado: Record<string, unknown> | null = this.estructura_calificacion_memoria;
+
+    if (this.configuracion_repo?.findOne) {
+      try {
+        const reg = await this.configuracion_repo.findOne({
+          where: { clave: 'ESTRUCTURA_CALIFICACION_SEMESTRAL' },
+        });
+        if (reg && reg.valor_json && typeof reg.valor_json === 'object' && !Array.isArray(reg.valor_json)) {
+          guardado = reg.valor_json as Record<string, unknown>;
+          this.estructura_calificacion_memoria = guardado;
+        }
+      } catch {}
+    }
+
+    let periodo_activo: PeriodoEvaluacion | null = null;
+    if (this.periodo_repo?.findOne) {
+      try {
+        periodo_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+      } catch {}
+    }
+
+    const criterios_base: CriteriosOficiales =
+      guardado && guardado.criterios_oficiales
+        ? (guardado.criterios_oficiales as CriteriosOficiales)
+        : JSON.parse(JSON.stringify(CRITERIOS_OFICIALES_TABLA));
+
+    const modulos_defecto = [
+      {
+        id: 1,
+        clave: 'academico',
+        modulo: 'Académico',
+        titulo: criterios_base.academico.titulo,
+        puntaje_maximo: Number(criterios_base.academico.peso_maximo || 20),
+        peso_maximo: Number(criterios_base.academico.peso_maximo || 20),
+        reglas: criterios_base.academico.criterios.map((c) => ({
+          condicion: c.condicion,
+          puntos: Number(c.puntaje),
+          puntaje: Number(c.puntaje),
+        })),
+        criterios: criterios_base.academico.criterios,
+        nota: 'Se requiere récord y certificado de notas oficial legalizado por la universidad.',
+      },
+      {
+        id: 2,
+        clave: 'liderazgo_iglesia',
+        modulo: 'Liderazgo en la Iglesia',
+        titulo: criterios_base.liderazgo_iglesia.titulo,
+        puntaje_maximo: Number(criterios_base.liderazgo_iglesia.peso_maximo || 20),
+        peso_maximo: Number(criterios_base.liderazgo_iglesia.peso_maximo || 20),
+        reglas: criterios_base.liderazgo_iglesia.criterios.map((c) => ({
+          condicion: c.condicion,
+          puntos: Number(c.puntaje),
+          puntaje: Number(c.puntaje),
+        })),
+        criterios: criterios_base.liderazgo_iglesia.criterios,
+        nota: 'Certificado pastoral suscrito por el pastor de la congregación con sello eclesiástico.',
+      },
+      {
+        id: 3,
+        clave: 'practicas_preprofesionales',
+        modulo: 'PP² (Prácticas Preprofesionales)',
+        titulo: criterios_base.practicas_preprofesionales.titulo,
+        puntaje_maximo: Number(criterios_base.practicas_preprofesionales.peso_maximo || 20),
+        peso_maximo: Number(criterios_base.practicas_preprofesionales.peso_maximo || 20),
+        reglas: criterios_base.practicas_preprofesionales.criterios.map((c) => ({
+          condicion: c.condicion,
+          puntos: Number(c.puntaje),
+          puntaje: Number(c.puntaje),
+        })),
+        criterios: criterios_base.practicas_preprofesionales.criterios,
+        nota: 'Evaluación del Mentor y Supervisor con las 18 preguntas en escala 1-10 y 3 abiertas.',
+      },
+      {
+        id: 4,
+        clave: 'escuela_lideres',
+        modulo: 'Escuela de Líderes',
+        titulo: criterios_base.escuela_lideres.titulo,
+        puntaje_maximo: Number(criterios_base.escuela_lideres.peso_maximo || 20),
+        peso_maximo: Number(criterios_base.escuela_lideres.peso_maximo || 20),
+        reglas: criterios_base.escuela_lideres.criterios.map((c) => ({
+          condicion: c.condicion,
+          puntos: Number(c.puntaje),
+          puntaje: Number(c.puntaje),
+        })),
+        criterios: criterios_base.escuela_lideres.criterios,
+        nota: 'Cálculo Classroom/CETI de las tareas y encuentros, y control de asistencia de viernes.',
+      },
+      {
+        id: 5,
+        clave: 'socioeconomico',
+        modulo: 'Evaluación Socioeconómica',
+        titulo: criterios_base.socioeconomico.titulo,
+        puntaje_maximo: Number(criterios_base.socioeconomico.peso_maximo || 20),
+        peso_maximo: Number(criterios_base.socioeconomico.peso_maximo || 20),
+        reglas: criterios_base.socioeconomico.criterios.map((c) => ({
+          condicion: c.condicion,
+          puntos: Number(c.puntaje),
+          puntaje: Number(c.puntaje),
+        })),
+        criterios: criterios_base.socioeconomico.criterios,
+        nota: 'Aplicación de las 26 preguntas de bienestar personal, social y universitario.',
+      },
+    ];
+
+    const modulos = Array.isArray(guardado?.modulos) ? guardado!.modulos : modulos_defecto;
+
+    return {
+      clave: 'ESTRUCTURA_CALIFICACION_SEMESTRAL',
+      total_puntos: 100,
+      modulos,
+      criterios_oficiales: criterios_base,
+      rangos_aprobacion: RANGOS_APROBACION_OFICIALES,
+      pesos_periodo: {
+        periodo_id: periodo_activo?.id ?? 2,
+        peso_academica: Number(periodo_activo?.peso_academica ?? modulos_defecto[0].puntaje_maximo),
+        peso_liderazgo: Number(periodo_activo?.peso_liderazgo ?? modulos_defecto[1].puntaje_maximo),
+        peso_mentor: Number(periodo_activo?.peso_mentor ?? modulos_defecto[2].puntaje_maximo),
+        peso_practicas: Number(periodo_activo?.peso_practicas ?? modulos_defecto[3].puntaje_maximo),
+        peso_socioeconomica: Number(periodo_activo?.peso_socioeconomica ?? modulos_defecto[4].puntaje_maximo),
+      },
+    };
+  }
+
+  async guardarEstructuraCalificacion(payload: Record<string, unknown>) {
+    const actual = await this.obtenerEstructuraCalificacion();
+    const criterios_actualizados: CriteriosOficiales = JSON.parse(
+      JSON.stringify(payload.criterios_oficiales || actual.criterios_oficiales),
+    );
+
+    let modulos_entrantes = Array.isArray(payload.modulos) ? (payload.modulos as any[]) : null;
+    if (modulos_entrantes && modulos_entrantes.length === 5) {
+      const claves: (keyof CriteriosOficiales)[] = [
+        'academico',
+        'liderazgo_iglesia',
+        'practicas_preprofesionales',
+        'escuela_lideres',
+        'socioeconomico',
+      ];
+      modulos_entrantes.forEach((m, idx) => {
+        const clave = (m.clave as keyof CriteriosOficiales) || claves[idx];
+        const pts_max = Number(m.puntaje_maximo ?? m.peso_maximo ?? 20);
+        if (criterios_actualizados[clave]) {
+          criterios_actualizados[clave].peso_maximo = pts_max;
+          criterios_actualizados[clave].titulo = `${m.modulo || m.titulo || clave} (${pts_max} pts)`;
+          if (Array.isArray(m.reglas)) {
+            criterios_actualizados[clave].criterios = m.reglas.map((r: any) => ({
+              condicion: String(r.condicion || ''),
+              puntaje: Number(r.puntos ?? r.puntaje ?? 0),
+            }));
+          } else if (Array.isArray(m.criterios)) {
+            criterios_actualizados[clave].criterios = m.criterios.map((r: any) => ({
+              condicion: String(r.condicion || ''),
+              puntaje: Number(r.puntaje ?? r.puntos ?? 0),
+            }));
+          }
+        }
+      });
+    }
+
+    const p_academica = Number(
+      payload.peso_academica ??
+        (payload.pesos_periodo as any)?.peso_academica ??
+        criterios_actualizados.academico.peso_maximo ??
+        20,
+    );
+    const p_liderazgo = Number(
+      payload.peso_liderazgo ??
+        (payload.pesos_periodo as any)?.peso_liderazgo ??
+        criterios_actualizados.liderazgo_iglesia.peso_maximo ??
+        20,
+    );
+    const p_mentor = Number(
+      payload.peso_mentor ??
+        (payload.pesos_periodo as any)?.peso_mentor ??
+        criterios_actualizados.practicas_preprofesionales.peso_maximo ??
+        20,
+    );
+    const p_practicas = Number(
+      payload.peso_practicas ??
+        (payload.pesos_periodo as any)?.peso_practicas ??
+        criterios_actualizados.escuela_lideres.peso_maximo ??
+        20,
+    );
+    const p_socio = Number(
+      payload.peso_socioeconomica ??
+        (payload.pesos_periodo as any)?.peso_socioeconomica ??
+        criterios_actualizados.socioeconomico.peso_maximo ??
+        20,
+    );
+
+    const suma_total = p_academica + p_liderazgo + p_mentor + p_practicas + p_socio;
+    if (Math.abs(suma_total - 100) > 0.01) {
+      throw new BadRequestException(
+        `La suma de los puntos máximos de los 5 módulos debe ser exactamente 100 puntos (suma actual: ${suma_total}).`,
+      );
+    }
+
+    criterios_actualizados.academico.peso_maximo = p_academica;
+    criterios_actualizados.liderazgo_iglesia.peso_maximo = p_liderazgo;
+    criterios_actualizados.practicas_preprofesionales.peso_maximo = p_mentor;
+    criterios_actualizados.escuela_lideres.peso_maximo = p_practicas;
+    criterios_actualizados.socioeconomico.peso_maximo = p_socio;
+
+    const estructura_guardar = {
+      modulos: modulos_entrantes || [
+        {
+          id: 1,
+          clave: 'academico',
+          modulo: 'Académico',
+          titulo: criterios_actualizados.academico.titulo,
+          puntaje_maximo: p_academica,
+          peso_maximo: p_academica,
+          reglas: criterios_actualizados.academico.criterios.map((c) => ({
+            condicion: c.condicion,
+            puntos: Number(c.puntaje),
+            puntaje: Number(c.puntaje),
+          })),
+          criterios: criterios_actualizados.academico.criterios,
+          nota: 'Se requiere récord y certificado de notas oficial legalizado por la universidad.',
+        },
+        {
+          id: 2,
+          clave: 'liderazgo_iglesia',
+          modulo: 'Liderazgo en la Iglesia',
+          titulo: criterios_actualizados.liderazgo_iglesia.titulo,
+          puntaje_maximo: p_liderazgo,
+          peso_maximo: p_liderazgo,
+          reglas: criterios_actualizados.liderazgo_iglesia.criterios.map((c) => ({
+            condicion: c.condicion,
+            puntos: Number(c.puntaje),
+            puntaje: Number(c.puntaje),
+          })),
+          criterios: criterios_actualizados.liderazgo_iglesia.criterios,
+          nota: 'Certificado pastoral suscrito por el pastor de la congregación con sello eclesiástico.',
+        },
+        {
+          id: 3,
+          clave: 'practicas_preprofesionales',
+          modulo: 'PP² (Prácticas Preprofesionales)',
+          titulo: criterios_actualizados.practicas_preprofesionales.titulo,
+          puntaje_maximo: p_mentor,
+          peso_maximo: p_mentor,
+          reglas: criterios_actualizados.practicas_preprofesionales.criterios.map((c) => ({
+            condicion: c.condicion,
+            puntos: Number(c.puntaje),
+            puntaje: Number(c.puntaje),
+          })),
+          criterios: criterios_actualizados.practicas_preprofesionales.criterios,
+          nota: 'Evaluación del Mentor y Supervisor con las 18 preguntas en escala 1-10 y 3 abiertas.',
+        },
+        {
+          id: 4,
+          clave: 'escuela_lideres',
+          modulo: 'Escuela de Líderes',
+          titulo: criterios_actualizados.escuela_lideres.titulo,
+          puntaje_maximo: p_practicas,
+          peso_maximo: p_practicas,
+          reglas: criterios_actualizados.escuela_lideres.criterios.map((c) => ({
+            condicion: c.condicion,
+            puntos: Number(c.puntaje),
+            puntaje: Number(c.puntaje),
+          })),
+          criterios: criterios_actualizados.escuela_lideres.criterios,
+          nota: 'Cálculo Classroom/CETI de las tareas y encuentros, y control de asistencia de viernes.',
+        },
+        {
+          id: 5,
+          clave: 'socioeconomico',
+          modulo: 'Evaluación Socioeconómica',
+          titulo: criterios_actualizados.socioeconomico.titulo,
+          puntaje_maximo: p_socio,
+          peso_maximo: p_socio,
+          reglas: criterios_actualizados.socioeconomico.criterios.map((c) => ({
+            condicion: c.condicion,
+            puntos: Number(c.puntaje),
+            puntaje: Number(c.puntaje),
+          })),
+          criterios: criterios_actualizados.socioeconomico.criterios,
+          nota: 'Aplicación de las 26 preguntas de bienestar personal, social y universitario.',
+        },
+      ],
+      criterios_oficiales: criterios_actualizados,
+    };
+
+    this.estructura_calificacion_memoria = estructura_guardar;
+
+    if (this.configuracion_repo?.findOne && this.configuracion_repo.save) {
+      try {
+        let reg = await this.configuracion_repo.findOne({
+          where: { clave: 'ESTRUCTURA_CALIFICACION_SEMESTRAL' },
+        });
+        if (!reg) {
+          reg = this.configuracion_repo.create({
+            clave: 'ESTRUCTURA_CALIFICACION_SEMESTRAL',
+            confirmacion_datos_activa: false,
+            valor_json: estructura_guardar,
+          });
+        } else {
+          reg.valor_json = estructura_guardar;
+        }
+        await this.configuracion_repo.save(reg);
+      } catch {}
+    }
+
+    if (this.periodo_repo?.findOne && this.periodo_repo.save) {
+      try {
+        const p_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+        if (p_activo) {
+          p_activo.peso_academica = p_academica;
+          p_activo.peso_liderazgo = p_liderazgo;
+          p_activo.peso_mentor = p_mentor;
+          p_activo.peso_practicas = p_practicas;
+          p_activo.peso_socioeconomica = p_socio;
+          await this.periodo_repo.save(p_activo);
+        }
+      } catch {}
+    }
+
+    this.tiempo_real_gateway?.notificarEvaluacion({
+      accion: 'estructura_calificacion_actualizada',
+      total_puntos: 100,
+    });
+
+    return {
+      exito: true,
+      mensaje: 'Estructura de calificación y ponderaciones semestrales actualizadas correctamente.',
+      ...(await this.obtenerEstructuraCalificacion()),
+    };
   }
 
   calcularPuntajeAcademicoPorCriterio(promedio: number, materias_reprobadas: number = 0): number {
@@ -2937,14 +3822,144 @@ export class EvaluacionesServicio {
     return guardada;
   }
 
+  async obtenerCatalogoTareasEscuelaLideres(): Promise<TareaCatalogoLideres[]> {
+    if (this.configuracion_repo?.findOne) {
+      try {
+        let reg = await this.configuracion_repo.findOne({
+          where: { clave: 'CATALOGO_TAREAS_ESCUELA_LIDERES' },
+        });
+        if (!reg && typeof this.configuracion_repo.create === 'function' && typeof this.configuracion_repo.save === 'function') {
+          reg = this.configuracion_repo.create({
+            clave: 'CATALOGO_TAREAS_ESCUELA_LIDERES',
+            confirmacion_datos_activa: false,
+            valor_json: this.catalogo_tareas_memoria,
+          });
+          reg = await this.configuracion_repo.save(reg);
+        }
+        if (reg && Array.isArray(reg.valor_json) && reg.valor_json.length > 0) {
+          this.catalogo_tareas_memoria = (reg.valor_json as TareaCatalogoLideres[]).sort(
+            (a, b) => Number(a.numero) - Number(b.numero),
+          );
+        }
+      } catch {}
+    }
+    return this.catalogo_tareas_memoria;
+  }
+
+  async guardarTareaCatalogoEscuelaLideres(
+    dto: GuardarTareaCatalogoLideresDto,
+    numero_forzado?: number,
+  ) {
+    const catalogo_actual = await this.obtenerCatalogoTareasEscuelaLideres();
+    const max_numero = catalogo_actual.reduce((max, t) => Math.max(max, Number(t.numero || 0)), 0);
+    const numero_final = Number(numero_forzado ?? dto.numero ?? max_numero + 1);
+    const indice_existente = catalogo_actual.findIndex((t) => Number(t.numero) === numero_final);
+    const previo = indice_existente >= 0 ? catalogo_actual[indice_existente] : null;
+
+    const nueva_tarea: TareaCatalogoLideres = {
+      numero: numero_final,
+      codigo: dto.codigo || previo?.codigo || `CETI-${String(numero_final).padStart(2, '0')}`,
+      titulo: (dto.titulo || previo?.titulo || `Tarea Formativa #${numero_final}`).trim(),
+      modulo: (dto.modulo || previo?.modulo || 'Módulo Formativo Escuela de Líderes').trim(),
+      descripcion: (dto.descripcion || dto.instrucciones || previo?.descripcion || '').trim(),
+      fecha_limite: dto.fecha_limite || previo?.fecha_limite || new Date().toISOString().split('T')[0],
+      ponderacion: Number(dto.ponderacion ?? dto.puntaje_maximo ?? previo?.ponderacion ?? 8.33),
+      publicada_apk: dto.publicada_apk ?? dto.enviar_apk ?? true,
+    };
+
+    if (indice_existente >= 0) {
+      catalogo_actual[indice_existente] = nueva_tarea;
+    } else {
+      catalogo_actual.push(nueva_tarea);
+    }
+
+    catalogo_actual.sort((a, b) => Number(a.numero) - Number(b.numero));
+    this.catalogo_tareas_memoria = catalogo_actual;
+
+    if (this.configuracion_repo?.findOne && this.configuracion_repo.save) {
+      try {
+        let reg = await this.configuracion_repo.findOne({
+          where: { clave: 'CATALOGO_TAREAS_ESCUELA_LIDERES' },
+        });
+        if (!reg) {
+          reg = this.configuracion_repo.create({
+            clave: 'CATALOGO_TAREAS_ESCUELA_LIDERES',
+            confirmacion_datos_activa: false,
+            valor_json: catalogo_actual,
+          });
+        } else {
+          reg.valor_json = catalogo_actual;
+        }
+        await this.configuracion_repo.save(reg);
+      } catch {}
+    }
+
+    // Sincronizar filas en entregas_tareas_lideres para todos los becarios
+    let total_sincronizados = 0;
+    if (this.becario_repo?.find && this.entrega_tarea_repo?.findOne && this.entrega_tarea_repo.save) {
+      try {
+        let periodo_id = 2;
+        if (this.periodo_repo?.findOne) {
+          const p_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+          if (p_activo) periodo_id = p_activo.id;
+        }
+        const todos_becarios = await this.becario_repo.find();
+        for (const b of todos_becarios) {
+          let entrega = await this.entrega_tarea_repo.findOne({
+            where: { becario_id: b.id, periodo_id, tarea_numero: numero_final },
+          });
+          if (!entrega) {
+            entrega = this.entrega_tarea_repo.create({
+              becario_id: b.id,
+              periodo_id,
+              tarea_numero: numero_final,
+              tarea_codigo: nueva_tarea.codigo,
+              titulo_tarea: nueva_tarea.titulo,
+              ponderacion_maxima: nueva_tarea.ponderacion,
+              estado: EstadoEntregaTarea.PENDIENTE,
+            });
+          } else {
+            entrega.tarea_codigo = nueva_tarea.codigo;
+            entrega.titulo_tarea = nueva_tarea.titulo;
+            entrega.ponderacion_maxima = nueva_tarea.ponderacion;
+          }
+          await this.entrega_tarea_repo.save(entrega);
+          total_sincronizados++;
+        }
+      } catch {}
+    }
+
+    this.tiempo_real_gateway?.notificarEvaluacion({
+      accion: 'tarea_lideres_publicada_apk',
+      modulo_id: 4,
+      tarea: nueva_tarea,
+      total_becarios_sincronizados: total_sincronizados,
+    });
+
+    return {
+      exito: true,
+      mensaje: `Tarea #${numero_final} ("${nueva_tarea.titulo}") guardada y enviada a la APK para todos los becarios.`,
+      tarea: nueva_tarea,
+      total_becarios_sincronizados: total_sincronizados,
+      catalogo: catalogo_actual,
+    };
+  }
+
   async obtenerTareasEscuelaLideres(usuario: Usuario, becario_id?: number, periodo_id?: number) {
     let target_becario_id = becario_id;
-    if (usuario.rol === Rol.BECARIO) {
+    if (usuario?.rol === Rol.BECARIO) {
       if (this.becario_repo) {
-        const becario = await this.becario_repo.findOne({ where: { usuario_id: usuario.id } });
+        const becario = await this.becario_repo.findOne({
+          where: [{ usuario_id: usuario.id }, { id: usuario.id }],
+        });
         if (becario) target_becario_id = becario.id;
       }
       if (!target_becario_id) target_becario_id = usuario.id;
+    } else if (target_becario_id && this.becario_repo) {
+      const becario = await this.becario_repo.findOne({
+        where: [{ id: target_becario_id }, { usuario_id: target_becario_id }],
+      });
+      if (becario) target_becario_id = becario.id;
     } else if (!target_becario_id) {
       target_becario_id = 1;
     }
@@ -2955,6 +3970,8 @@ export class EvaluacionesServicio {
       if (periodo_activo) periodo_activo_id = periodo_activo.id;
     }
     if (!periodo_activo_id) periodo_activo_id = 2;
+
+    const catalogo_dinamico = await this.obtenerCatalogoTareasEscuelaLideres();
 
     let entregas: EntregaTareaLideres[] = [];
     if (this.entrega_tarea_repo) {
@@ -2973,7 +3990,7 @@ export class EvaluacionesServicio {
     let total_revisadas = 0;
     let puntaje_acumulado = 0;
 
-    const tareas = TAREAS_CETI_CATALOGO.map((cat) => {
+    const tareas = catalogo_dinamico.map((cat) => {
       const entrega = entregas_map.get(cat.numero);
       if (entrega) {
         if (entrega.estado === EstadoEntregaTarea.ENTREGADO || entrega.estado === EstadoEntregaTarea.REVISADO) {
@@ -2983,51 +4000,97 @@ export class EvaluacionesServicio {
           total_revisadas++;
           puntaje_acumulado += Number(entrega.puntaje_obtenido || 0);
         }
+        const pts_obt = entrega.puntaje_obtenido !== null && entrega.puntaje_obtenido !== undefined
+          ? Number(entrega.puntaje_obtenido)
+          : null;
+        const calif_100 = pts_obt !== null && Number(cat.ponderacion) > 0
+          ? Math.round((pts_obt / Number(cat.ponderacion)) * 100)
+          : null;
+
         return {
+          id: cat.numero,
+          numero: cat.numero,
           tarea_numero: cat.numero,
+          codigo: cat.codigo,
           tarea_codigo: cat.codigo,
+          titulo: cat.titulo,
+          tema: cat.titulo,
           titulo_tarea: cat.titulo,
+          modulo: cat.modulo,
+          modulo_tematico: cat.modulo,
+          descripcion: cat.descripcion,
+          fecha_limite: cat.fecha_limite,
+          ponderacion: cat.ponderacion,
           ponderacion_maxima: cat.ponderacion,
+          publicada_apk: cat.publicada_apk ?? true,
           entrega_id: entrega.id,
           estado: entrega.estado,
           archivo_evidencia_url: entrega.archivo_evidencia_url,
+          archivo_url: entrega.archivo_evidencia_url,
           nombre_archivo: entrega.nombre_archivo,
+          archivo_nombre: entrega.nombre_archivo,
+          evidencia_nombre: entrega.nombre_archivo,
           tamano_archivo: entrega.tamano_archivo,
+          archivo_tamano: entrega.tamano_archivo,
           comentario_becario: entrega.comentario_becario,
-          puntaje_obtenido: entrega.puntaje_obtenido !== null ? Number(entrega.puntaje_obtenido) : null,
+          comentario_estudiante: entrega.comentario_becario,
+          puntaje_obtenido: pts_obt,
+          calificacion_100: calif_100,
           comentario_revisor: entrega.comentario_revisor,
+          retroalimentacion: entrega.comentario_revisor,
+          retroalimentacion_docente: entrega.comentario_revisor,
           fecha_entrega: entrega.fecha_entrega,
           fecha_revision: entrega.fecha_revision,
         };
       }
       return {
+        id: cat.numero,
+        numero: cat.numero,
         tarea_numero: cat.numero,
+        codigo: cat.codigo,
         tarea_codigo: cat.codigo,
+        titulo: cat.titulo,
+        tema: cat.titulo,
         titulo_tarea: cat.titulo,
+        modulo: cat.modulo,
+        modulo_tematico: cat.modulo,
+        descripcion: cat.descripcion,
+        fecha_limite: cat.fecha_limite,
+        ponderacion: cat.ponderacion,
         ponderacion_maxima: cat.ponderacion,
+        publicada_apk: cat.publicada_apk ?? true,
         entrega_id: null,
         estado: EstadoEntregaTarea.PENDIENTE,
         archivo_evidencia_url: null,
+        archivo_url: null,
         nombre_archivo: null,
+        archivo_nombre: null,
+        evidencia_nombre: null,
         tamano_archivo: null,
+        archivo_tamano: null,
         comentario_becario: null,
+        comentario_estudiante: null,
         puntaje_obtenido: null,
+        calificacion_100: null,
         comentario_revisor: null,
+        retroalimentacion: null,
+        retroalimentacion_docente: null,
         fecha_entrega: null,
         fecha_revision: null,
       };
     });
 
     puntaje_acumulado = Number(puntaje_acumulado.toFixed(2));
+    const total_catalogo = catalogo_dinamico.length;
 
     return {
       becario_id: target_becario_id,
       periodo_id: periodo_activo_id,
       resumen: {
-        total_tareas: 12,
+        total_tareas: total_catalogo,
         entregadas: total_entregadas,
         revisadas: total_revisadas,
-        pendientes: 12 - total_entregadas,
+        pendientes: Math.max(0, total_catalogo - total_entregadas),
         puntaje_acumulado_100: puntaje_acumulado,
       },
       tareas,
@@ -3040,56 +4103,133 @@ export class EvaluacionesServicio {
     }
 
     let becario_id = dto.becario_id;
-    if (usuario.rol === Rol.BECARIO) {
+    if (usuario?.rol === Rol.BECARIO) {
       if (this.becario_repo) {
-        const becario = await this.becario_repo.findOne({ where: { usuario_id: usuario.id } });
+        const becario = await this.becario_repo.findOne({
+          where: [{ usuario_id: usuario.id }, { id: usuario.id }],
+        });
         if (becario) becario_id = becario.id;
       }
       if (!becario_id) becario_id = usuario.id;
+    } else if (becario_id && this.becario_repo) {
+      const becario = await this.becario_repo.findOne({
+        where: [{ id: becario_id }, { usuario_id: becario_id }],
+      });
+      if (becario) becario_id = becario.id;
     } else if (!becario_id) {
       becario_id = 1;
     }
 
-    const catalogo_item = TAREAS_CETI_CATALOGO.find((t) => t.numero === dto.tarea_numero) || {
-      numero: dto.tarea_numero,
-      codigo: `CETI-${dto.tarea_numero.toString().padStart(2, '0')}`,
-      titulo: `Tarea ${dto.tarea_numero}`,
+    let periodo_id = dto.periodo_id;
+    if (!periodo_id && this.periodo_repo?.findOne) {
+      const p_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+      if (p_activo) periodo_id = p_activo.id;
+    }
+    if (!periodo_id) periodo_id = 2;
+
+    const tarea_numero = Number(dto.tarea_numero ?? dto.numero ?? 1);
+    const catalogo_dinamico = await this.obtenerCatalogoTareasEscuelaLideres();
+    const catalogo_item = catalogo_dinamico.find((t) => t.numero === tarea_numero) || {
+      numero: tarea_numero,
+      codigo: `CETI-${tarea_numero.toString().padStart(2, '0')}`,
+      titulo: `Tarea ${tarea_numero}`,
       ponderacion: 8.33,
     };
+
+    const archivo_url_final =
+      dto.archivo_evidencia_url || dto.enlace_externo || dto.archivo_adjunto || `/uploads/escuela-lideres/tarea-${tarea_numero}.pdf`;
+    const nombre_archivo_final =
+      dto.nombre_archivo || dto.archivo_adjunto || `Entrega_Tarea_${tarea_numero}.pdf`;
+    const comentario_final =
+      dto.comentario_becario || dto.respuesta_texto || dto.enlace_externo || null;
 
     let entrega = await this.entrega_tarea_repo.findOne({
       where: {
         becario_id,
-        periodo_id: dto.periodo_id,
-        tarea_numero: dto.tarea_numero,
+        periodo_id,
+        tarea_numero,
       },
     });
 
     if (!entrega) {
       entrega = this.entrega_tarea_repo.create({
         becario_id,
-        periodo_id: dto.periodo_id,
-        tarea_numero: dto.tarea_numero,
+        periodo_id,
+        tarea_numero,
         tarea_codigo: catalogo_item.codigo,
         titulo_tarea: catalogo_item.titulo,
         ponderacion_maxima: catalogo_item.ponderacion,
         estado: EstadoEntregaTarea.ENTREGADO,
-        archivo_evidencia_url: dto.archivo_evidencia_url,
-        nombre_archivo: dto.nombre_archivo,
+        archivo_evidencia_url: archivo_url_final,
+        nombre_archivo: nombre_archivo_final,
         tamano_archivo: dto.tamano_archivo || null,
-        comentario_becario: dto.comentario_becario || null,
+        comentario_becario: comentario_final,
         fecha_entrega: new Date(),
       });
     } else {
-      entrega.archivo_evidencia_url = dto.archivo_evidencia_url;
-      entrega.nombre_archivo = dto.nombre_archivo;
+      entrega.archivo_evidencia_url = archivo_url_final;
+      entrega.nombre_archivo = nombre_archivo_final;
       if (dto.tamano_archivo) entrega.tamano_archivo = dto.tamano_archivo;
-      if (dto.comentario_becario) entrega.comentario_becario = dto.comentario_becario;
+      if (comentario_final) entrega.comentario_becario = comentario_final;
       entrega.estado = EstadoEntregaTarea.ENTREGADO;
       entrega.fecha_entrega = new Date();
     }
 
-    return this.entrega_tarea_repo.save(entrega);
+    const guardada = await this.entrega_tarea_repo.save(entrega);
+    this.tiempo_real_gateway?.notificarEvaluacion({
+      accion: 'tarea_lideres_entregada',
+      modulo_id: 4,
+      becario_id,
+      tarea_numero,
+      entrega_id: guardada.id,
+    });
+    return guardada;
+  }
+
+  async revisarTareaPorNumeroEscuelaLideres(
+    tarea_numero: number,
+    dto: RevisarEntregaLideresDto,
+    revisor: Usuario,
+  ) {
+    if (!this.entrega_tarea_repo) {
+      throw new BadRequestException('Repositorio de entregas no disponible');
+    }
+
+    let becario_id = dto.becario_id || 1;
+    if (this.becario_repo && dto.becario_id) {
+      const b = await this.becario_repo.findOne({
+        where: [{ id: dto.becario_id }, { usuario_id: dto.becario_id }],
+      });
+      if (b) becario_id = b.id;
+    }
+
+    let periodo_id = dto.periodo_id || 2;
+    if (!dto.periodo_id && this.periodo_repo?.findOne) {
+      const p = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+      if (p) periodo_id = p.id;
+    }
+
+    let entrega = await this.entrega_tarea_repo.findOne({
+      where: { becario_id, periodo_id, tarea_numero },
+    });
+
+    if (!entrega) {
+      const catalogo = await this.obtenerCatalogoTareasEscuelaLideres();
+      const cat = catalogo.find((t) => t.numero === tarea_numero);
+      entrega = this.entrega_tarea_repo.create({
+        becario_id,
+        periodo_id,
+        tarea_numero,
+        tarea_codigo: cat?.codigo || `CETI-${String(tarea_numero).padStart(2, '0')}`,
+        titulo_tarea: cat?.titulo || `Tarea ${tarea_numero}`,
+        ponderacion_maxima: cat?.ponderacion || 8.33,
+        estado: EstadoEntregaTarea.ENTREGADO,
+        fecha_entrega: new Date(),
+      });
+      entrega = await this.entrega_tarea_repo.save(entrega);
+    }
+
+    return this.revisarEntregaEscuelaLideres(entrega.id, dto, revisor);
   }
 
   async revisarEntregaEscuelaLideres(
@@ -3101,22 +4241,31 @@ export class EvaluacionesServicio {
       throw new BadRequestException('Repositorio de entregas no disponible');
     }
 
-    const entrega = await this.entrega_tarea_repo.findOne({
+    let entrega = await this.entrega_tarea_repo.findOne({
       where: { id: entrega_id },
       relations: { becario: true, periodo: true },
     });
+
+    if (!entrega && entrega_id >= 1 && entrega_id <= 50) {
+      return this.revisarTareaPorNumeroEscuelaLideres(entrega_id, dto, revisor);
+    }
 
     if (!entrega) {
       throw new NotFoundException(`No se encontró la entrega con ID ${entrega_id}`);
     }
 
-    entrega.estado = dto.estado;
-    entrega.comentario_revisor = dto.comentario_revisor || null;
+    const estado_final = dto.estado || EstadoEntregaTarea.REVISADO;
+    const comentario_final =
+      dto.comentario_revisor || dto.retroalimentacion_supervisor || dto.observaciones || null;
+    const puntaje_entrante = Number(dto.puntaje_obtenido ?? dto.calificacion ?? dto.puntaje ?? 0);
+
+    entrega.estado = estado_final;
+    entrega.comentario_revisor = comentario_final;
     entrega.revisor_id = revisor?.id || null;
     entrega.fecha_revision = new Date();
 
-    if (dto.estado === EstadoEntregaTarea.REVISADO) {
-      let puntaje = Number(dto.puntaje_obtenido);
+    if (estado_final === EstadoEntregaTarea.REVISADO) {
+      let puntaje = puntaje_entrante;
       if (puntaje > Number(entrega.ponderacion_maxima) && Number(entrega.ponderacion_maxima) > 0) {
         puntaje = Number(((puntaje / 100) * Number(entrega.ponderacion_maxima)).toFixed(2));
       }
@@ -3198,6 +4347,13 @@ export class EvaluacionesServicio {
     }
 
     const evaluacion_guardada = await this.evaluacion_repo.save(evaluacion_mod4);
+    this.tiempo_real_gateway?.notificarEvaluacion({
+      accion: 'tarea_lideres_revisada',
+      modulo_id: 4,
+      becario_id: entrega.becario_id,
+      entrega_id: entrega_guardada.id,
+      puntaje_acumulado: puntaje_final_lideres,
+    });
 
     return {
       entrega: entrega_guardada,

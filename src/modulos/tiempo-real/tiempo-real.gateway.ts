@@ -58,4 +58,10 @@ export class TiempoRealGateway implements OnGatewayConnection, OnGatewayDisconne
       this.servidor.emit('codigo_verificacion_tutor', datos_codigo);
     }
   }
+
+  notificarEvaluacion(datos_evaluacion: unknown) {
+    if (this.servidor) {
+      this.servidor.emit('evaluacion_actualizada', datos_evaluacion);
+    }
+  }
 }

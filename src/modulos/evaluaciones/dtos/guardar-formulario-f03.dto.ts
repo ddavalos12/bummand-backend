@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsOptional, IsString, IsNumber, IsObject } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsObject, IsBoolean } from 'class-validator';
 
 export class GuardarFormularioF03Dto {
   @ApiPropertyOptional({
@@ -126,4 +126,121 @@ export class GuardarFormularioF03Dto {
   @IsOptional()
   @IsString()
   observaciones?: string;
+
+  @IsOptional()
+  @IsString()
+  periodo?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  periodo_id?: number;
+
+  @IsOptional()
+  @IsString()
+  frecuencia?: string;
+
+  @IsOptional()
+  @IsString()
+  frecuencia_asistencia?: string;
+
+  @IsOptional()
+  @IsString()
+  compromiso?: string;
+
+  @IsOptional()
+  @IsString()
+  demuestra_compromiso?: string;
+
+  @IsOptional()
+  @IsString()
+  ocupa_cargo?: string;
+
+  @IsOptional()
+  @IsString()
+  cargo_iglesia?: string;
+
+  @IsOptional()
+  @IsString()
+  cargo_2025?: string;
+
+  @IsOptional()
+  @IsString()
+  cumplimiento?: string;
+
+  @IsOptional()
+  @IsString()
+  cumplimiento_cargos?: string;
+
+  @IsOptional()
+  @IsString()
+  conviccion_llamado?: string;
+
+  @IsOptional()
+  @IsString()
+  ejemplo_congregacion?: string;
+
+  @IsOptional()
+  @IsString()
+  compromiso_capacitaciones?: string;
+
+  @IsOptional()
+  @IsString()
+  testimonio_cristiano?: string;
+
+  @IsOptional()
+  @IsString()
+  relacion_miembros?: string;
+
+  @IsOptional()
+  @IsString()
+  desarrollo_nuevos_lideres?: string;
+
+  @IsOptional()
+  @IsString()
+  fortalezas?: string;
+
+  @IsOptional()
+  @IsString()
+  debilidades?: string;
+
+  @IsOptional()
+  @IsString()
+  opinion_general?: string;
+
+  @IsOptional()
+  @IsString()
+  lider_nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  lider_cargo?: string;
+
+  @IsOptional()
+  @IsString()
+  declara_nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  declara_ci?: string;
+
+  @IsOptional()
+  @IsString()
+  declaracion_ci?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  declara_conforme?: boolean;
+
+  @IsOptional()
+  @IsString()
+  fecha_recepcion?: string;
+
+  @IsOptional()
+  @IsString()
+  estado?: string;
+
+  @IsOptional()
+  @IsObject()
+  respuestas?: Record<string, unknown>;
 }
