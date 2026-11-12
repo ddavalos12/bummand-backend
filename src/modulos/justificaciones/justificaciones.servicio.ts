@@ -126,7 +126,7 @@ export class JustificacionesServicio {
 
   async obtenerTodas(): Promise<Justificacion[]> {
     return this.justificacion_repo.find({
-      relations: ['becario', 'becario.usuario', 'becario.lugar_practica', 'supervisor'] as any,
+      relations: { becario: { usuario: true, lugar_practica: true }, supervisor: true },
       order: { created_at: 'DESC' },
     });
   }
@@ -134,7 +134,7 @@ export class JustificacionesServicio {
   async obtenerPorId(id: number): Promise<Justificacion> {
     const justificacion = await this.justificacion_repo.findOne({
       where: { id },
-      relations: ['becario', 'becario.usuario', 'becario.lugar_practica', 'supervisor'] as any,
+      relations: { becario: { usuario: true, lugar_practica: true }, supervisor: true },
     });
 
     if (!justificacion) {
@@ -162,7 +162,7 @@ export class JustificacionesServicio {
 
     return this.justificacion_repo.find({
       where: { becario_id },
-      relations: ['becario', 'becario.usuario', 'becario.lugar_practica', 'supervisor'] as any,
+      relations: { becario: { usuario: true, lugar_practica: true }, supervisor: true },
       order: { created_at: 'DESC' },
     });
   }

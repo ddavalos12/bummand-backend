@@ -123,7 +123,7 @@ export class AsistenciaControlador {
     return this.asistenciaServicio.revisarSupervisor(id, dto, usuario.id);
   }
 
-  @Patch(':id/aprobar-administracion')
+  @Patch([':id/aprobar-administracion', ':id/convalidar'])
   @Roles(Rol.ADMINISTRADOR)
   @ApiOperation({
     summary: 'Aprobación definitiva de asistencia por administración',

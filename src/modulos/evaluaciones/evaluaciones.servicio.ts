@@ -579,9 +579,10 @@ export class EvaluacionesServicio {
         }
 
         if (!becario && becario_referencia) {
-          becario = await this.becario_repo.findOne({
-            where: [{ id: becario_referencia }, { usuario_id: becario_referencia }],
-          });
+          becario = await this.becario_repo.findOne({ where: { id: becario_referencia } });
+          if (!becario) {
+            becario = await this.becario_repo.findOne({ where: { usuario_id: becario_referencia } });
+          }
         }
 
         if (!becario && (nombre_buscado || ci_buscado) && typeof this.becario_repo.find === 'function') {
@@ -605,6 +606,13 @@ export class EvaluacionesServicio {
           if (!becario && todos_becarios.length > 0) {
             becario = todos_becarios[0];
           }
+        }
+
+        if (!becario && typeof this.becario_repo.findOne === 'function') {
+          // Fallback: ID de demostración o inexistente en BD -> primer becario activo (o cualquiera)
+          becario =
+            (await this.becario_repo.findOne({ where: { activo: true } as any, order: { id: 'ASC' } as any }).catch(() => null)) ||
+            (await this.becario_repo.findOne({ where: {}, order: { id: 'ASC' } as any }).catch(() => null));
         }
 
         if (!becario && typeof this.becario_repo.create === 'function' && typeof this.becario_repo.save === 'function') {

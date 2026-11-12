@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsIn, IsNumber, IsOptional, IsString } from 'class-validator';
 import { EstadoAprobacionAsistencia } from '../entidades/registro-asistencia.entidad';
 
 export class RevisarSupervisorAsistenciaDto {
@@ -50,8 +50,8 @@ export class AprobarAdminAsistenciaDto {
     default: EstadoAprobacionAsistencia.APROBADO_ADMINISTRACION,
   })
   @IsOptional()
-  @IsEnum(EstadoAprobacionAsistencia)
-  estado?: EstadoAprobacionAsistencia;
+  @IsIn([...Object.values(EstadoAprobacionAsistencia), 'convalidado'])
+  estado?: EstadoAprobacionAsistencia | 'convalidado';
 
   @ApiPropertyOptional({
     example: 'Aprobación definitiva de marcación y cómputo de horas para beca.',
