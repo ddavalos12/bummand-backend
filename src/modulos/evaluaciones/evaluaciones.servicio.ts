@@ -718,10 +718,18 @@ export class EvaluacionesServicio {
     if (dto.declara_conforme !== undefined) campos_extra.declara_conforme = dto.declara_conforme;
     if (dto.fecha_recepcion) campos_extra.fecha_recepcion = dto.fecha_recepcion;
 
+    const solicita_solo_revision =
+      dto.convalidado === false ||
+      dto.estado === 'en_revision' ||
+      dto.estado === 'pendiente' ||
+      dto.estado === 'borrador';
+    const es_convalidado = !solicita_solo_revision;
+
     const campos_formulario_unificados = {
       ...campos_extra,
       ...(dto.respuestas || {}),
       ...(dto.campos_formulario || {}),
+      convalidado: es_convalidado,
     };
     const tiene_campos = Object.keys(campos_formulario_unificados).length > 0;
 
@@ -763,26 +771,39 @@ export class EvaluacionesServicio {
         ? Number(((puntaje_num / 100) * 20).toFixed(2))
         : Number(puntaje_num.toFixed(2));
       evaluacion.puntaje = puntaje_20;
-      evaluacion.estado = EstadoEvaluacion.COMPLETADO;
-    } else {
-      evaluacion.estado = EstadoEvaluacion.COMPLETADO;
     }
+    evaluacion.estado = es_convalidado
+      ? EstadoEvaluacion.COMPLETADO
+      : EstadoEvaluacion.PENDIENTE;
 
     if (dto.observaciones !== undefined) {
       evaluacion.observaciones = dto.observaciones;
+    } else if (
+      es_convalidado &&
+      evaluacion.observaciones === 'Evaluación F-03 ministerial favorable por el pastor local.'
+    ) {
+      evaluacion.observaciones = 'Evaluación F-03 aprobada y convalidada en sistema.';
+    } else if (!es_convalidado) {
+      evaluacion.observaciones = 'Evaluación F-03 revisada y modificada. Pendiente de convalidación.';
     }
     evaluacion.fecha_evaluacion = new Date();
     await this.evaluacion_repo.save(evaluacion);
 
     this.tiempo_real_gateway?.notificarEvaluacion({
-      accion: 'f03_actualizado',
+      accion: es_convalidado ? 'f03_aprobado' : 'f03_en_revision',
       modulo_id: 1,
       becario_id: evaluacion.becario_id,
       evaluacion_id: evaluacion.id,
       puntaje: evaluacion.puntaje,
+      estado: es_convalidado ? 'completada' : 'en_revision',
+      convalidado: es_convalidado,
     });
 
-    return pastor_guardado;
+    return Object.assign(pastor_guardado, {
+      estado: es_convalidado ? 'completada' : 'en_revision',
+      convalidado: es_convalidado,
+      puntaje: evaluacion.puntaje !== null && evaluacion.puntaje !== undefined ? Number(evaluacion.puntaje) : null,
+    });
   }
 
   async procesarReceptorF03(
@@ -979,6 +1000,7 @@ export class EvaluacionesServicio {
       evaluacion_id: number | null;
       puntaje: number | null;
       estado: string;
+      convalidado: boolean;
       iglesia_nombre: string | null;
       pastor_nombre: string | null;
       pastor_celular: string | null;
@@ -1015,8 +1037,8 @@ export class EvaluacionesServicio {
           periodo_id,
           evaluador_id,
           puntaje: puntaje_f03,
-          estado: EstadoEvaluacion.COMPLETADO,
-          observaciones: 'Evaluación F-03 ministerial favorable por el pastor local.',
+          estado: EstadoEvaluacion.PENDIENTE,
+          observaciones: 'Evaluación F-03 inicial registrada. Pendiente de convalidación.',
           fecha_evaluacion: new Date(),
         });
         ev = await this.evaluacion_repo.save(ev);
@@ -1074,13 +1096,24 @@ export class EvaluacionesServicio {
         mapa_pastor.set(ev.id, ev_pastor);
       }
 
+      const campos_ev = (ev_pastor.campos_formulario || {}) as Record<string, unknown>;
+      // Registros autogenerados previos sin marca explícita de convalidación deben permanecer pendientes de aprobación
+      const es_placeholder_autogenerado =
+        ev.observaciones === 'Evaluación F-03 ministerial favorable por el pastor local.' &&
+        campos_ev.convalidado !== true;
+      const convalidado =
+        campos_ev.convalidado === false || es_placeholder_autogenerado
+          ? false
+          : campos_ev.convalidado === true || ev.estado === EstadoEvaluacion.COMPLETADO;
+
       resultado.push({
         becario_id: b.id,
         nombre: nombre_becario,
         ci: b.ci || '—',
         evaluacion_id: ev.id,
         puntaje: ev.puntaje !== null && ev.puntaje !== undefined ? Number(ev.puntaje) : null,
-        estado: ev.estado || 'completada',
+        estado: convalidado ? 'completada' : 'en_revision',
+        convalidado,
         iglesia_nombre: ev_pastor.iglesia_nombre || iglesia_nombre,
         pastor_nombre: ev_pastor.pastor_nombre || pastor_nombre,
         pastor_celular: ev_pastor.pastor_celular || pastor_celular,
@@ -2378,7 +2411,7 @@ export class EvaluacionesServicio {
     const convalidado = aprobar || Boolean(dto.convalidado);
     const estado_final = convalidado
       ? EstadoEvaluacion.COMPLETADO
-      : (dto.estado as EstadoEvaluacion) || EstadoEvaluacion.COMPLETADO;
+      : (dto.estado as EstadoEvaluacion) || EstadoEvaluacion.PENDIENTE;
 
     const datos_formulario_final = {
       ...(evaluacion?.datos_formulario || {}),

@@ -240,6 +240,13 @@ export class GuardarFormularioF03Dto {
   @IsString()
   estado?: string;
 
+  @ApiPropertyOptional({
+    description: 'Indica si la evaluación F-03 fue aprobada y convalidada (true) o guardada solo como revisión (false)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  convalidado?: boolean;
+
   @IsOptional()
   @IsObject()
   respuestas?: Record<string, unknown>;
