@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CrearNotificacionDto {
   @ApiProperty({
@@ -10,9 +10,17 @@ export class CrearNotificacionDto {
   @IsNotEmpty()
   usuario_id: number;
 
+  @ApiPropertyOptional({
+    example: 'Permiso Aprobado',
+    description: 'Título breve de la notificación',
+  })
+  @IsOptional()
+  @IsString()
+  titulo?: string;
+
   @ApiProperty({
     example: 'recordatorio_salida',
-    description: 'Tipo o clasificación de la notificación (recordatorio_salida, pasaje_observado, evaluacion_pendiente, general)',
+    description: 'Tipo o clasificación de la notificación (recordatorio_salida, pasaje_observado, evaluacion_pendiente, justificacion, general)',
   })
   @IsString()
   @IsNotEmpty()

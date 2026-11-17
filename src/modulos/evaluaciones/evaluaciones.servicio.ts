@@ -66,6 +66,11 @@ export interface TareaCatalogoLideres {
   fecha_limite: string;
   ponderacion: number;
   publicada_apk: boolean;
+  lecturas_pdf?: Array<{ nombre: string; url: string; tamano?: string }>;
+  enlaces_lectura?: Array<{ titulo: string; url: string }>;
+  lectura_pdf_url?: string | null;
+  lectura_pdf_nombre?: string | null;
+  enlace_lectura?: string | null;
 }
 
 export const TAREAS_CETI_CATALOGO: TareaCatalogoLideres[] = [
@@ -208,7 +213,7 @@ export const PESOS_PONDERADOS_MODULOS: Record<
   3: {
     nombre: 'Evaluación del Mentor / Prácticas',
     peso_porcentaje: 25,
-    evaluador_tipo: 'Supervisor Diaconía',
+    evaluador_tipo: 'Mentor Diaconía',
   },
   4: {
     nombre: 'Evaluación Escuela de Líderes',
@@ -1657,7 +1662,7 @@ export class EvaluacionesServicio {
       promedio_calculado: promedio,
       pre_evaluacion: {
         supervisor_id: supervisor_usuario?.id ?? null,
-        supervisor_nombre: supervisor_usuario?.nombre ?? 'Supervisor',
+        supervisor_nombre: supervisor_usuario?.nombre ?? 'Mentor',
         fecha_pre_evaluacion: new Date().toISOString(),
         observaciones: dto.observaciones_supervisor || '',
         resultado: 'aprobado',
@@ -1667,7 +1672,7 @@ export class EvaluacionesServicio {
     evaluacion.promedio_academico = promedio;
     evaluacion.puntaje = puntaje;
     evaluacion.estado = EstadoEvaluacion.PRE_EVALUADO;
-    evaluacion.observaciones = dto.observaciones_supervisor || `Pre-evaluación completada por supervisor. Promedio: ${promedio} pts. Enviado a Administración.`;
+    evaluacion.observaciones = dto.observaciones_supervisor || `Pre-evaluación completada por mentor. Promedio: ${promedio} pts. Enviado a Administración.`;
 
     const guardada = await this.evaluacion_repo.save(evaluacion);
     Object.assign(guardada, {
@@ -1680,7 +1685,7 @@ export class EvaluacionesServicio {
         await this.notificaciones_servicio.crear({
           usuario_id: evaluacion.becario.usuario_id,
           tipo: 'evaluacion_pendiente',
-          mensaje: `Tu supervisor ha revisado y remitido tus notas (Promedio: ${promedio} pts) a Administración.`,
+          mensaje: `Tu mentor ha revisado y remitido tus notas (Promedio: ${promedio} pts) a Administración.`,
         });
       } catch (e) {
         // Envio no bloqueante
@@ -2983,7 +2988,7 @@ export class EvaluacionesServicio {
       supervisor_nombre,
       supervisor_correo,
       expira_en_segundos: 600,
-      mensaje: `Se envió una notificación con el código de 6 dígitos a la pantalla de su supervisor específico (${supervisor_nombre}).`,
+      mensaje: `Se envió una notificación con el código de 6 dígitos a la pantalla de su mentor específico (${supervisor_nombre}).`,
     };
   }
 
@@ -3014,7 +3019,7 @@ export class EvaluacionesServicio {
       }
 
       throw new BadRequestException(
-        'El código ingresado es incorrecto o ha expirado. Revisa la notificación en la pantalla de su supervisor específico o solicita un nuevo código.',
+        'El código ingresado es incorrecto o ha expirado. Revisa la notificación en la pantalla de su mentor específico o solicita un nuevo código.',
       );
     }
 
@@ -3041,12 +3046,12 @@ export class EvaluacionesServicio {
       }
 
       throw new BadRequestException(
-        'Credenciales inválidas o la cuenta ingresada no corresponde a un Supervisor/Tutor autorizado.',
+        'Credenciales inválidas o la cuenta ingresada no corresponde a un Mentor/Tutor autorizado.',
       );
     }
 
     throw new BadRequestException(
-      'Debes ingresar el código de 6 dígitos enviado por notificación a su supervisor o las credenciales del supervisor.',
+      'Debes ingresar el código de 6 dígitos enviado por notificación a su mentor o las credenciales del mentor.',
     );
   }
 
@@ -3878,13 +3883,27 @@ export class EvaluacionesServicio {
           reg = await this.configuracion_repo.save(reg);
         }
         if (reg && Array.isArray(reg.valor_json) && reg.valor_json.length > 0) {
-          this.catalogo_tareas_memoria = (reg.valor_json as TareaCatalogoLideres[]).sort(
-            (a, b) => Number(a.numero) - Number(b.numero),
-          );
+          this.catalogo_tareas_memoria = (reg.valor_json as TareaCatalogoLideres[])
+            .map((t) => ({
+              ...t,
+              lecturas_pdf: Array.isArray(t.lecturas_pdf) ? t.lecturas_pdf : [],
+              enlaces_lectura: Array.isArray(t.enlaces_lectura) ? t.enlaces_lectura : [],
+              lectura_pdf_url: t.lectura_pdf_url ?? t.lecturas_pdf?.[0]?.url ?? null,
+              lectura_pdf_nombre: t.lectura_pdf_nombre ?? t.lecturas_pdf?.[0]?.nombre ?? null,
+              enlace_lectura: t.enlace_lectura ?? t.enlaces_lectura?.[0]?.url ?? null,
+            }))
+            .sort((a, b) => Number(a.numero) - Number(b.numero));
         }
       } catch {}
     }
-    return this.catalogo_tareas_memoria;
+    return this.catalogo_tareas_memoria.map((t) => ({
+      ...t,
+      lecturas_pdf: Array.isArray(t.lecturas_pdf) ? t.lecturas_pdf : [],
+      enlaces_lectura: Array.isArray(t.enlaces_lectura) ? t.enlaces_lectura : [],
+      lectura_pdf_url: t.lectura_pdf_url ?? t.lecturas_pdf?.[0]?.url ?? null,
+      lectura_pdf_nombre: t.lectura_pdf_nombre ?? t.lecturas_pdf?.[0]?.nombre ?? null,
+      enlace_lectura: t.enlace_lectura ?? t.enlaces_lectura?.[0]?.url ?? null,
+    }));
   }
 
   async guardarTareaCatalogoEscuelaLideres(
@@ -3897,6 +3916,34 @@ export class EvaluacionesServicio {
     const indice_existente = catalogo_actual.findIndex((t) => Number(t.numero) === numero_final);
     const previo = indice_existente >= 0 ? catalogo_actual[indice_existente] : null;
 
+    let lecturas_pdf: Array<{ nombre: string; url: string; tamano?: string }> = Array.isArray(
+      dto.lecturas_pdf,
+    )
+      ? dto.lecturas_pdf.filter((p) => p && p.url)
+      : Array.isArray(previo?.lecturas_pdf)
+      ? [...previo.lecturas_pdf]
+      : [];
+
+    if (dto.lectura_pdf_url && !lecturas_pdf.some((p) => p.url === dto.lectura_pdf_url)) {
+      lecturas_pdf.push({
+        nombre: dto.lectura_pdf_nombre || 'Material de lectura PDF',
+        url: dto.lectura_pdf_url,
+      });
+    }
+
+    let enlaces_lectura: Array<{ titulo: string; url: string }> = Array.isArray(dto.enlaces_lectura)
+      ? dto.enlaces_lectura.filter((e) => e && e.url)
+      : Array.isArray(previo?.enlaces_lectura)
+      ? [...previo.enlaces_lectura]
+      : [];
+
+    if (dto.enlace_lectura && !enlaces_lectura.some((e) => e.url === dto.enlace_lectura)) {
+      enlaces_lectura.push({
+        titulo: 'Enlace de lectura complementaria',
+        url: dto.enlace_lectura,
+      });
+    }
+
     const nueva_tarea: TareaCatalogoLideres = {
       numero: numero_final,
       codigo: dto.codigo || previo?.codigo || `CETI-${String(numero_final).padStart(2, '0')}`,
@@ -3906,6 +3953,12 @@ export class EvaluacionesServicio {
       fecha_limite: dto.fecha_limite || previo?.fecha_limite || new Date().toISOString().split('T')[0],
       ponderacion: Number(dto.ponderacion ?? dto.puntaje_maximo ?? previo?.ponderacion ?? 8.33),
       publicada_apk: dto.publicada_apk ?? dto.enviar_apk ?? true,
+      lecturas_pdf,
+      enlaces_lectura,
+      lectura_pdf_url: dto.lectura_pdf_url ?? lecturas_pdf[0]?.url ?? previo?.lectura_pdf_url ?? null,
+      lectura_pdf_nombre:
+        dto.lectura_pdf_nombre ?? lecturas_pdf[0]?.nombre ?? previo?.lectura_pdf_nombre ?? null,
+      enlace_lectura: dto.enlace_lectura ?? enlaces_lectura[0]?.url ?? previo?.enlace_lectura ?? null,
     };
 
     if (indice_existente >= 0) {
@@ -3935,7 +3988,6 @@ export class EvaluacionesServicio {
       } catch {}
     }
 
-    // Sincronizar filas en entregas_tareas_lideres para todos los becarios
     let total_sincronizados = 0;
     if (this.becario_repo?.find && this.entrega_tarea_repo?.findOne && this.entrega_tarea_repo.save) {
       try {
@@ -4033,6 +4085,12 @@ export class EvaluacionesServicio {
 
     const tareas = catalogo_dinamico.map((cat) => {
       const entrega = entregas_map.get(cat.numero);
+      const lecturas_pdf = Array.isArray(cat.lecturas_pdf) ? cat.lecturas_pdf : [];
+      const enlaces_lectura = Array.isArray(cat.enlaces_lectura) ? cat.enlaces_lectura : [];
+      const lectura_pdf_url = cat.lectura_pdf_url ?? lecturas_pdf[0]?.url ?? null;
+      const lectura_pdf_nombre = cat.lectura_pdf_nombre ?? lecturas_pdf[0]?.nombre ?? null;
+      const enlace_lectura = cat.enlace_lectura ?? enlaces_lectura[0]?.url ?? null;
+
       if (entrega) {
         if (entrega.estado === EstadoEntregaTarea.ENTREGADO || entrega.estado === EstadoEntregaTarea.REVISADO) {
           total_entregadas++;
@@ -4064,6 +4122,11 @@ export class EvaluacionesServicio {
           ponderacion: cat.ponderacion,
           ponderacion_maxima: cat.ponderacion,
           publicada_apk: cat.publicada_apk ?? true,
+          lecturas_pdf,
+          enlaces_lectura,
+          lectura_pdf_url,
+          lectura_pdf_nombre,
+          enlace_lectura,
           entrega_id: entrega.id,
           estado: entrega.estado,
           archivo_evidencia_url: entrega.archivo_evidencia_url,
@@ -4100,6 +4163,11 @@ export class EvaluacionesServicio {
         ponderacion: cat.ponderacion,
         ponderacion_maxima: cat.ponderacion,
         publicada_apk: cat.publicada_apk ?? true,
+        lecturas_pdf,
+        enlaces_lectura,
+        lectura_pdf_url,
+        lectura_pdf_nombre,
+        enlace_lectura,
         entrega_id: null,
         estado: EstadoEntregaTarea.PENDIENTE,
         archivo_evidencia_url: null,
@@ -4295,7 +4363,13 @@ export class EvaluacionesServicio {
       throw new NotFoundException(`No se encontró la entrega con ID ${entrega_id}`);
     }
 
-    const estado_final = dto.estado || EstadoEntregaTarea.REVISADO;
+    const estado_raw = String(dto.estado || EstadoEntregaTarea.REVISADO).toLowerCase().trim();
+    const es_rechazo =
+      estado_raw === EstadoEntregaTarea.OBSERVADO ||
+      estado_raw === 'rechazado' ||
+      estado_raw === 'rechazada' ||
+      estado_raw === 'observada';
+    const estado_final = es_rechazo ? EstadoEntregaTarea.OBSERVADO : EstadoEntregaTarea.REVISADO;
     const comentario_final =
       dto.comentario_revisor || dto.retroalimentacion_supervisor || dto.observaciones || null;
     const puntaje_entrante = Number(dto.puntaje_obtenido ?? dto.calificacion ?? dto.puntaje ?? 0);
@@ -4317,7 +4391,33 @@ export class EvaluacionesServicio {
 
     const entrega_guardada = await this.entrega_tarea_repo.save(entrega);
 
-    // RECALCULO AUTOMÁTICO DE NOTA ACUMULADA DEL MÓDULO 4
+    if (this.notificaciones_servicio) {
+      try {
+        let usuario_id = entrega.becario?.usuario_id || null;
+        if (!usuario_id && this.becario_repo?.findOne) {
+          const bec = await this.becario_repo.findOne({ where: { id: entrega.becario_id } });
+          usuario_id = bec?.usuario_id || bec?.id || null;
+        }
+        if (!usuario_id) {
+          usuario_id = entrega.becario_id;
+        }
+        const titulo_notif =
+          estado_final === EstadoEntregaTarea.REVISADO
+            ? `Tarea #${entrega.tarea_numero} Aprobada — Escuela de Líderes`
+            : `Tarea #${entrega.tarea_numero} Rechazada / Observada — Escuela de Líderes`;
+        const detalle_notif =
+          estado_final === EstadoEntregaTarea.REVISADO
+            ? `Tu entrega "${entrega.titulo_tarea || `Tarea #${entrega.tarea_numero}`}" fue aprobada con puntaje ${entrega_guardada.puntaje_obtenido}/${entrega.ponderacion_maxima}.${comentario_final ? ` Comentario del Mentor: ${comentario_final}` : ''}`
+            : `Tu entrega "${entrega.titulo_tarea || `Tarea #${entrega.tarea_numero}`}" fue observada/rechazada por el Mentor.${comentario_final ? ` Motivo: ${comentario_final}` : ' Por favor corrige y vuelve a subir tu evidencia.'}`;
+        await this.notificaciones_servicio.crear(
+          usuario_id,
+          titulo_notif,
+          detalle_notif,
+          'evaluacion_lideres',
+        );
+      } catch {}
+    }
+
     const todas_las_entregas = await this.entrega_tarea_repo.find({
       where: { becario_id: entrega.becario_id, periodo_id: entrega.periodo_id },
     });
@@ -4362,7 +4462,7 @@ export class EvaluacionesServicio {
       puntaje_acumulado: puntaje_final_lideres,
       ultima_revision: {
         tarea_numero: entrega.tarea_numero,
-        revisor_nombre: revisor?.nombre || 'Facilitador',
+        revisor_nombre: revisor?.nombre || 'Mentor / Facilitador',
         fecha: new Date().toISOString(),
       },
     };
@@ -4393,6 +4493,7 @@ export class EvaluacionesServicio {
       modulo_id: 4,
       becario_id: entrega.becario_id,
       entrega_id: entrega_guardada.id,
+      estado: entrega_guardada.estado,
       puntaje_acumulado: puntaje_final_lideres,
     });
 

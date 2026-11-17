@@ -1,6 +1,6 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 import { EstadoEntregaTarea } from '../entidades/entrega-tarea-lideres.entidad';
 
 export class EntregarTareaLideresDto {
@@ -71,12 +71,12 @@ export class EntregarTareaLideresDto {
 export class RevisarEntregaLideresDto {
   @ApiPropertyOptional({
     example: EstadoEntregaTarea.REVISADO,
-    enum: [EstadoEntregaTarea.REVISADO, EstadoEntregaTarea.OBSERVADO],
-    description: 'Dictamen de revisión: revisado u observado',
+    enum: ['revisado', 'aprobado', 'observado', 'rechazado'],
+    description: 'Dictamen de revisión: revisado/aprobado u observado/rechazado',
   })
   @IsOptional()
-  @IsEnum(EstadoEntregaTarea)
-  estado?: EstadoEntregaTarea;
+  @IsString()
+  estado?: EstadoEntregaTarea | string;
 
   @ApiPropertyOptional({
     example: 8.33,
@@ -102,7 +102,7 @@ export class RevisarEntregaLideresDto {
 
   @ApiPropertyOptional({
     example: 'Excelente fundamentación teológica y aplicabilidad práctica en la iglesia local.',
-    description: 'Observaciones del facilitador / supervisor',
+    description: 'Observaciones del facilitador / mentor',
   })
   @IsOptional()
   @IsString()
@@ -174,4 +174,24 @@ export class GuardarTareaCatalogoLideresDto {
   @IsOptional()
   @IsBoolean()
   enviar_apk?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  lecturas_pdf?: Array<{ nombre: string; url: string; tamano?: string }>;
+
+  @IsOptional()
+  @IsArray()
+  enlaces_lectura?: Array<{ titulo: string; url: string }>;
+
+  @IsOptional()
+  @IsString()
+  lectura_pdf_url?: string;
+
+  @IsOptional()
+  @IsString()
+  lectura_pdf_nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  enlace_lectura?: string;
 }

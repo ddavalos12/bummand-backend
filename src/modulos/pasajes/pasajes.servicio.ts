@@ -6,6 +6,7 @@ import { Recorrido, Tramo } from './entidades/recorrido.entidad';
 import { TarifaTransporte } from './entidades/tarifa-transporte.entidad';
 import { ParadaTransporte, PARADAS_OFICIALES_DEFECTO } from './entidades/parada-transporte.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
+import { Multa } from '../asistencia/entidades/multa.entidad';
 import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 import { CrearSolicitudPasajeDto } from './dtos/crear-solicitud-pasaje.dto';
 import { AgregarRecorridoDto, ItemRecorridoDto } from './dtos/agregar-recorrido.dto';
@@ -41,6 +42,9 @@ export class PasajesServicio {
     @Optional()
     @InjectRepository(Becario)
     private readonly becarioRepositorio?: Repository<Becario>,
+    @Optional()
+    @InjectRepository(Multa)
+    private readonly multa_repositorio?: Repository<Multa>,
     @Optional()
     private readonly tiempoRealGateway?: TiempoRealGateway,
   ) {}
@@ -419,15 +423,45 @@ export class PasajesServicio {
     };
   }
 
-  async obtenerTodas(): Promise<SolicitudPasajes[]> {
-    const solicitudes = await this.solicitudRepositorio.find({
-      relations: { recorridos: true, becario: { usuario: true } },
-      order: { id: 'DESC' },
-    });
-    return solicitudes.map((s) => ({
+  private async obtenerMapaMultasVigentes(becario_ids?: number[]): Promise<Map<number, number>> {
+    const mapa = new Map<number, number>();
+    if (!this.multa_repositorio || typeof this.multa_repositorio.find !== 'function') {
+      return mapa;
+    }
+    try {
+      const multas = await this.multa_repositorio.find();
+      for (const m of multas || []) {
+        const monto = Number(m.monto_bs || 0);
+        if (monto <= 0) continue;
+        if (becario_ids && becario_ids.length > 0 && !becario_ids.includes(m.becario_id)) {
+          continue;
+        }
+        const acumulado = mapa.get(m.becario_id) || 0;
+        mapa.set(m.becario_id, Number((acumulado + monto).toFixed(2)));
+      }
+    } catch {}
+    return mapa;
+  }
+
+  private mapearSolicitudConMultas(s: SolicitudPasajes, multas_bs: number): SolicitudPasajes {
+    const monto_total = Number(s.monto_total) || 0;
+    const monto_devolucion = Number(s.monto_devolucion) || 0;
+    const multas_asistencia_bs = Number((Number(multas_bs) || 0).toFixed(2));
+    const multas_asistencia_centavos = Math.round(multas_asistencia_bs * 100);
+    const devolucion_centavos = Math.round(monto_devolucion * 100);
+    const monto_liquido_pagable_centavos = Math.max(0, devolucion_centavos - multas_asistencia_centavos);
+    const monto_liquido_pagable = Number(
+      Math.max(0, monto_devolucion - multas_asistencia_bs).toFixed(2),
+    );
+
+    return {
       ...s,
-      monto_total: Number(s.monto_total) || 0,
-      monto_devolucion: Number(s.monto_devolucion) || 0,
+      monto_total,
+      monto_devolucion,
+      multas_asistencia_bs,
+      multas_asistencia_centavos,
+      monto_liquido_pagable,
+      monto_liquido_pagable_centavos,
       recorridos: (s.recorridos || []).map((r) => ({
         ...r,
         tarifa: Number(r.tarifa) || 0,
@@ -438,7 +472,30 @@ export class PasajesServicio {
         medioTransporte: r.medio_transporte ?? null,
         detalleTramosJson: r.detalle_tramos_json ?? null,
       })),
-    })) as SolicitudPasajes[];
+    } as unknown as SolicitudPasajes;
+  }
+
+  async listarSolicitudes(): Promise<SolicitudPasajes[]> {
+    return this.obtenerTodas();
+  }
+
+  async obtenerMisSolicitudes(id_referencia: number): Promise<SolicitudPasajes[]> {
+    return this.obtenerPorBecario(id_referencia);
+  }
+
+  async obtenerSolicitudesPorBecario(id_referencia: number): Promise<SolicitudPasajes[]> {
+    return this.obtenerPorBecario(id_referencia);
+  }
+
+  async obtenerTodas(): Promise<SolicitudPasajes[]> {
+    const solicitudes = await this.solicitudRepositorio.find({
+      relations: { recorridos: true, becario: { usuario: true } },
+      order: { id: 'DESC' },
+    });
+    const mapa_multas = await this.obtenerMapaMultasVigentes();
+    return solicitudes.map((s) =>
+      this.mapearSolicitudConMultas(s, mapa_multas.get(s.becario_id) || 0),
+    );
   }
 
   async obtenerPorId(id: number): Promise<SolicitudPasajes> {
@@ -449,21 +506,13 @@ export class PasajesServicio {
     if (!solicitud) {
       throw new NotFoundException(`Solicitud de pasaje con ID ${id} no encontrada.`);
     }
-    return {
-      ...solicitud,
-      monto_total: Number(solicitud.monto_total) || 0,
-      monto_devolucion: Number(solicitud.monto_devolucion) || 0,
-      recorridos: (solicitud.recorridos || []).map((r) => ({
-        ...r,
-        tarifa: Number(r.tarifa) || 0,
-        calles_declaradas: r.calles_declaradas ?? null,
-        medio_transporte: r.medio_transporte ?? null,
-        detalle_tramos_json: r.detalle_tramos_json ?? null,
-        callesDeclaradas: r.calles_declaradas ?? null,
-        medioTransporte: r.medio_transporte ?? null,
-        detalleTramosJson: r.detalle_tramos_json ?? null,
-      })),
-    } as SolicitudPasajes;
+    const mapa_multas = await this.obtenerMapaMultasVigentes(
+      solicitud.becario_id ? [solicitud.becario_id] : undefined,
+    );
+    return this.mapearSolicitudConMultas(
+      solicitud,
+      mapa_multas.get(solicitud.becario_id) || 0,
+    );
   }
 
   async obtenerPorBecario(id_referencia: number): Promise<SolicitudPasajes[]> {
@@ -476,22 +525,13 @@ export class PasajesServicio {
       relations: { recorridos: true },
       order: { created_at: 'DESC' },
     });
-
-    return solicitudes.map((s) => ({
-      ...s,
-      monto_total: Number(s.monto_total) || 0,
-      monto_devolucion: Number(s.monto_devolucion) || 0,
-      recorridos: (s.recorridos || []).map((r) => ({
-        ...r,
-        tarifa: Number(r.tarifa) || 0,
-        calles_declaradas: r.calles_declaradas ?? null,
-        medio_transporte: r.medio_transporte ?? null,
-        detalle_tramos_json: r.detalle_tramos_json ?? null,
-        callesDeclaradas: r.calles_declaradas ?? null,
-        medioTransporte: r.medio_transporte ?? null,
-        detalleTramosJson: r.detalle_tramos_json ?? null,
-      })),
-    })) as SolicitudPasajes[];
+    const mapa_multas = await this.obtenerMapaMultasVigentes([becario_id_real, id_referencia]);
+    return solicitudes.map((s) =>
+      this.mapearSolicitudConMultas(
+        s,
+        mapa_multas.get(s.becario_id) ?? mapa_multas.get(becario_id_real) ?? 0,
+      ),
+    );
   }
 
   async aprobarSolicitud(id: number, supervisor_id: number): Promise<SolicitudPasajes> {
@@ -1163,6 +1203,19 @@ export class PasajesServicio {
     );
 
     const calculo = this.calcularReembolsoCentavos(tarifas_array);
+    const id_becario_multa = becario ? becario.id : becario_id_real;
+    const mapa_multas = await this.obtenerMapaMultasVigentes([id_becario_multa, parametros.id_estudiante]);
+    const multas_asistencia_bs = Number(
+      (mapa_multas.get(id_becario_multa) ?? mapa_multas.get(parametros.id_estudiante) ?? 0).toFixed(2),
+    );
+    const multas_asistencia_centavos = Math.round(multas_asistencia_bs * 100);
+    const monto_liquido_pagable_centavos = Math.max(
+      0,
+      calculo.devolucion_centavos - multas_asistencia_centavos,
+    );
+    const monto_liquido_pagable = Number(
+      Math.max(0, calculo.monto_devolucion - multas_asistencia_bs).toFixed(2),
+    );
 
     let dias_filtrados = 0;
     if (parametros.fecha_inicio && parametros.fecha_fin) {
@@ -1194,6 +1247,10 @@ export class PasajesServicio {
         total_paradas_registradas: total_paradas_contadas,
         gasto_total_bs: calculo.monto_total,
         devolucion_80_bs: calculo.monto_devolucion,
+        multas_asistencia_bs,
+        multas_asistencia_centavos,
+        monto_liquido_pagable,
+        monto_liquido_pagable_centavos,
         paradas_unicas_frecuentes,
       },
       historial: items_render,

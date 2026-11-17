@@ -5,6 +5,7 @@ import { Becario } from '../becarios/entidades/becario.entidad';
 import { AsistenciaEvento } from '../eventos/entidades/asistencia-evento.entidad';
 import { Multa } from '../asistencia/entidades/multa.entidad';
 import { RegistroAsistencia } from '../asistencia/entidades/registro-asistencia.entidad';
+import { NotificacionesModulo } from '../notificaciones/notificaciones.modulo';
 import { JustificacionesServicio } from './justificaciones.servicio';
 import { JustificacionesControlador } from './justificaciones.controlador';
 
@@ -17,6 +18,7 @@ import { JustificacionesControlador } from './justificaciones.controlador';
       Multa,
       RegistroAsistencia,
     ]),
+    NotificacionesModulo,
   ],
   controllers: [JustificacionesControlador],
   providers: [JustificacionesServicio],

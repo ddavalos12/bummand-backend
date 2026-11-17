@@ -7,6 +7,7 @@ import { SolicitudPasajes } from '../pasajes/entidades/solicitud-pasaje.entidad'
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { Evaluacion } from '../evaluaciones/entidades/evaluacion.entidad';
 import { Multa } from '../asistencia/entidades/multa.entidad';
+import { Justificacion } from '../justificaciones/entidades/justificacion.entidad';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { Multa } from '../asistencia/entidades/multa.entidad';
       Becario,
       Evaluacion,
       Multa,
+      Justificacion,
     ]),
   ],
   controllers: [DashboardControlador],

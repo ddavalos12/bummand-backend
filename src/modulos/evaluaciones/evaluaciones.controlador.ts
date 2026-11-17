@@ -937,6 +937,27 @@ export class EvaluacionesControlador {
   }
 
   @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Post('escuela-lideres/catalogo-tareas/subir-lectura')
+  @UseInterceptors(FileInterceptor('archivo', { storage: almacenamiento_lideres }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Subir PDF o material de lectura para una tarea del catálogo de Escuela de Líderes',
+  })
+  subirLecturaCatalogoLideres(@UploadedFile() archivo: any) {
+    if (!archivo) {
+      throw new BadRequestException('Se requiere adjuntar un archivo PDF de lectura');
+    }
+    const url = `/uploads/escuela-lideres/${archivo.filename}`;
+    return {
+      exito: true,
+      url,
+      nombre: archivo.originalname,
+      tamano: archivo.size,
+      tamano_legible: `${(archivo.size / 1024).toFixed(1)} KB`,
+    };
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('escuela-lideres/catalogo-tareas')
   @ApiOperation({
     summary: 'Crear o publicar una nueva tarea en el catálogo de Escuela de Líderes para todos los becarios',

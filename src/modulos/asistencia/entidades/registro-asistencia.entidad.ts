@@ -132,6 +132,12 @@ export class RegistroAsistencia {
   get horasTrabajadas(): number { return this.horas_trabajadas; }
   set horasTrabajadas(v: number) { this.horas_trabajadas = v; }
 
+  get horas_computadas(): number { return this.horas_trabajadas; }
+  set horas_computadas(v: number) { this.horas_trabajadas = v; }
+
+  get validado(): boolean { return this.confirmado_organizador; }
+  set validado(v: boolean) { this.confirmado_organizador = v; }
+
   get dentroDeRadio(): boolean { return this.dentro_de_radio; }
   set dentroDeRadio(v: boolean) { this.dentro_de_radio = v; }
 

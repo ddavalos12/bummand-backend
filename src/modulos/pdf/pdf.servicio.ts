@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import { Evento } from '../eventos/entidades/evento.entidad';
 import { AsistenciaEvento } from '../eventos/entidades/asistencia-evento.entidad';
 import { RegistroAsistencia, TipoAsistencia } from '../asistencia/entidades/registro-asistencia.entidad';
+import { Multa } from '../asistencia/entidades/multa.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { SolicitudPasajes } from '../pasajes/entidades/solicitud-pasaje.entidad';
 import { Recorrido, Tramo } from '../pasajes/entidades/recorrido.entidad';
@@ -44,6 +45,9 @@ export class PdfServicio {
     @Optional()
     @InjectRepository(Justificacion)
     private readonly justificacion_repo?: Repository<Justificacion>,
+    @Optional()
+    @InjectRepository(Multa)
+    private readonly multa_repo?: Repository<Multa>,
   ) {}
 
   private async lanzarNavegador(): Promise<puppeteer.Browser> {
@@ -116,7 +120,7 @@ export class PdfServicio {
     const modulo_nombre = evaluacion.modulo?.nombre || 'Liderazgo en la Iglesia (Formulario F-03)';
     const periodo_nombre = evaluacion.periodo?.nombre || 'Gestión II-2026';
     const evaluador_nombre = evaluacion.evaluador?.nombre || 'Pastor Evaluador Diaconía';
-    const evaluador_tipo = evaluacion.evaluador?.tipo || 'Supervisor';
+    const evaluador_tipo = evaluacion.evaluador?.tipo || 'Mentor';
     const respuestas = evaluacion.detalle_pastor?.campos_formulario || {
       'Compromiso y Asistencia': 'Excelente',
       'Testimonio Eclesial': 'Sobresaliente',
@@ -418,7 +422,7 @@ export class PdfServicio {
           </table>
 
           <div class="meta-box" style="margin-top: 24px;">
-            <strong>Revisado / Aprobado en sistema por:</strong> Supervisor Institucional (${evento_activo.creador?.nombre || 'Control y Aprobación'}) · Dirección BUMAND (Conformidad y Archivo) · Fecha y Hora de emisión: ${new Date().toLocaleString('es-BO')}
+            <strong>Revisado / Aprobado en sistema por:</strong> Mentor Institucional (${evento_activo.creador?.nombre || 'Control y Aprobación'}) · Dirección BUMAND (Conformidad y Archivo) · Fecha y Hora de emisión: ${new Date().toLocaleString('es-BO')}
           </div>
 
           <div class="footer-note">
@@ -716,7 +720,7 @@ export class PdfServicio {
             </div>
 
             <div style="margin-top: 20px; padding: 8px 12px; background-color: #eff4f6; border: 1px solid #cbd5dc; border-radius: 4px; font-size: 9px;">
-              <strong>Revisado / Aprobado en sistema por:</strong> Supervisor(a) de Evaluaciones (Coordinación Académica BUMAND) · Dirección Ejecutiva (Programa de Becas BUMAND) · Fecha y Hora de emisión: ${new Date().toLocaleDateString('es-BO')} ${new Date().toLocaleTimeString('es-BO')}
+              <strong>Revisado / Aprobado en sistema por:</strong> Mentor(a) de Evaluaciones (Coordinación Académica BUMAND) · Dirección Ejecutiva (Programa de Becas BUMAND) · Fecha y Hora de emisión: ${new Date().toLocaleDateString('es-BO')} ${new Date().toLocaleTimeString('es-BO')}
             </div>
 
             <div class="footer-note">
@@ -1123,7 +1127,7 @@ export class PdfServicio {
 
           <div class="meta-box" style="margin-top: 14px;">
             <div>
-              <strong>Revisado / Aprobado en sistema por:</strong> Lic. Coordinación Nacional BUMAND · Supervisor de Práctica Institucional · Auditoría y Control de Asistencia (Fundación Diaconía FRIF-IFD)
+              <strong>Revisado / Aprobado en sistema por:</strong> Lic. Coordinación Nacional BUMAND · Mentor de Práctica Institucional · Auditoría y Control de Asistencia (Fundación Diaconía FRIF-IFD)
             </div>
             <div>
               <strong>Fecha y Hora de emisión:</strong> ${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}
@@ -1659,7 +1663,7 @@ export class PdfServicio {
             </div>
             <div class="meta-col">
               <div class="meta-item"><span class="meta-label">Sede de Prácticas:</span> <span class="meta-val">${datos.sede_estudiante}</span></div>
-              <div class="meta-item"><span class="meta-label">Supervisor Asignado:</span> <span class="meta-val">${datos.supervisor_nombre}</span></div>
+              <div class="meta-item"><span class="meta-label">Mentor Asignado:</span> <span class="meta-val">${datos.supervisor_nombre}</span></div>
               <div class="meta-item"><span class="meta-label">Periodo Auditado:</span> <span class="meta-val">${datos.mes_nombre}</span></div>
             </div>
           </div>
@@ -1732,7 +1736,7 @@ export class PdfServicio {
           <div class="meta-box" style="margin-top: 12px;">
             <div class="meta-col">
               <div class="meta-item"><strong>Registrado en sistema por:</strong> ${datos.nombre_estudiante} (Estudiante Becario · C.I. ${datos.ci_estudiante})</div>
-              <div class="meta-item"><strong>Revisado / Aprobado en sistema por:</strong> ${datos.supervisor_nombre} (Supervisor Institucional · ${datos.sede_estudiante})</div>
+              <div class="meta-item"><strong>Revisado / Aprobado en sistema por:</strong> ${datos.supervisor_nombre} (Mentor Institucional · ${datos.sede_estudiante})</div>
             </div>
             <div class="meta-col">
               <div class="meta-item"><strong>Convalidación Institucional:</strong> Lic. Coordinación Nacional BUMAND (Visto Bueno y Liquidación · Fundación Diaconía FRIF-IFD)</div>
@@ -2232,7 +2236,7 @@ export class PdfServicio {
             </div>
             <div class="meta-col">
               <div class="meta-item"><span class="meta-label">Sede de Prácticas:</span> <span class="meta-val">${datos.sede_estudiante}</span></div>
-              <div class="meta-item"><span class="meta-label">Supervisor Institucional:</span> <span class="meta-val">${datos.supervisor_nombre}</span></div>
+              <div class="meta-item"><span class="meta-label">Mentor Institucional:</span> <span class="meta-val">${datos.supervisor_nombre}</span></div>
               <div class="meta-item"><span class="meta-label">Periodo Auditado:</span> <span class="meta-val">${datos.mes_nombre}</span></div>
             </div>
           </div>
@@ -2321,7 +2325,7 @@ export class PdfServicio {
           <div class="meta-box" style="margin-top: 12px;">
             <div class="meta-col">
               <div class="meta-item"><strong>Acreditado en sistema para:</strong> ${datos.nombre_estudiante} (Estudiante Becario · C.I. ${datos.ci_estudiante})</div>
-              <div class="meta-item"><strong>Revisado / Aprobado en sistema por:</strong> ${datos.supervisor_nombre} (Supervisor Tutor Institucional · ${datos.sede_estudiante})</div>
+              <div class="meta-item"><strong>Revisado / Aprobado en sistema por:</strong> ${datos.supervisor_nombre} (Mentor Tutor Institucional · ${datos.sede_estudiante})</div>
             </div>
             <div class="meta-col">
               <div class="meta-item"><strong>Convalidación Institucional:</strong> Lic. Coordinación Nacional BUMAND (Auditoría y Certificación de Asistencia · Diaconía IFD)</div>
@@ -2684,7 +2688,7 @@ export class PdfServicio {
             </div>
             <div class="firma-item">
               <div class="firma-linea">
-                ${refrigerio.revisado_por_supervisor_id ? `Supervisor Institucional (ID #${refrigerio.revisado_por_supervisor_id})` : 'Supervisor de Cohorte'}
+                ${refrigerio.revisado_por_supervisor_id ? `Mentor Institucional (ID #${refrigerio.revisado_por_supervisor_id})` : 'Mentor de Cohorte'}
               </div>
               <div class="firma-cargo">Revisión y Conformidad Operativa</div>
             </div>
@@ -2945,6 +2949,8 @@ export class PdfServicio {
     total_horas: number;
     total_solicitudes_pasajes: number;
     total_monto_pasajes: number;
+    total_multas_bs?: number;
+    monto_liquido_pagable?: number;
     total_refrigerios: number;
     total_monto_refrigerios: number;
   }): string {
@@ -2954,18 +2960,22 @@ export class PdfServicio {
       : 'Periodo de Evaluación Integral';
 
     const codigo_auditoria = `AUD-GLOBAL-${Date.now().toString().slice(-6)}`;
+    const multas_bs = Number(datos.total_multas_bs || 0);
+    const liquido_pagable = Number(
+      datos.monto_liquido_pagable ?? Math.max(0, Number(datos.total_monto_pasajes || 0) - multas_bs),
+    );
 
     return `
       <!DOCTYPE html>
       <html lang="es">
         <head>
           <meta charset="UTF-8">
-          <title>Consolidado Global de Auditoría - BUMAND</title>
+          <title>FORMULARIO PARA CONTABILIDAD Y SRD - LIQUIDACIÓN DE PASAJES</title>
           <style>
             @page { size: A4 portrait; margin: 12mm 15mm; }
             body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1E293B; font-size: 10px; margin: 0; padding: 0; }
             .header-table { width: 100%; border-bottom: 2px solid #007BBE; padding-bottom: 8px; margin-bottom: 12px; }
-            .header-title { font-size: 16px; font-weight: 800; color: #007BBE; text-transform: uppercase; }
+            .header-title { font-size: 15px; font-weight: 800; color: #007BBE; text-transform: uppercase; }
             .auditoria-badge { background: #007BBE; color: #FFFFFF; font-size: 10px; font-weight: bold; padding: 4px 10px; border-radius: 4px; font-family: monospace; }
             .rango-banner { background: #F1F5F9; border-left: 4px solid #00ABBD; padding: 8px 12px; margin-bottom: 14px; font-size: 9.5px; }
             .card-resumen { border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
@@ -2984,8 +2994,8 @@ export class PdfServicio {
           <table class="header-table">
             <tr>
               <td>
-                <div class="header-title">Fundación Diaconía FRIF-IFD · Programa BUMAND</div>
-                <div style="font-size: 11px; color: #035683; font-weight: 600;">Informe Oficial Consolidado de Auditoría y Fiscalización Institucional</div>
+                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y SRD - LIQUIDACIÓN DE PASAJES</div>
+                <div style="font-size: 11px; color: #035683; font-weight: 600;">Fundación Diaconía FRIF-IFD · Programa BUMAND · Consolidado de Auditoría y Fiscalización</div>
               </td>
               <td style="text-align: right;">
                 <span class="auditoria-badge">${codigo_auditoria}</span>
@@ -3013,15 +3023,23 @@ export class PdfServicio {
           </div>
 
           <div class="card-resumen">
-            <div class="card-titulo">2. Auditoría de Liquidación de Pasajes (80%)</div>
+            <div class="card-titulo">2. Formulario para Contabilidad y SRD — Liquidación de Pasajes (80%)</div>
             <table class="metric-table">
               <tr>
                 <td class="metric-lbl">Total solicitudes de transporte procesadas:</td>
                 <td class="metric-val">${datos.total_solicitudes_pasajes} expedientes</td>
               </tr>
               <tr>
-                <td class="metric-lbl">Importe total desembolsado por pasajes (80% reglamentario):</td>
+                <td class="metric-lbl">Reembolso bruto por pasajes (80% reglamentario):</td>
                 <td class="metric-val" style="color: #035683;">Bs ${datos.total_monto_pasajes.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td class="metric-lbl">(-) Descuento por multas de asistencia vigentes:</td>
+                <td class="metric-val" style="color: #B45309;">- Bs ${multas_bs.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td class="metric-lbl"><strong>Líquido Pagable Neto (Contabilidad y SRD):</strong></td>
+                <td class="metric-val" style="color: #065F46;">Bs ${liquido_pagable.toFixed(2)}</td>
               </tr>
             </table>
           </div>
@@ -3043,14 +3061,14 @@ export class PdfServicio {
           <div class="firmas-grid">
             <div class="firma-col">
               <div class="firma-linea">Lic. Angel Javier Ali Paz</div>
-              <div style="font-size: 7.5px; color: #64748B;">Supervisor Tutor Institucional</div>
+              <div style="font-size: 7.5px; color: #64748B;">Mentor Tutor Institucional</div>
             </div>
             <div class="firma-col">
               <div class="firma-linea">Lic. Coordinación Nacional</div>
               <div style="font-size: 7.5px; color: #64748B;">Programa de Becas BUMAND</div>
             </div>
             <div class="firma-col">
-              <div class="firma-linea">Dirección y Finanzas</div>
+              <div class="firma-linea">Dirección y Finanzas (Contabilidad y SRD)</div>
               <div style="font-size: 7.5px; color: #64748B;">Fundación Diaconía FRIF - IFD</div>
             </div>
           </div>
@@ -3074,6 +3092,7 @@ export class PdfServicio {
     let total_horas = 0;
     let total_solicitudes_pasajes = 0;
     let total_monto_pasajes = 0;
+    let total_multas_bs = 0;
     let total_refrigerios = 0;
     let total_monto_refrigerios = 0;
 
@@ -3106,6 +3125,18 @@ export class PdfServicio {
       );
     }
 
+    if (this.multa_repo && typeof this.multa_repo.find === 'function') {
+      try {
+        const multas = await this.multa_repo.find();
+        total_multas_bs = (multas || []).reduce(
+          (acc, m) => acc + Math.max(0, Number(m.monto_bs || 0)),
+          0,
+        );
+      } catch {}
+    }
+
+    const monto_liquido_pagable = Math.max(0, Number((total_monto_pasajes - total_multas_bs).toFixed(2)));
+
     if (this.refrigerio_repo) {
       const qb = this.refrigerio_repo.createQueryBuilder('ref');
       if (filtros.fecha_inicio && filtros.fecha_fin) {
@@ -3129,6 +3160,8 @@ export class PdfServicio {
       total_horas,
       total_solicitudes_pasajes,
       total_monto_pasajes,
+      total_multas_bs,
+      monto_liquido_pagable,
       total_refrigerios,
       total_monto_refrigerios,
     });
@@ -3227,8 +3260,21 @@ export class PdfServicio {
       ];
     }
 
+    let total_multas_bs = 0;
+    if (this.multa_repo && typeof this.multa_repo.find === 'function') {
+      try {
+        const multas = await this.multa_repo.find();
+        total_multas_bs = Number(
+          (multas || [])
+            .reduce((acc, m) => acc + Math.max(0, Number(m.monto_bs || 0)), 0)
+            .toFixed(2),
+        );
+      } catch {}
+    }
+
     const total_bruto = items_render.reduce((acc, r) => acc + r.tarifa, 0);
     const total_devolucion = items_render.reduce((acc, r) => acc + r.reembolso_80, 0);
+    const monto_liquido_pagable = Math.max(0, Number((total_devolucion - total_multas_bs).toFixed(2)));
     const total_tramos = items_render.length;
     const becarios_unicos = new Set(items_render.map((r) => r.becario_nombre)).size;
 
@@ -3264,7 +3310,7 @@ export class PdfServicio {
       <html lang="es">
         <head>
           <meta charset="UTF-8" />
-          <title>Consolidado General de Pasajes - BUMAND</title>
+          <title>FORMULARIO PARA CONTABILIDAD Y SRD - LIQUIDACIÓN DE PASAJES</title>
           <style>
             @page { size: A4 landscape; margin: 8mm 10mm; }
             body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1E293B; margin: 0; padding: 0; font-size: 9px; }
@@ -3296,12 +3342,12 @@ export class PdfServicio {
           <table class="header-table">
             <tr>
               <td>
-                <div class="header-title">Fundación Diaconía FRIF-IFD · Programa BUMAND</div>
-                <div class="header-subtitle">Consolidado General de Recorridos y Liquidación de Pasajes (80%)</div>
+                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y SRD - LIQUIDACIÓN DE PASAJES</div>
+                <div class="header-subtitle">Fundación Diaconía FRIF-IFD · Programa BUMAND · Consolidado de Recorridos (80%) y Descuento de Multas</div>
               </td>
               <td style="text-align: right;">
                 <span style="background: #007BBE; color: #FFFFFF; font-size: 9px; font-weight: bold; padding: 4px 8px; border-radius: 4px; font-family: monospace;">
-                  PASAJES AUDITADOS
+                  CONTABILIDAD Y SRD
                 </span>
               </td>
             </tr>
@@ -3326,20 +3372,26 @@ export class PdfServicio {
             </div>
             <div class="kpi-col">
               <div class="kpi-card">
-                <div class="kpi-title">Estudiantes Beneficiarios</div>
-                <div class="kpi-value">${becarios_unicos}</div>
-              </div>
-            </div>
-            <div class="kpi-col">
-              <div class="kpi-card">
                 <div class="kpi-title">Gasto Total Declarado</div>
                 <div class="kpi-value">Bs ${total_bruto.toFixed(2)}</div>
               </div>
             </div>
             <div class="kpi-col">
               <div class="kpi-card" style="border-color: #00ABBD; background: #ECFEFF;">
-                <div class="kpi-title" style="color: #00808E;">Reembolso Oficial 80%</div>
+                <div class="kpi-title" style="color: #00808E;">Reembolso Bruto 80%</div>
                 <div class="kpi-value" style="color: #00808E;">Bs ${total_devolucion.toFixed(2)}</div>
+              </div>
+            </div>
+            <div class="kpi-col">
+              <div class="kpi-card" style="border-color: #FDE68A; background: #FFFBEB;">
+                <div class="kpi-title" style="color: #92400E;">(-) Descuento Multas</div>
+                <div class="kpi-value" style="color: #B45309;">- Bs ${total_multas_bs.toFixed(2)}</div>
+              </div>
+            </div>
+            <div class="kpi-col">
+              <div class="kpi-card" style="border-color: #A7F3D0; background: #ECFDF5;">
+                <div class="kpi-title" style="color: #065F46;">Líquido Pagable Neto</div>
+                <div class="kpi-value" style="color: #065F46;">Bs ${monto_liquido_pagable.toFixed(2)}</div>
               </div>
             </div>
           </div>
@@ -3363,10 +3415,12 @@ export class PdfServicio {
             </tbody>
             <tfoot>
               <tr style="background: #F1F5F9; font-weight: bold;">
-                <td colspan="6" style="text-align: right; padding: 6px;">TOTALES GENERALES DE LIQUIDACIÓN:</td>
+                <td colspan="6" style="text-align: right; padding: 6px;">
+                  REEMBOLSO 80%: Bs ${total_devolucion.toFixed(2)} &nbsp;|&nbsp; (-) MULTAS: Bs ${total_multas_bs.toFixed(2)} &nbsp;|&nbsp; LÍQUIDO PAGABLE NETO:
+                </td>
                 <td style="text-align: right; font-family: monospace;">Bs ${total_bruto.toFixed(2)}</td>
-                <td style="text-align: right; font-family: monospace; color: #007BBE;">Bs ${total_devolucion.toFixed(2)}</td>
-                <td style="text-align: center; font-size: 7.5px; color: #065F46;">80% ACREDITADO</td>
+                <td style="text-align: right; font-family: monospace; color: #065F46;">Bs ${monto_liquido_pagable.toFixed(2)}</td>
+                <td style="text-align: center; font-size: 7.5px; color: #065F46;">NETO PAGABLE</td>
               </tr>
             </tfoot>
           </table>
@@ -3374,14 +3428,14 @@ export class PdfServicio {
           <div class="firmas-row">
             <div class="firma-col">
               <div class="firma-linea">Lic. Angel Javier Ali Paz</div>
-              <div style="font-size: 7.5px; color: #64748B;">Supervisor Tutor Institucional</div>
+              <div style="font-size: 7.5px; color: #64748B;">Mentor Tutor Institucional</div>
             </div>
             <div class="firma-col">
               <div class="firma-linea">Lic. Coordinación Nacional</div>
               <div style="font-size: 7.5px; color: #64748B;">Programa de Becas BUMAND</div>
             </div>
             <div class="firma-col">
-              <div class="firma-linea">Dirección y Finanzas</div>
+              <div class="firma-linea">Dirección y Finanzas (Contabilidad y SRD)</div>
               <div style="font-size: 7.5px; color: #64748B;">Fundación Diaconía FRIF - IFD</div>
             </div>
           </div>
@@ -3864,7 +3918,7 @@ export class PdfServicio {
           <div class="firmas-row">
             <div class="firma-col">
               <div class="firma-linea">Lic. Angel Javier Ali Paz</div>
-              <div style="font-size: 7.5px; color: #64748B;">Supervisor Tutor Institucional</div>
+              <div style="font-size: 7.5px; color: #64748B;">Mentor Tutor Institucional</div>
             </div>
             <div class="firma-col">
               <div class="firma-linea">Lic. Coordinación Nacional</div>

@@ -6,6 +6,7 @@ import { SolicitudPasajes, EstadoSolicitud } from '../pasajes/entidades/solicitu
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { Evaluacion, EstadoEvaluacion } from '../evaluaciones/entidades/evaluacion.entidad';
 import { Multa } from '../asistencia/entidades/multa.entidad';
+import { Justificacion, EstadoJustificacion } from '../justificaciones/entidades/justificacion.entidad';
 
 export interface MetricasGenerales {
   total_becarios_activos: number;
@@ -14,6 +15,8 @@ export interface MetricasGenerales {
   evaluaciones_pendientes: number;
   solicitudes_pasajes_pendientes: number;
   total_multas_bs: number;
+  dias_permiso_aprobado?: number;
+  horas_compensadas_permiso?: number;
 }
 
 export interface ConsolidadoPresupuesto80 {
@@ -39,6 +42,8 @@ export interface PosicionRankingPuntualidad {
   asistencias_a_tiempo: number;
   asistencias_dentro_radio: number;
   porcentaje_puntualidad: number;
+  dias_permiso_aprobado?: number;
+  horas_compensadas_permiso?: number;
 }
 
 export interface EstadisticasDashboard {
@@ -47,6 +52,8 @@ export interface EstadisticasDashboard {
   tendencia_horas: ItemTendenciaMensualHoras[];
   ranking_puntualidad: PosicionRankingPuntualidad[];
   total_multas_bs?: number;
+  dias_permiso_aprobado?: number;
+  horas_compensadas_permiso?: number;
 }
 
 export interface InfoBecarioResumen {
@@ -69,6 +76,8 @@ export interface ItemBecarioAsistenciaSemanal {
   becario: InfoBecarioResumen;
   total_asistencias: number;
   ultima_fecha?: string;
+  dias_permiso_aprobado?: number;
+  horas_compensadas_permiso?: number;
 }
 
 export interface AsistenciaSemanalResultado {
@@ -80,6 +89,8 @@ export interface ConteoSeguimientoSemanal {
   total: number;
   asistieron: number;
   no_asistieron: number;
+  dias_permiso_aprobado?: number;
+  horas_compensadas_permiso?: number;
 }
 
 export interface SeguimientoSemanal {
@@ -88,6 +99,8 @@ export interface SeguimientoSemanal {
   becarios_con_retraso: ItemBecarioConRetraso[];
   asistencia_semanal: AsistenciaSemanalResultado;
   conteo: ConteoSeguimientoSemanal;
+  dias_permiso_aprobado?: number;
+  horas_compensadas_permiso?: number;
 }
 
 const NOMBRES_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -107,6 +120,9 @@ export class DashboardServicio {
     @Optional()
     @InjectRepository(Multa)
     private readonly multa_repo?: Repository<Multa>,
+    @Optional()
+    @InjectRepository(Justificacion)
+    private readonly justificacion_repo?: Repository<Justificacion>,
   ) {}
 
   async obtenerEstadisticas(
@@ -121,12 +137,18 @@ export class DashboardServicio {
       todas_solicitudes,
       evaluaciones_pendientes,
       todas_multas,
+      todas_justificaciones,
     ] = await Promise.all([
       this.becario_repo.find({ where: where_becario, relations: { usuario: true } }),
       this.asistencia_repo.find({ relations: { becario: { usuario: true } } }),
       this.pasajes_repo.find(),
       this.evaluacion_repo.count({ where: { estado: EstadoEvaluacion.PENDIENTE } }),
-      this.multa_repo ? this.multa_repo.find() : Promise.resolve([]),
+      this.multa_repo && typeof this.multa_repo.find === 'function'
+        ? this.multa_repo.find()
+        : Promise.resolve([]),
+      this.justificacion_repo && typeof this.justificacion_repo.find === 'function'
+        ? this.justificacion_repo.find()
+        : Promise.resolve([]),
     ]);
 
     const set_becarios_permitidos = new Set(becarios.map((b) => b.id));
@@ -160,7 +182,32 @@ export class DashboardServicio {
       });
     }
 
-    // Cálculo consolidado de multas institucionales
+    const justificaciones_aprobadas = (todas_justificaciones || []).filter((j) => {
+      const es_aprobada =
+        j.estado === EstadoJustificacion.APROBADA ||
+        j.estado === EstadoJustificacion.APROBADO_ADMINISTRACION;
+      if (!es_aprobada) return false;
+      if (supervisor_id && !set_becarios_permitidos.has(j.becario_id)) return false;
+      if (!j.fecha_incidencia) return false;
+      const f = new Date(j.fecha_incidencia);
+      if (d_inicio && f < d_inicio) return false;
+      if (d_fin && f > d_fin) return false;
+      return true;
+    });
+
+    const claves_permiso_aprobado = new Set<string>();
+    const permisos_por_becario = new Map<number, Set<string>>();
+    for (const j of justificaciones_aprobadas) {
+      const f_str =
+        j.fecha_incidencia instanceof Date
+          ? j.fecha_incidencia.toISOString().split('T')[0]
+          : String(j.fecha_incidencia).split('T')[0];
+      claves_permiso_aprobado.add(`${j.becario_id}_${f_str}`);
+      const set_fechas = permisos_por_becario.get(j.becario_id) || new Set<string>();
+      set_fechas.add(f_str);
+      permisos_por_becario.set(j.becario_id, set_fechas);
+    }
+
     const multas_filtradas = todas_multas.filter((m) => {
       if (!m.es_institucional) return false;
       if (supervisor_id && !set_becarios_permitidos.has(m.becario_id)) return false;
@@ -176,7 +223,6 @@ export class DashboardServicio {
 
     const total_becarios_activos = becarios.length;
 
-    // 1. Consolidación de Horas
     let total_horas_acumuladas = 0;
     const horas_por_mes: Record<number, number> = {};
     for (let i = 0; i < 12; i++) {
@@ -191,21 +237,40 @@ export class DashboardServicio {
         total: number;
         a_tiempo: number;
         en_radio: number;
+        dias_permiso_aprobado: number;
+        horas_compensadas_permiso: number;
       }
     > = {};
 
     for (const b of becarios) {
+      const cant_permisos = permisos_por_becario.get(b.id)?.size || 0;
       metricas_becario[b.id] = {
         nombre: b.usuario?.nombre || `Becario #${b.id}`,
         carrera: b.carrera || 'No especificada',
         total: 0,
         a_tiempo: 0,
         en_radio: 0,
+        dias_permiso_aprobado: cant_permisos,
+        horas_compensadas_permiso: Number((cant_permisos * 4.0).toFixed(2)),
       };
     }
 
+    const permisos_contabilizados_en_asistencias = new Set<string>();
+
     for (const reg of asistencias) {
-      const horas = Number(reg.horas_trabajadas || 0);
+      const f_str = reg.fecha
+        ? reg.fecha instanceof Date
+          ? reg.fecha.toISOString().split('T')[0]
+          : String(reg.fecha).split('T')[0]
+        : '';
+      const clave_permiso = `${reg.becario_id}_${f_str}`;
+      const tiene_permiso = f_str !== '' && claves_permiso_aprobado.has(clave_permiso);
+      if (tiene_permiso) {
+        permisos_contabilizados_en_asistencias.add(clave_permiso);
+      }
+
+      const horas_base = Number(reg.horas_trabajadas || 0);
+      const horas = tiene_permiso && horas_base === 0 ? 4.0 : horas_base;
       total_horas_acumuladas += horas;
 
       if (reg.fecha) {
@@ -216,14 +281,34 @@ export class DashboardServicio {
 
       if (metricas_becario[reg.becario_id]) {
         metricas_becario[reg.becario_id].total += 1;
-        if (reg.dentro_de_horario) {
+        if (reg.dentro_de_horario || tiene_permiso) {
           metricas_becario[reg.becario_id].a_tiempo += 1;
         }
-        if (reg.dentro_de_radio) {
+        if (reg.dentro_de_radio || tiene_permiso) {
           metricas_becario[reg.becario_id].en_radio += 1;
         }
       }
     }
+
+    for (const clave of claves_permiso_aprobado) {
+      if (permisos_contabilizados_en_asistencias.has(clave)) continue;
+      const [b_id_str, f_str] = clave.split('_');
+      const b_id = Number(b_id_str);
+      if (metricas_becario[b_id]) {
+        metricas_becario[b_id].total += 1;
+        metricas_becario[b_id].a_tiempo += 1;
+        metricas_becario[b_id].en_radio += 1;
+        total_horas_acumuladas += 4.0;
+        const fecha = new Date(f_str);
+        if (!isNaN(fecha.getTime())) {
+          const mes_idx = fecha.getMonth();
+          horas_por_mes[mes_idx] = (horas_por_mes[mes_idx] || 0) + 4.0;
+        }
+      }
+    }
+
+    const total_dias_permiso = claves_permiso_aprobado.size;
+    const total_horas_compensadas = Number((total_dias_permiso * 4.0).toFixed(2));
 
     total_horas_acumuladas = Number(total_horas_acumuladas.toFixed(2));
     const promedio_horas_por_becario = total_becarios_activos > 0
@@ -235,7 +320,6 @@ export class DashboardServicio {
       horas: Number(horas_por_mes[idx].toFixed(2)),
     }));
 
-    // 2. Consolidación de Presupuesto del 80%
     let total_declarado = 0;
     let total_reembolso_80 = 0;
     let monto_aprobado = 0;
@@ -265,7 +349,6 @@ export class DashboardServicio {
       ? Number(Math.min(100, (total_reembolso_80 / LIMITE_PRESUPUESTO_DEFECTO) * 100).toFixed(1))
       : 0;
 
-    // 3. Consolidación de Ranking de Puntualidad
     const ranking_lista = Object.entries(metricas_becario).map(([b_id, data]) => {
       const becario_id = Number(b_id);
       const porcentaje_puntualidad = data.total > 0
@@ -279,6 +362,8 @@ export class DashboardServicio {
         asistencias_a_tiempo: data.a_tiempo,
         asistencias_dentro_radio: data.en_radio,
         porcentaje_puntualidad,
+        dias_permiso_aprobado: data.dias_permiso_aprobado,
+        horas_compensadas_permiso: data.horas_compensadas_permiso,
       };
     });
 
@@ -302,6 +387,8 @@ export class DashboardServicio {
         evaluaciones_pendientes,
         solicitudes_pasajes_pendientes,
         total_multas_bs,
+        dias_permiso_aprobado: total_dias_permiso,
+        horas_compensadas_permiso: total_horas_compensadas,
       },
       presupuesto_80: {
         total_declarado,
@@ -314,6 +401,8 @@ export class DashboardServicio {
       tendencia_horas,
       ranking_puntualidad,
       total_multas_bs,
+      dias_permiso_aprobado: total_dias_permiso,
+      horas_compensadas_permiso: total_horas_compensadas,
     };
   }
 
@@ -365,9 +454,36 @@ export class DashboardServicio {
 
     const asistencias_filtradas = asistencias_semana.filter((a) => set_becarios.has(a.becario_id));
 
-    // 1. Becarios con retraso
+    const todas_justificaciones =
+      this.justificacion_repo && typeof this.justificacion_repo.find === 'function'
+        ? await this.justificacion_repo.find()
+        : [];
+    const permisos_semana_set = new Set<string>();
+    const permisos_semana_por_becario = new Map<number, Set<string>>();
+
+    for (const j of todas_justificaciones || []) {
+      const es_aprobada =
+        j.estado === EstadoJustificacion.APROBADA ||
+        j.estado === EstadoJustificacion.APROBADO_ADMINISTRACION;
+      if (!es_aprobada || !set_becarios.has(j.becario_id) || !j.fecha_incidencia) continue;
+      const f_str =
+        j.fecha_incidencia instanceof Date
+          ? j.fecha_incidencia.toISOString().split('T')[0]
+          : String(j.fecha_incidencia).split('T')[0];
+      if (f_str >= inicio_str && f_str <= fin_str) {
+        permisos_semana_set.add(`${j.becario_id}_${f_str}`);
+        const set_f = permisos_semana_por_becario.get(j.becario_id) || new Set<string>();
+        set_f.add(f_str);
+        permisos_semana_por_becario.set(j.becario_id, set_f);
+      }
+    }
+
     const becarios_con_retraso: ItemBecarioConRetraso[] = [];
     for (const a of asistencias_filtradas) {
+      const f_str = a.fecha instanceof Date ? a.fecha.toISOString().split('T')[0] : String(a.fecha);
+      if (permisos_semana_set.has(`${a.becario_id}_${f_str}`)) {
+        continue;
+      }
       const tiene_retraso = (a.minutos_retraso && a.minutos_retraso > 0) || a.dentro_de_horario === false;
       if (tiene_retraso && a.hora_ingreso) {
         const b = mapa_becarios.get(a.becario_id) || a.becario;
@@ -383,18 +499,24 @@ export class DashboardServicio {
           hora_ingreso: a.hora_ingreso,
           hora_prevista: a.hora_prevista || '08:00',
           minutos_retraso: a.minutos_retraso || minutos,
-          fecha: a.fecha instanceof Date ? a.fecha.toISOString().split('T')[0] : String(a.fecha),
+          fecha: f_str,
         });
       }
     }
 
-    // 2. Asistencia semanal: clasificar entre quienes asistieron y no asistieron
-    const asistencias_por_becario = new Map<number, { total: number; ultima_fecha?: string }>();
+    const asistencias_por_becario = new Map<
+      number,
+      { total: number; ultima_fecha?: string; fechas_vistas: Set<string> }
+    >();
     for (const a of asistencias_filtradas) {
       if (a.hora_ingreso) {
-        const actual = asistencias_por_becario.get(a.becario_id) || { total: 0 };
-        actual.total += 1;
+        const actual = asistencias_por_becario.get(a.becario_id) || {
+          total: 0,
+          fechas_vistas: new Set<string>(),
+        };
         const f_str = a.fecha instanceof Date ? a.fecha.toISOString().split('T')[0] : String(a.fecha);
+        actual.total += 1;
+        actual.fechas_vistas.add(f_str);
         if (!actual.ultima_fecha || f_str > actual.ultima_fecha) {
           actual.ultima_fecha = f_str;
         }
@@ -402,11 +524,30 @@ export class DashboardServicio {
       }
     }
 
+    for (const [b_id, fechas_permiso] of permisos_semana_por_becario.entries()) {
+      const actual = asistencias_por_becario.get(b_id) || {
+        total: 0,
+        fechas_vistas: new Set<string>(),
+      };
+      for (const f_str of fechas_permiso) {
+        if (!actual.fechas_vistas.has(f_str)) {
+          actual.total += 1;
+          actual.fechas_vistas.add(f_str);
+        }
+        if (!actual.ultima_fecha || f_str > actual.ultima_fecha) {
+          actual.ultima_fecha = f_str;
+        }
+      }
+      asistencias_por_becario.set(b_id, actual);
+    }
+
     const asistieron: ItemBecarioAsistenciaSemanal[] = [];
     const no_asistieron: ItemBecarioAsistenciaSemanal[] = [];
 
     for (const b of becarios) {
       const reg = asistencias_por_becario.get(b.id);
+      const dias_permiso = permisos_semana_por_becario.get(b.id)?.size || 0;
+      const horas_compensadas = Number((dias_permiso * 4.0).toFixed(2));
       const info: InfoBecarioResumen = {
         id: b.id,
         nombre: b.usuario?.nombre || `Becario #${b.id}`,
@@ -420,19 +561,28 @@ export class DashboardServicio {
           becario: info,
           total_asistencias: reg.total,
           ultima_fecha: reg.ultima_fecha,
+          dias_permiso_aprobado: dias_permiso,
+          horas_compensadas_permiso: horas_compensadas,
         });
       } else {
         no_asistieron.push({
           becario: info,
           total_asistencias: 0,
+          dias_permiso_aprobado: dias_permiso,
+          horas_compensadas_permiso: horas_compensadas,
         });
       }
     }
+
+    const total_dias_permiso_semana = permisos_semana_set.size;
+    const total_horas_compensadas_semana = Number((total_dias_permiso_semana * 4.0).toFixed(2));
 
     const conteo: ConteoSeguimientoSemanal = {
       total: becarios.length,
       asistieron: asistieron.length,
       no_asistieron: no_asistieron.length,
+      dias_permiso_aprobado: total_dias_permiso_semana,
+      horas_compensadas_permiso: total_horas_compensadas_semana,
     };
 
     return {
@@ -444,6 +594,8 @@ export class DashboardServicio {
         no_asistieron,
       },
       conteo,
+      dias_permiso_aprobado: total_dias_permiso_semana,
+      horas_compensadas_permiso: total_horas_compensadas_semana,
     };
   }
 }

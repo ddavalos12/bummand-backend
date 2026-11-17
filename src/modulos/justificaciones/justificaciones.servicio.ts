@@ -10,7 +10,11 @@ import { Justificacion, EstadoJustificacion, TipoIncidencia } from './entidades/
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { AsistenciaEvento, EstadoAsistenciaEvento } from '../eventos/entidades/asistencia-evento.entidad';
 import { Multa } from '../asistencia/entidades/multa.entidad';
-import { RegistroAsistencia } from '../asistencia/entidades/registro-asistencia.entidad';
+import {
+  RegistroAsistencia,
+  TipoAsistencia,
+  EstadoAprobacionAsistencia,
+} from '../asistencia/entidades/registro-asistencia.entidad';
 import { CrearJustificacionDto } from './dtos/crear-justificacion.dto';
 import { ResolverJustificacionDto } from './dtos/resolver-justificacion.dto';
 import {
@@ -19,6 +23,7 @@ import {
 } from './dtos/revisar-justificacion.dto';
 import { Rol } from '../usuarios/entidades/usuario.entidad';
 import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
+import { NotificacionesServicio } from '../notificaciones/notificaciones.servicio';
 
 @Injectable()
 export class JustificacionesServicio {
@@ -38,6 +43,8 @@ export class JustificacionesServicio {
     private readonly asistenciaRepositorio?: Repository<RegistroAsistencia>,
     @Optional()
     private readonly tiempoRealGateway?: TiempoRealGateway,
+    @Optional()
+    private readonly notificaciones_servicio?: NotificacionesServicio,
   ) {}
 
   async crear(
@@ -118,6 +125,7 @@ export class JustificacionesServicio {
 
     if (es_admin) {
       await this.anularMultasDeViernesSiAplica(guardada);
+      await this.compensarAsistenciaPorPermiso(guardada);
     }
 
     this.tiempoRealGateway?.notificarJustificacion({ accion: 'crear', justificacion: guardada });
@@ -212,8 +220,8 @@ export class JustificacionesServicio {
       }
 
       await this.anularMultasDeViernesSiAplica(justificacion);
+      await this.compensarAsistenciaPorPermiso(justificacion);
 
-      // Si la justificación es aprobada y está vinculada a un evento, actualizar el estado de la asistencia
       if (
         justificacion.tipo_incidencia === TipoIncidencia.ASISTENCIA_EVENTO &&
         justificacion.referencia_id &&
@@ -230,13 +238,16 @@ export class JustificacionesServicio {
               : `Justificación #${justificacion.id} aprobada`;
             await this.asistencia_evento_repo.save(asistencia);
           }
-        } catch {
-          // Tolerancia si la referencia no corresponde a asistencia
-        }
+        } catch {}
       }
     }
 
     const guardada = await this.justificacion_repo.save(justificacion);
+    await this.notificarResolucionPermiso(
+      guardada,
+      es_aprobacion ? 'Permiso Aprobado' : 'Permiso Rechazado',
+      obs_final || (es_aprobacion ? 'Tu permiso fue aprobado y compensado al 100%.' : 'Tu solicitud de permiso fue rechazada.'),
+    );
     this.tiempoRealGateway?.notificarJustificacion({ accion: 'resolver', justificacion: guardada });
     return guardada;
   }
@@ -258,6 +269,16 @@ export class JustificacionesServicio {
     }
 
     const guardada = await this.justificacion_repo.save(justificacion);
+    const es_rechazo =
+      estado === EstadoJustificacion.RECHAZADA || estado === EstadoJustificacion.OBSERVADA;
+    await this.notificarResolucionPermiso(
+      guardada,
+      es_rechazo ? 'Permiso Rechazado / Observado por Mentor' : 'Permiso Revisado por Mentor',
+      dto.observacion_supervisor ||
+        (es_rechazo
+          ? 'El Mentor observó o rechazó tu solicitud de permiso.'
+          : 'El Mentor dio su visto bueno a tu permiso y lo remitió a Administración.'),
+    );
     this.tiempoRealGateway?.notificarJustificacion({
       accion: 'revisar_supervisor',
       justificacion: guardada,
@@ -281,11 +302,13 @@ export class JustificacionesServicio {
       justificacion.observacion_admin = dto.observacion_admin;
     }
 
-    if (
+    const es_aprobada =
       estado === EstadoJustificacion.APROBADO_ADMINISTRACION ||
-      estado === EstadoJustificacion.APROBADA
-    ) {
+      estado === EstadoJustificacion.APROBADA;
+
+    if (es_aprobada) {
       await this.anularMultasDeViernesSiAplica(justificacion);
+      await this.compensarAsistenciaPorPermiso(justificacion);
 
       if (
         justificacion.tipo_incidencia === TipoIncidencia.ASISTENCIA_EVENTO &&
@@ -303,18 +326,139 @@ export class JustificacionesServicio {
               : `Permiso #${justificacion.id} aprobado por administración`;
             await this.asistencia_evento_repo.save(asistencia);
           }
-        } catch {
-          // Tolerancia si no coincide id
-        }
+        } catch {}
       }
     }
 
     const guardada = await this.justificacion_repo.save(justificacion);
+    await this.notificarResolucionPermiso(
+      guardada,
+      es_aprobada ? 'Permiso Aprobado' : 'Permiso Rechazado',
+      dto.observacion_admin ||
+        justificacion.observacion_supervisor ||
+        (es_aprobada
+          ? 'Permiso aprobado definitivamente por Administración (asistencia compensada al 100%).'
+          : 'Permiso rechazado por Administración.'),
+    );
     this.tiempoRealGateway?.notificarJustificacion({
       accion: 'aprobar_administracion',
       justificacion: guardada,
     });
     return guardada;
+  }
+
+  private async compensarAsistenciaPorPermiso(justificacion: Justificacion): Promise<void> {
+    if (
+      !this.asistenciaRepositorio ||
+      typeof this.asistenciaRepositorio.find !== 'function' ||
+      !justificacion.becario_id ||
+      !justificacion.fecha_incidencia
+    ) {
+      return;
+    }
+
+    try {
+      const fecha_falta_str =
+        justificacion.fecha_incidencia instanceof Date
+          ? justificacion.fecha_incidencia.toISOString().split('T')[0]
+          : String(justificacion.fecha_incidencia).split('T')[0];
+
+      const registros = await this.asistenciaRepositorio.find({
+        where: { becario_id: justificacion.becario_id },
+      });
+
+      const existente = (registros || []).find((r) => {
+        if (
+          justificacion.referencia_id &&
+          justificacion.tipo_incidencia !== TipoIncidencia.ASISTENCIA_EVENTO &&
+          r.id === justificacion.referencia_id
+        ) {
+          return true;
+        }
+        if (!r.fecha) return false;
+        const r_str =
+          r.fecha instanceof Date
+            ? r.fecha.toISOString().split('T')[0]
+            : String(r.fecha).split('T')[0];
+        return r_str === fecha_falta_str;
+      });
+
+      if (existente && typeof this.asistenciaRepositorio.save === 'function') {
+        existente.dentro_de_horario = true;
+        existente.dentro_de_radio = true;
+        existente.minutos_retraso = 0;
+        existente.validado = true;
+        existente.confirmado_organizador = true;
+        if (Number(existente.horas_computadas || existente.horas_trabajadas || 0) === 0) {
+          existente.horas_computadas = 4.0;
+          existente.horas_trabajadas = 4.0;
+        }
+        existente.observacion_supervisor =
+          existente.observacion_supervisor || 'Compensado al 100% por permiso aprobado';
+        existente.estado_aprobacion = EstadoAprobacionAsistencia.APROBADO_ADMINISTRACION;
+        await this.asistenciaRepositorio.save(existente);
+      } else if (
+        typeof this.asistenciaRepositorio.create === 'function' &&
+        typeof this.asistenciaRepositorio.save === 'function'
+      ) {
+        const [anio, mes, dia] = fecha_falta_str.split('-').map(Number);
+        const fecha_obj = new Date(anio, (mes || 1) - 1, dia || 1);
+        const tipo_asistencia =
+          justificacion.tipo_incidencia === TipoIncidencia.ESCUELA_LIDERES
+            ? TipoAsistencia.ESCUELA_LIDERES
+            : TipoAsistencia.PRACTICAS;
+
+        const nuevo_registro = this.asistenciaRepositorio.create({
+          becario_id: justificacion.becario_id,
+          tipo: tipo_asistencia,
+          fecha: fecha_obj,
+          hora_ingreso: tipo_asistencia === TipoAsistencia.ESCUELA_LIDERES ? '14:30:00' : '08:00:00',
+          hora_salida: tipo_asistencia === TipoAsistencia.ESCUELA_LIDERES ? '17:30:00' : '12:00:00',
+          hora_prevista: tipo_asistencia === TipoAsistencia.ESCUELA_LIDERES ? '14:30' : '08:00',
+          dentro_de_horario: true,
+          dentro_de_radio: true,
+          minutos_retraso: 0,
+          confirmado_organizador: true,
+          es_registro_manual: true,
+          horas_trabajadas: 4.0,
+          motivo_contingencia: `Permiso aprobado: ${justificacion.motivo || 'Justificación institucional'}`,
+          observacion_supervisor: 'Compensado al 100% por permiso aprobado',
+          estado_aprobacion: EstadoAprobacionAsistencia.APROBADO_ADMINISTRACION,
+        });
+        nuevo_registro.validado = true;
+        nuevo_registro.horas_computadas = 4.0;
+        await this.asistenciaRepositorio.save(nuevo_registro);
+      }
+    } catch {}
+  }
+
+  private async notificarResolucionPermiso(
+    justificacion: Justificacion,
+    titulo: string,
+    detalle_observacion: string,
+  ): Promise<void> {
+    if (!this.notificaciones_servicio) return;
+
+    try {
+      let usuario_id = justificacion.becario?.usuario_id || null;
+      if (!usuario_id && this.becario_repo && typeof this.becario_repo.findOne === 'function') {
+        const becario = await this.becario_repo.findOne({
+          where: { id: justificacion.becario_id },
+        });
+        usuario_id = becario?.usuario_id || becario?.id || null;
+      }
+      if (!usuario_id) {
+        usuario_id = justificacion.becario_id;
+      }
+
+      const fecha_str =
+        justificacion.fecha_incidencia instanceof Date
+          ? justificacion.fecha_incidencia.toISOString().split('T')[0]
+          : String(justificacion.fecha_incidencia || '').split('T')[0];
+
+      const mensaje = `Fecha: ${fecha_str} (${justificacion.motivo || 'Permiso'}). Dictamen de Mentor/Administración: ${detalle_observacion}`;
+      await this.notificaciones_servicio.crear(usuario_id, titulo, mensaje, 'justificacion');
+    } catch {}
   }
 
   private async anularMultasDeViernesSiAplica(justificacion: Justificacion): Promise<void> {
@@ -325,25 +469,23 @@ export class JustificacionesServicio {
       const multas = await this.multaRepositorio.find({
         where: { becario_id: justificacion.becario_id },
       });
-      const fechaIncidenciaStr =
+      const fecha_incidencia_str =
         justificacion.fecha_incidencia instanceof Date
           ? justificacion.fecha_incidencia.toISOString().split('T')[0]
           : String(justificacion.fecha_incidencia).split('T')[0];
 
       for (const multa of multas) {
-        const fechaMultaStr =
+        const fecha_multa_str =
           multa.fecha_aplicacion instanceof Date
             ? multa.fecha_aplicacion.toISOString().split('T')[0]
             : String(multa.fecha_aplicacion).split('T')[0];
 
-        if (fechaMultaStr === fechaIncidenciaStr) {
+        if (fecha_multa_str === fecha_incidencia_str) {
           multa.monto_bs = 0;
           multa.motivo = 'Multa eximida/anulada por Permiso aprobado por Administración';
           await this.multaRepositorio.save(multa);
         }
       }
-    } catch {
-      // Silencioso ante fallos en tabla multas
-    }
+    } catch {}
   }
 }
