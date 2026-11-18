@@ -633,5 +633,62 @@ describe('EvaluacionesServicio', () => {
       expect(resultado.evaluacion_modulo_4.puntaje).toBe(8.33);
       expect(resultado.evaluacion_modulo_4.estado).toBe(EstadoEvaluacion.COMPLETADO);
     });
+
+    it('debe resolver becario_id real por CI o nombre normalizado cuando dto.becario_id no existe en BD', async () => {
+      const facilitador: Usuario = { id: 20, nombre: 'Facilitador CETI', rol: Rol.SUPERVISOR } as any;
+      becario_repo.findOne.mockResolvedValue(null);
+      becario_repo.find.mockResolvedValue([
+        { id: 42, ci: '9876543-LP', nombre: 'José María Pérez', usuario: { nombre: 'José María Pérez' } },
+      ]);
+      periodo_repo.findOne.mockResolvedValue({ id: 2, estado: EstadoPeriodo.ABIERTO });
+      entrega_tarea_repo.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 88,
+          becario_id: 42,
+          periodo_id: 2,
+          tarea_numero: 3,
+          ponderacion_maxima: 8.33,
+          estado: EstadoEntregaTarea.ENTREGADO,
+          puntaje_obtenido: null,
+        });
+      entrega_tarea_repo.create.mockImplementation((d: any) => ({ ...d, id: 88 }));
+      entrega_tarea_repo.save.mockImplementation((d: any) => Promise.resolve({ ...d, id: 88 }));
+      entrega_tarea_repo.find.mockResolvedValue([
+        { id: 88, becario_id: 42, periodo_id: 2, tarea_numero: 3, estado: EstadoEntregaTarea.REVISADO, puntaje_obtenido: 8.33 },
+      ]);
+      evaluador_repo.findOne.mockResolvedValue({ id: 4, tipo: 'facilitador' });
+      evaluacion_repo.findOne.mockResolvedValue(null);
+      evaluacion_repo.create.mockImplementation((d: any) => ({ ...d, id: 99 }));
+      evaluacion_repo.save.mockImplementation((d: any) => Promise.resolve({ ...d, id: 99 }));
+
+      const resultado = await servicio.revisarTareaPorNumeroEscuelaLideres(
+        3,
+        {
+          becario_id: 9999,
+          becario_nombre: 'jose maria perez',
+          estado: EstadoEntregaTarea.REVISADO,
+          puntaje_obtenido: 8.33,
+        },
+        facilitador,
+      );
+
+      expect(entrega_tarea_repo.create).toHaveBeenCalledWith(expect.objectContaining({ becario_id: 42 }));
+      expect(resultado.entrega.becario_id).toBe(42);
+    });
+
+    it('debe lanzar NotFoundException si no existe ningún becario en BD al revisar por número', async () => {
+      const facilitador: Usuario = { id: 20, nombre: 'Facilitador CETI', rol: Rol.SUPERVISOR } as any;
+      becario_repo.findOne.mockResolvedValue(null);
+      becario_repo.find.mockResolvedValue([]);
+
+      await expect(
+        servicio.revisarTareaPorNumeroEscuelaLideres(
+          1,
+          { becario_id: 9999, estado: EstadoEntregaTarea.REVISADO, puntaje_obtenido: 8 },
+          facilitador,
+        ),
+      ).rejects.toThrow('No se encontró ningún becario registrado en la base de datos.');
+    });
   });
 });

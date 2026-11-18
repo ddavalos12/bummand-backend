@@ -4220,16 +4220,64 @@ export class EvaluacionesServicio {
     };
   }
 
+  private async resolverBecarioIdReal(
+    becario_id_param?: number,
+    becario_ci?: string,
+    becario_nombre?: string,
+  ): Promise<number> {
+    if (!this.becario_repo) {
+      throw new NotFoundException('Repositorio de becarios no disponible.');
+    }
+
+    if (becario_id_param && typeof this.becario_repo.findOne === 'function') {
+      const por_id = await this.becario_repo.findOne({
+        where: [{ id: becario_id_param }, { usuario_id: becario_id_param }],
+      });
+      if (por_id) return por_id.id;
+    }
+
+    const normalizar = (txt?: string | null) =>
+      txt ? txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() : '';
+    const ci_buscado = becario_ci ? becario_ci.split(/[- ]/)[0].trim().toLowerCase() : '';
+    const nombre_buscado = normalizar(becario_nombre);
+
+    if ((ci_buscado || nombre_buscado) && typeof this.becario_repo.find === 'function') {
+      const todos_becarios = (await this.becario_repo.find({ relations: { usuario: true } })) || [];
+
+      if (ci_buscado) {
+        const por_ci = todos_becarios.find((b) => {
+          const b_ci = b.ci ? b.ci.split(/[- ]/)[0].trim().toLowerCase() : '';
+          return Boolean(b_ci && b_ci === ci_buscado);
+        });
+        if (por_ci) return por_ci.id;
+      }
+
+      if (nombre_buscado) {
+        const por_nombre = todos_becarios.find((b) => {
+          const n_bd = normalizar(b.nombre);
+          const n_usuario_bd = normalizar(b.usuario?.nombre);
+          if (n_bd && (n_bd.includes(nombre_buscado) || nombre_buscado.includes(n_bd))) return true;
+          if (n_usuario_bd && (n_usuario_bd.includes(nombre_buscado) || nombre_buscado.includes(n_usuario_bd))) {
+            return true;
+          }
+          return false;
+        });
+        if (por_nombre) return por_nombre.id;
+      }
+    }
+
+    if (typeof this.becario_repo.findOne === 'function') {
+      const primero = await this.becario_repo.findOne({ where: {}, order: { id: 'ASC' } });
+      if (primero) return primero.id;
+    }
+
+    throw new NotFoundException('No se encontró ningún becario registrado en la base de datos.');
+  }
+
   async obtenerTareasEscuelaLideres(usuario: Usuario, becario_id?: number, periodo_id?: number) {
     let target_becario_id = becario_id;
     if (usuario?.rol === Rol.BECARIO) {
-      if (this.becario_repo) {
-        const becario = await this.becario_repo.findOne({
-          where: [{ usuario_id: usuario.id }, { id: usuario.id }],
-        });
-        if (becario) target_becario_id = becario.id;
-      }
-      if (!target_becario_id) target_becario_id = usuario.id;
+      target_becario_id = await this.resolverBecarioIdReal(becario_id || usuario.id);
     } else if (esRolMentor(usuario?.rol) && this.becario_repo) {
       const designados = await obtenerBecariosDesignadosMentor(
         this.becario_repo,
@@ -4242,16 +4290,11 @@ export class EvaluacionesServicio {
           ? designados.find((d) => d.id === target_becario_id || d.usuario_id === target_becario_id)
           : null;
         target_becario_id = match ? match.id : designados[0].id;
-      } else if (!target_becario_id) {
-        target_becario_id = 1;
+      } else {
+        target_becario_id = await this.resolverBecarioIdReal(target_becario_id);
       }
-    } else if (target_becario_id && this.becario_repo) {
-      const becario = await this.becario_repo.findOne({
-        where: [{ id: target_becario_id }, { usuario_id: target_becario_id }],
-      });
-      if (becario) target_becario_id = becario.id;
-    } else if (!target_becario_id) {
-      target_becario_id = 1;
+    } else {
+      target_becario_id = await this.resolverBecarioIdReal(target_becario_id);
     }
 
     let periodo_activo_id = periodo_id;
@@ -4501,13 +4544,11 @@ export class EvaluacionesServicio {
       throw new BadRequestException('Repositorio de entregas no disponible');
     }
 
-    let becario_id = dto.becario_id || 1;
-    if (this.becario_repo && dto.becario_id) {
-      const b = await this.becario_repo.findOne({
-        where: [{ id: dto.becario_id }, { usuario_id: dto.becario_id }],
-      });
-      if (b) becario_id = b.id;
-    }
+    const becario_id = await this.resolverBecarioIdReal(
+      dto.becario_id,
+      dto.becario_ci,
+      dto.becario_nombre,
+    );
 
     let periodo_id = dto.periodo_id || 2;
     if (!dto.periodo_id && this.periodo_repo?.findOne) {
@@ -4547,15 +4588,10 @@ export class EvaluacionesServicio {
       throw new BadRequestException('Repositorio de entregas no disponible');
     }
 
-    let becario_real_id = dto.becario_id;
-    if (dto.becario_id && this.becario_repo?.findOne) {
-      const becario_encontrado = await this.becario_repo.findOne({
-        where: [{ id: dto.becario_id }, { usuario_id: dto.becario_id }],
-      });
-      if (becario_encontrado) {
-        becario_real_id = becario_encontrado.id;
-      }
-    }
+    const becario_real_id =
+      dto.becario_id || dto.becario_ci || dto.becario_nombre
+        ? await this.resolverBecarioIdReal(dto.becario_id, dto.becario_ci, dto.becario_nombre)
+        : undefined;
 
     let entrega = await this.entrega_tarea_repo.findOne({
       where: { id: entrega_id },

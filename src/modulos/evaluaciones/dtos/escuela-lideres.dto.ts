@@ -122,6 +122,14 @@ export class RevisarEntregaLideresDto {
   becario_id?: number;
 
   @IsOptional()
+  @IsString()
+  becario_nombre?: string;
+
+  @IsOptional()
+  @IsString()
+  becario_ci?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   periodo_id?: number;
