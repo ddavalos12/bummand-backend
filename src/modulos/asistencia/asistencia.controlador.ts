@@ -272,6 +272,7 @@ export class AsistenciaControlador {
     @Query('fecha_inicio') fecha_inicio?: string,
     @Query('fecha_fin') fecha_fin?: string,
     @Query('supervisor_id') supervisor_id?: number,
+    @Query('limite') limite?: number,
   ): Promise<RegistroAsistencia[]> {
     if (usuario && usuario.rol === Rol.BECARIO) {
       return this.asistenciaServicio.obtenerPorUsuario(usuario.id, becario_id, usuario);
@@ -283,6 +284,7 @@ export class AsistenciaControlador {
       becario_id: becario_id ? Number(becario_id) : undefined,
       usuario,
       supervisor_id: supervisor_id ? Number(supervisor_id) : undefined,
+      limite: limite ? Number(limite) : undefined,
     });
   }
 }

@@ -822,6 +822,7 @@ export class AsistenciaServicio {
     becario_id?: number;
     usuario?: Usuario;
     supervisor_id?: number;
+    limite?: number;
   }): Promise<RegistroAsistencia[]> {
     let ids_mentor_permitidos: Set<number> | null = null;
     if (esRolMentor(opciones?.usuario?.rol) || opciones?.supervisor_id) {
@@ -845,6 +846,11 @@ export class AsistenciaServicio {
       .leftJoinAndSelect('becario.usuario', 'usuario')
       .leftJoinAndSelect('becario.lugar_practica', 'lugar_practica');
 
+    if (ids_mentor_permitidos && ids_mentor_permitidos.size > 0) {
+      qb.andWhere('asistencia.becario_id IN (:...idsMentor)', {
+        idsMentor: Array.from(ids_mentor_permitidos),
+      });
+    }
     if (opciones?.becario_id) {
       qb.andWhere('asistencia.becario_id = :bId', { bId: opciones.becario_id });
     }
@@ -858,7 +864,15 @@ export class AsistenciaServicio {
       qb.andWhere('asistencia.fecha <= :fin', { fin: opciones.fecha_fin });
     }
 
+    const tiene_rango = Boolean(opciones?.fecha_inicio || opciones?.fecha_fin);
+    const limite_efectivo = opciones?.limite
+      ? Math.min(Math.max(Number(opciones.limite) || 120, 1), 500)
+      : tiene_rango
+        ? 500
+        : 120;
+
     qb.orderBy('asistencia.fecha', 'DESC').addOrderBy('asistencia.created_at', 'DESC');
+    qb.take(limite_efectivo);
     let registros = await qb.getMany();
 
     if (ids_mentor_permitidos && ids_mentor_permitidos.size > 0) {
@@ -866,6 +880,12 @@ export class AsistenciaServicio {
     } else if (esRolMentor(opciones?.usuario?.rol) || opciones?.supervisor_id) {
       const sup_id = opciones?.supervisor_id ?? opciones?.usuario?.id;
       registros = registros.filter((r) => r.becario?.supervisor_id === sup_id);
+    }
+
+    for (const registro of registros) {
+      if (registro.becario?.usuario && 'contrasena' in registro.becario.usuario) {
+        delete (registro.becario.usuario as unknown as Record<string, unknown>).contrasena;
+      }
     }
 
     return registros;

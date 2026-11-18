@@ -24,6 +24,16 @@ export class NotificacionesControlador {
     return this.servicio.crear(dto);
   }
 
+  @Get()
+  @ApiOperation({
+    summary: 'Listar notificaciones del usuario autenticado (raíz)',
+    description: 'Retorna todas las alertas y avisos del usuario en orden cronológico inverso.',
+  })
+  @ApiResponse({ status: 200, description: 'Bandeja de notificaciones.', type: [Notificacion] })
+  listarRaiz(@UsuarioActual() usuario: Usuario) {
+    return this.servicio.listarPorUsuario(usuario.id);
+  }
+
   @Get('mis-notificaciones')
   @ApiOperation({
     summary: 'Listar notificaciones del usuario autenticado',
