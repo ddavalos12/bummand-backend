@@ -1,380 +1,341 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { PdfServicio } from './pdf.servicio';
-import { Evento } from '../eventos/entidades/evento.entidad';
-import { AsistenciaEvento } from '../eventos/entidades/asistencia-evento.entidad';
-import { Refrigerio } from '../refrigerios/entidades/refrigerio.entidad';
-import { REGISTROS_CONSOLIDADO_SEM_II } from '../evaluaciones/constantes/consolidado-semestral-datos.constantes';
+import {
+  PdfServicio,
+  separarNombresYApellidos,
+  CATALOGO_FIRMANTES_INSTITUCIONALES,
+} from './pdf.servicio';
+import { EstadoSolicitud } from '../pasajes/entidades/solicitud-pasaje.entidad';
 
-describe('PdfServicio', () => {
+describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transporte)', () => {
   let servicio: PdfServicio;
-  let refrigerio_repo: any;
 
-  beforeEach(async () => {
-    refrigerio_repo = {
-      findOne: jest.fn(),
-      find: jest.fn(),
-      createQueryBuilder: jest.fn().mockReturnValue({
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        orderBy: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
-      }),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PdfServicio,
-        {
-          provide: getRepositoryToken(Evento),
-          useValue: { findOne: jest.fn() },
-        },
-        {
-          provide: getRepositoryToken(AsistenciaEvento),
-          useValue: { find: jest.fn() },
-        },
-        {
-          provide: getRepositoryToken(Refrigerio),
-          useValue: refrigerio_repo,
-        },
-      ],
-    }).compile();
-
-    servicio = module.get<PdfServicio>(PdfServicio);
+  const crearConstructorConsultaMock = <T>(datos: T[]) => ({
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    addOrderBy: jest.fn().mockReturnThis(),
+    getMany: jest.fn().mockResolvedValue(datos),
   });
 
-  it('should be defined', () => {
-    expect(servicio).toBeDefined();
+  beforeEach(() => {
+    servicio = new PdfServicio();
   });
 
-  describe('generarReporteEvaluacionSemestralHtml', () => {
-    it('debe generar HTML completo con 14 columnas, 21 becarios, comentarios y rangos oficiales', () => {
-      const html = servicio.generarReporteEvaluacionSemestralHtml();
+  describe('separarNombresYApellidos y ordenamiento alfabético por apellido', () => {
+    it('separa correctamente nombres de 4 y 3 palabras y aplica fallback seguro para menos de 3 palabras', () => {
+      expect(separarNombresYApellidos('Nilda Amalia Churata Paye')).toEqual({
+        nombres: 'Nilda Amalia',
+        apellidos: 'Churata Paye',
+      });
 
-      // Verificar elementos de estructura y diseño
-      expect(html).toContain('size: A4 landscape');
-      expect(html).toContain('Consolidado General de Evaluación Semestral');
-      expect(html).toContain('Gestión II-2025');
+      expect(servicio.separarNombresYApellidos('Joel Mamani Quispe')).toEqual({
+        nombres: 'Joel',
+        apellidos: 'Mamani Quispe',
+      });
 
-      // Verificar columnas principales
-      expect(html).toContain('Acad. (20p)');
-      expect(html).toContain('Iglesia (20p)');
-      expect(html).toContain('Prácticas (20p)');
-      expect(html).toContain('Líderes (20p)');
-      expect(html).toContain('Socioec. (20p)');
-      expect(html).toContain('Total (100p)');
-      expect(html).toContain('Calificación');
+      expect(servicio.separarNombresYApellidos('Ana Condori')).toEqual({
+        nombres: 'Ana',
+        apellidos: 'Condori',
+      });
 
-      // Verificar inclusión de becarios canónicos
-      expect(html).toContain('Jose Marcos Suñagua Quispe');
-      expect(html).toContain('Mayherli Alejandra Loza Villalobos');
+      expect(servicio.separarNombresYApellidos('Samuel')).toEqual({
+        nombres: 'Samuel',
+        apellidos: '',
+      });
 
-      // Verificar página 2 de comentarios y rangos
-      expect(html).toContain('page-break-before: always');
-      expect(html).toContain('Observaciones Cualitativas y Criterios Oficiales de Evaluación');
-      expect(html).toContain('Aprobación óptima');
-      expect(html).toContain('Aprobación Condicionada');
-      expect(html).toContain('Reprobó y debe abandonar el programa');
-      expect(html).toContain('70 - 100');
+      expect(servicio.separarNombresYApellidos('   ')).toEqual({
+        nombres: '',
+        apellidos: '',
+      });
     });
 
-    it('debe generar HTML con registros personalizados si se le suministran', () => {
-      const registros_prueba = [
-        {
-          nombre_completo: 'Test Becario Uno',
-          ci: '1234567',
-          universidad: 'UMSA',
-          carrera: 'Derecho',
-          modalidad_carrera: 'Semestral',
-          promedio: 85,
-          academica: 20,
-          liderazgo_iglesia: 20,
-          practicas_preprofesionales: 20,
-          escuela_lideres: 20,
-          ceti_tareas: [100],
-          socioeconomico: 20,
-          total: 100,
-          total_calificacion: 'Aprobación óptima',
-          tipo_beca: 'Total',
-          comentario_academico: 'Excelente rendimiento',
-          comentario_iglesia: 'Líder comprometido',
-        },
+    it('ordena alfabéticamente por APELLIDOS y usa NOMBRES como criterio de desempate', () => {
+      const desordenados = [
+        servicio.separarNombresYApellidos('Joel Alex Quisbert Alanoca'),
+        servicio.separarNombresYApellidos('Maria Belen Condori Quispe'),
+        servicio.separarNombresYApellidos('Juan Carlos Aruquipa Mamani'),
+        servicio.separarNombresYApellidos('Ana Lucia Condori Quispe'),
       ];
 
-      const html = servicio.generarReporteEvaluacionSemestralHtml(registros_prueba);
-      expect(html).toContain('Test Becario Uno');
-      expect(html).toContain('Excelente rendimiento');
-      expect(html).toContain('Líder comprometido');
+      const ordenados = servicio.ordenarBecariosPorApellido(desordenados);
+
+      expect(ordenados.map((b) => `${b.apellidos}, ${b.nombres}`)).toEqual([
+        'Aruquipa Mamani, Juan Carlos',
+        'Condori Quispe, Ana Lucia',
+        'Condori Quispe, Maria Belen',
+        'Quisbert Alanoca, Joel Alex',
+      ]);
     });
   });
 
-  describe('parsearMes', () => {
-    it('debe parsear formato YYYY-MM correctamente', () => {
-      const res = servicio.parsearMes('2026-10');
-      expect(res.anio).toBe(2026);
-      expect(res.mes_num).toBe(10);
-      expect(res.fecha_inicio).toBe('2026-10-01');
-      expect(res.fecha_fin).toBe('2026-10-31');
-      expect(res.mes_nombre).toBe('Octubre 2026');
-    });
-
-    it('debe parsear nombre de mes en español', () => {
-      const res = servicio.parsearMes('Septiembre 2026');
-      expect(res.anio).toBe(2026);
-      expect(res.mes_num).toBe(9);
-      expect(res.fecha_inicio).toBe('2026-09-01');
-      expect(res.fecha_fin).toBe('2026-09-30');
-      expect(res.mes_nombre).toBe('Septiembre 2026');
-    });
-  });
-
-  describe('generarExpedienteRecorridosEstudianteHtml', () => {
-    it('debe generar HTML completo del expediente mensual de recorridos con cálculo exacto del 80% y firmas', () => {
-      const html = servicio.generarExpedienteRecorridosEstudianteHtml({
-        nombre_estudiante: 'Carlos Oscar Luna Lizarraga',
-        ci_estudiante: '9943280 LP',
-        carrera_estudiante: 'Economía',
-        universidad_estudiante: 'UMSA',
-        sede_estudiante: 'Oficina Central Diaconía',
-        supervisor_nombre: 'Lic. Angel Javier Ali Paz',
-        mes_nombre: 'Octubre 2026',
-        items: [
+  describe('Donación para refrigerio BUMAN-D', () => {
+    it('consolida por responsable único receptor del reembolso, formatea montos en bolivianos y usa firmantes por defecto (Pamela + Samuel) sin columna FIRMA', () => {
+      const html = servicio.generarDonacionRefrigerioHtml({
+        mes: '2026-12',
+        con_firma: 'false',
+        refrigerios: [
           {
-            numero: 1,
-            fecha: '2026-10-02',
-            dia_semana: 'Viernes',
-            tramo: 'Ida',
-            origen: 'Ceja El Alto',
-            destino: 'San Francisco',
-            calles_declaradas: 'Av. 6 de Marzo, Autopista',
-            medio_transporte: 'Minibús Interciudad',
-            tipo_actividad: 'Prácticas',
-            apoyo_realizado: 'Conciliación de cartera',
-            tarifa: 3.5,
+            becario_receptor_devolucion_nombre: 'Nilda Amalia Churata Paye',
+            becario_encargado_1_nombre: 'Nilda Amalia Churata Paye',
+            becario_encargado_2_nombre: 'Joel Mamani Quispe',
+            monto_devolucion_bs: 94,
+            costo_total_bs: 94,
+            estado_reposicion: 'aprobado_administracion',
+          },
+          {
+            becario_receptor_devolucion_nombre: 'Nilda Amalia Churata Paye',
+            monto_devolucion_bs: 50,
+            costo_total_bs: 50,
+            estado_reposicion: 'aprobado_administracion',
+          },
+          {
+            becario_receptor_devolucion_nombre: null,
+            becario_encargado_1_nombre: 'Maria Belen Condori Quispe',
+            monto_devolucion_bs: 0,
+            costo_total_bs: 94,
+            estado_reposicion: 'revisado_supervisor',
+          },
+          {
+            becario_receptor_devolucion_nombre: 'Becario Rechazado Prueba',
+            monto_devolucion_bs: 115,
+            costo_total_bs: 115,
+            estado_reposicion: 'rechazado',
           },
         ],
-        total_bruto: 3.5,
-        total_devolucion: 2.8,
-        total_tramos: 1,
-        tramos_ida: 1,
-        tramos_vuelta: 0,
-        dias_unicos: 1,
       });
 
-      expect(html).toContain('Expediente Mensual Oficial de Recorridos y Liquidación de Pasajes (80%)');
-      expect(html).toContain('Carlos Oscar Luna Lizarraga');
-      expect(html).toContain('9943280 LP');
-      expect(html).toContain('Economía');
-      expect(html).toContain('Ceja El Alto');
-      expect(html).toContain('San Francisco');
-      expect(html).toContain('MONTO REEMBOLSO OFICIAL BUMAND (80% EN CENTAVOS)');
-      expect(html).toContain('Bs 2.80');
-      expect(html).toContain('Revisado / Aprobado en sistema por:');
-      expect(html).toContain('Supervisor Institucional');
-      expect(html).toContain('Visto Bueno y Liquidación · Fundación Diaconía FRIF-IFD');
-      expect(html).not.toContain('Firma del Estudiante Becario');
+      expect(html).toContain('Donación para refrigerio BUMAN-D');
+      expect(html).toContain('Reuniones Escuela de Líderes');
+      expect(html).toContain('Diciembre');
+      expect(html).toContain('Nilda Amalia Churata Paye');
+      expect(html).toContain('Maria Belen Condori Quispe');
+      expect(html).not.toContain('Becario Rechazado Prueba');
+      expect(html).toContain('144,00');
+      expect(html).toContain('94,00');
+      expect(html).toContain('TOTAL GASTO POR REFRIGERIO');
+      expect(html).toContain('238,00');
+      expect(html).not.toContain('<th class="col-firma">FIRMA</th>');
+      expect(html).toContain(
+        'El presente detalle consolida los gastos de refrigerio de las reuniones BUMAN-D.',
+      );
+      expect(html).toContain(CATALOGO_FIRMANTES_INSTITUCIONALES.pamela.nombre);
+      expect(html).toContain(CATALOGO_FIRMANTES_INSTITUCIONALES.pamela.cargo);
+      expect(html).toContain(CATALOGO_FIRMANTES_INSTITUCIONALES.samuel.nombre);
+      expect(html).toContain(CATALOGO_FIRMANTES_INSTITUCIONALES.samuel.cargo);
     });
-  });
 
-  describe('generarAsistenciaMensualEstudianteHtml', () => {
-    it('debe generar HTML completo del kárdex mensual de asistencia de un solo estudiante', () => {
-      const html = servicio.generarAsistenciaMensualEstudianteHtml({
-        nombre_estudiante: 'Adai Belen Huayta Cardozo',
-        ci_estudiante: '13696496 LP',
-        carrera_estudiante: 'Estadística',
-        universidad_estudiante: 'UMSA',
-        sede_estudiante: 'Sede Central Blq. A',
-        supervisor_nombre: 'Lic. Angel Javier Ali Paz',
-        mes_nombre: 'Octubre 2026',
-        items: [
-          {
-            numero: 1,
-            fecha: '2026-10-02',
-            dia_semana: 'Viernes',
-            tipo: 'Escuela de Líderes',
-            sede: 'Auditorio Central',
-            hora_prevista: '14:30',
-            hora_ingreso: '14:25',
-            hora_salida: '17:00',
-            retraso_m: 0,
-            horas: 2.5,
-            geocerca: 'Conforme (22m GPS)',
-            estado: 'Puntual Conforme',
-            es_retraso: false,
-          },
-        ],
-        total_dias: 1,
-        horas_totales: 2.5,
-        meta_horas: 36.0,
-        pct_avance: 7,
-        asistencias_conformes: 1,
-        pct_puntualidad: '100.0',
-        total_retrasos: 0,
-        minutos_totales_retraso: 0,
-        horas_practicas: '0.0',
-        horas_lideres: '2.5',
-        horas_servicio: '0.0',
+    it('incluye la columna FIRMA cuando con_firma=true, permite elegir Ruth/Pamela/Samuel y genera tabla válida con total 0,00 si no hay registros', () => {
+      const html = servicio.generarDonacionRefrigerioHtml({
+        fecha_inicio: '2026-11-01',
+        fecha_fin: '2026-11-30',
+        con_firma: 'true',
+        firmante_1: 'ruth',
+        firmante_2: 'pamela',
+        refrigerios: [],
       });
 
-      expect(html).toContain('Kárdex Oficial Individual de Asistencia y Puntualidad Mensual');
-      expect(html).toContain('Adai Belen Huayta Cardozo');
-      expect(html).toContain('13696496 LP');
-      expect(html).toContain('Estadística');
-      expect(html).toContain('Escuela de Líderes');
-      expect(html).toContain('TOTAL HORAS ACREDITADAS EN EL MES');
-      expect(html).toContain('Revisado / Aprobado en sistema por:');
-      expect(html).toContain('Supervisor Tutor Institucional');
-      expect(html).toContain('Auditoría y Certificación de Asistencia · Diaconía IFD');
-      expect(html).not.toContain('Firma del Estudiante Becario');
-    });
-  });
-
-  describe('Reportes PDF de Refrigerios y Auditoría (TAREA-07, TAREA-08, TAREA-15)', () => {
-    it('debe generar HTML del reporte de refrigerio con dupla, modalidad, ingredientes y devolución al 100%', () => {
-      const refrigerio_mock: Partial<Refrigerio> = {
-        id: 10,
-        fecha: new Date('2026-10-30'),
-        descripcion: 'Sándwich de huevo con jugo de durazno',
-        cantidad_raciones: 23,
-        costo_unitario_bs: 6.0,
-        costo_total_bs: 138.0,
-        presupuesto_referencial_bs: 138.0,
-        porcentaje_devolucion: 100.0,
-        monto_devolucion_bs: 138.0,
-        modalidad_preparacion: 'cocina_diaconia',
-        becario_encargado_1_id: 1,
-        becario_encargado_1_nombre: 'Nilda Churata',
-        becario_encargado_2_id: 2,
-        becario_encargado_2_nombre: 'Joel Mamani',
-        becario_receptor_devolucion_id: 1,
-        becario_receptor_devolucion_nombre: 'Nilda Churata',
-        fecha_entrega_devolucion: new Date('2026-10-30T16:00:00Z'),
-        entregado_por_usuario_id: 99,
-        estado_reposicion: 'aprobado_administracion',
-        detalle_ingredientes: [
-          { insumo: 'Pan surtido', cantidad: '25 unid', costo_bs: 38.0, pagado_por_nombre: 'Nilda Churata' },
-          { insumo: 'Huevos y refresco', cantidad: '1 maple', costo_bs: 100.0, pagado_por_nombre: 'Joel Mamani' },
-        ],
-      };
-
-      const html = servicio.generarReporteRefrigerioHtml(refrigerio_mock as Refrigerio);
-
-      expect(html).toContain('Planilla Oficial de Rendición de Refrigerios y Solicitud de Devolución (100%)');
-      expect(html).toContain('REP-REF-00010');
-      expect(html).toContain('Nilda Churata');
-      expect(html).toContain('Joel Mamani');
-      expect(html).toContain('Preparado en Cocina de Diaconía');
-      expect(html).toContain('Pan surtido');
-      expect(html).toContain('Bs 138.00');
-      expect(html).toContain('100.00% (Reembolso Total)');
-      expect(html).toContain('Nilda Churata');
-      expect(html).toContain('De acuerdo con la directriz del Directorio de BUMAND');
+      expect(html).toContain('Noviembre');
+      expect(html).toContain('<th class="col-firma">FIRMA</th>');
+      expect(html).toContain('TOTAL GASTO POR REFRIGERIO');
+      expect(html).toContain('0,00');
+      expect(html).toContain(CATALOGO_FIRMANTES_INSTITUCIONALES.ruth.nombre);
+      expect(html).toContain(CATALOGO_FIRMANTES_INSTITUCIONALES.ruth.cargo);
+      expect(html).toContain(CATALOGO_FIRMANTES_INSTITUCIONALES.pamela.nombre);
+      expect(html).toContain(CATALOGO_FIRMANTES_INSTITUCIONALES.pamela.cargo);
     });
 
-    it('debe generar HTML del consolidado de refrigerios por intervalo de auditoría', () => {
-      const refrigerios = [
+    it('genera el PDF y asigna el nombre de archivo oficial ConFirma o SinFirma', async () => {
+      const qb_mock = crearConstructorConsultaMock([
         {
           id: 1,
-          fecha: new Date('2026-10-02'),
-          descripcion: 'Refrigerio 1',
-          cantidad_raciones: 23,
-          costo_total_bs: 138.0,
-          monto_devolucion_bs: 138.0,
-          becario_encargado_1_nombre: 'Nilda Churata',
-          becario_encargado_2_nombre: 'Joel Mamani',
-          becario_receptor_devolucion_nombre: 'Nilda Churata',
+          becario_receptor_devolucion_nombre: 'Nilda Amalia Churata Paye',
+          monto_devolucion_bs: 94,
+          costo_total_bs: 94,
           estado_reposicion: 'aprobado_administracion',
-        } as Refrigerio,
-      ];
+        },
+      ]);
+      const servicio_con_repos = new PdfServicio(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { createQueryBuilder: jest.fn().mockReturnValue(qb_mock) } as never,
+      );
 
-      const html = servicio.generarReporteRefrigeriosConsolidadoHtml({
-        refrigerios,
-        fecha_inicio: '2026-10-01',
-        fecha_fin: '2026-10-31',
+      jest
+        .spyOn(servicio_con_repos, 'generarPdf')
+        .mockResolvedValue(Buffer.from('PDF_REFRIGERIO'));
+
+      const resultado = await servicio_con_repos.generarDonacionRefrigerioPdf({
+        mes: '2026-12',
+        con_firma: 'true',
+        firmante_1: 'ruth',
+        firmante_2: 'samuel',
       });
 
-      expect(html).toContain('Consolidado de Auditoría de Refrigerios y Devoluciones al 100%');
-      expect(html).toContain('2026-10-01');
-      expect(html).toContain('2026-10-31');
-      expect(html).toContain('Nilda Churata');
-      expect(html).toContain('Joel Mamani');
-    });
-
-    it('debe generar HTML del consolidado global de auditoría', () => {
-      const html = servicio.generarConsolidadoAuditoriaHtml({
-        fecha_inicio: '2026-10-01',
-        fecha_fin: '2026-10-31',
-        total_asistencias: 50,
-        total_horas: 180.5,
-        total_solicitudes_pasajes: 20,
-        total_monto_pasajes: 560.0,
-        total_refrigerios: 4,
-        total_monto_refrigerios: 552.0,
-      });
-
-      expect(html).toContain('Informe Oficial Consolidado de Auditoría y Fiscalización Institucional');
-      expect(html).toContain('Auditoría de Asistencia y Acreditación de Horas');
-      expect(html).toContain('Auditoría de Liquidación de Pasajes (80%)');
-      expect(html).toContain('Auditoría de Refrigerios y Devolución Total (100%)');
-      expect(html).toContain('Bs 552.00');
+      expect(resultado.nombre_archivo).toBe(
+        'Donacion_Refrigerio_BUMAND_Diciembre_ConFirma.pdf',
+      );
+      expect(resultado.bufer.toString()).toBe('PDF_REFRIGERIO');
     });
   });
 
-  describe('generación binaria con Puppeteer', () => {
-    it('debe generar el buffer PDF válido del expediente de recorridos mensual', async () => {
-      const resultado = await servicio.generarExpedienteRecorridosEstudiantePdf({
-        becario_id: 7,
-        mes: '2026-10',
+  describe('Donación para transporte BUMAN-D', () => {
+    it('incluye a TODOS los becarios (incluso con 0,00), ordena por apellido, calcula el 80% neto SIN descontar multas y alterna la columna FIRMA', () => {
+      const becarios_mock = [
+        { id: 1, nombre: 'Joel Alex Quisbert Alanoca' },
+        { id: 2, nombre: 'Juan Carlos Aruquipa Mamani' },
+        { id: 3, nombre: 'Maria Belen Condori Quispe' },
+      ];
+
+      const recorridos_mock = [
+        {
+          id: 10,
+          tarifa: 1000,
+          solicitud: {
+            becario_id: 2,
+            estado: EstadoSolicitud.APROBADO,
+          },
+        },
+        {
+          id: 11,
+          tarifa: 556.25,
+          solicitud: {
+            becario_id: 3,
+            estado: EstadoSolicitud.APROBADO_ADMINISTRACION,
+          },
+        },
+        {
+          id: 12,
+          tarifa: 500,
+          solicitud: {
+            becario_id: 1,
+            estado: EstadoSolicitud.BORRADOR,
+          },
+        },
+        {
+          id: 13,
+          tarifa: 300,
+          solicitud: {
+            becario_id: 1,
+            estado: EstadoSolicitud.RECHAZADO,
+          },
+        },
+      ];
+
+      const html_sin_firma = servicio.generarDonacionTransporteHtml({
+        mes: '2026-11',
+        con_firma: 'false',
+        firmante_1: 'ruth',
+        firmante_2: 'samuel',
+        becarios: becarios_mock as never,
+        recorridos: recorridos_mock as never,
       });
 
-      expect(resultado).toBeDefined();
-      expect(resultado.bufer).toBeInstanceOf(Buffer);
-      expect(resultado.bufer.length).toBeGreaterThan(0);
-      expect(resultado.nombre_archivo).toContain('Expediente_Recorridos_');
-      expect(resultado.mes_nombre).toBe('Octubre 2026');
+      expect(html_sin_firma).toContain('Donación para transporte BUMAN-D');
+      expect(html_sin_firma).toContain('Noviembre');
+      expect(html_sin_firma).not.toContain('<th class="col-firma">FIRMA</th>');
+
+      const pos_aruquipa = html_sin_firma.indexOf('Aruquipa Mamani');
+      const pos_condori = html_sin_firma.indexOf('Condori Quispe');
+      const pos_quisbert = html_sin_firma.indexOf('Quisbert Alanoca');
+      expect(pos_aruquipa).toBeGreaterThan(-1);
+      expect(pos_condori).toBeGreaterThan(pos_aruquipa);
+      expect(pos_quisbert).toBeGreaterThan(pos_condori);
+
+      expect(html_sin_firma).toContain('800,00');
+      expect(html_sin_firma).toContain('445,00');
+      expect(html_sin_firma).toContain('0,00');
+      expect(html_sin_firma).toContain('Total General Bs.');
+      expect(html_sin_firma).toContain('1.245,00');
+      expect(html_sin_firma).toContain(
+        'El presente detalle consolida los gastos de transporte de los BUMAN-D para el cumplimiento de sus Prácticas Pre Profesionales.',
+      );
+      expect(html_sin_firma).toContain(
+        CATALOGO_FIRMANTES_INSTITUCIONALES.ruth.nombre,
+      );
+      expect(html_sin_firma).toContain(
+        CATALOGO_FIRMANTES_INSTITUCIONALES.samuel.nombre,
+      );
+
+      const html_con_firma = servicio.generarDonacionTransporteHtml({
+        mes: '2026-11',
+        con_firma: 'true',
+        firmante_1: 'pamela',
+        firmante_2: 'samuel',
+        becarios: becarios_mock as never,
+        recorridos: recorridos_mock as never,
+      });
+
+      expect(html_con_firma).toContain('<th class="col-firma">FIRMA</th>');
+      expect(html_con_firma).toContain(
+        CATALOGO_FIRMANTES_INSTITUCIONALES.pamela.nombre,
+      );
+      expect(html_con_firma).toContain(
+        CATALOGO_FIRMANTES_INSTITUCIONALES.samuel.nombre,
+      );
     });
 
-    it('debe generar el buffer PDF válido del kárdex de asistencia mensual', async () => {
-      const resultado = await servicio.generarAsistenciaMensualEstudiantePdf({
-        becario_id: 1,
-        mes: '2026-10',
+    it('consulta todos los becarios en generarDonacionTransportePdf sin restar multas de asistencia', async () => {
+      const becario_repo_mock = {
+        find: jest.fn().mockResolvedValue([
+          { id: 1, nombre: 'Nilda Amalia Churata Paye', usuario: null },
+          {
+            id: 2,
+            nombre: null,
+            usuario: { nombre: 'Joel Mamani Quispe' },
+          },
+        ]),
+      };
+      const qb_recorridos = crearConstructorConsultaMock([
+        {
+          id: 1,
+          tarifa: 100,
+          solicitud: { becario_id: 1, estado: EstadoSolicitud.APROBADO },
+        },
+      ]);
+      const multa_repo_mock = {
+        find: jest.fn().mockResolvedValue([{ id: 1, monto_bs: 50 }]),
+      };
+
+      const servicio_transporte = new PdfServicio(
+        undefined,
+        undefined,
+        undefined,
+        becario_repo_mock as never,
+        undefined,
+        {
+          createQueryBuilder: jest.fn().mockReturnValue(qb_recorridos),
+        } as never,
+        undefined,
+        undefined,
+        multa_repo_mock as never,
+      );
+
+      const espia_pdf = jest
+        .spyOn(servicio_transporte, 'generarPdf')
+        .mockResolvedValue(Buffer.from('PDF_TRANSPORTE'));
+
+      const resultado = await servicio_transporte.generarDonacionTransportePdf({
+        fecha_inicio: '2026-12-01',
+        fecha_fin: '2026-12-31',
+        con_firma: 'false',
       });
 
-      expect(resultado).toBeDefined();
-      expect(resultado.bufer).toBeInstanceOf(Buffer);
-      expect(resultado.bufer.length).toBeGreaterThan(0);
-      expect(resultado.nombre_archivo).toContain('Asistencia_Mensual_');
-      expect(resultado.mes_nombre).toBe('Octubre 2026');
-    });
-
-    it('debe generar el buffer PDF válido del reporte de refrigerio (TAREA-07)', async () => {
-      refrigerio_repo.findOne.mockResolvedValue({
-        id: 12,
-        fecha: new Date('2026-10-30'),
-        descripcion: 'Refrigerio jornada Escuela de Líderes',
-        cantidad_raciones: 23,
-        costo_unitario_bs: 6.0,
-        costo_total_bs: 138.0,
-        presupuesto_referencial_bs: 138.0,
-        porcentaje_devolucion: 100.0,
-        monto_devolucion_bs: 138.0,
-        modalidad_preparacion: 'cocina_diaconia',
-        becario_encargado_1_id: 1,
-        becario_encargado_1_nombre: 'Nilda Churata',
-        becario_encargado_2_id: 2,
-        becario_encargado_2_nombre: 'Joel Mamani',
-        becario_receptor_devolucion_id: 1,
-        becario_receptor_devolucion_nombre: 'Nilda Churata',
-        estado_reposicion: 'aprobado_administracion',
-        detalle_ingredientes: [],
+      expect(becario_repo_mock.find).toHaveBeenCalledWith({
+        relations: { usuario: true },
       });
-
-      const resultado = await servicio.generarReporteRefrigerioPdf(12);
-
-      expect(resultado).toBeDefined();
-      expect(resultado.bufer).toBeInstanceOf(Buffer);
-      expect(resultado.bufer.length).toBeGreaterThan(0);
-      expect(resultado.nombre_archivo).toContain('Reporte_Refrigerio_12_');
+      expect(multa_repo_mock.find).not.toHaveBeenCalled();
+      expect(espia_pdf).toHaveBeenCalledTimes(1);
+      const html_generado = espia_pdf.mock.calls[0][0];
+      expect(html_generado).toContain('80,00');
+      expect(html_generado).toContain('0,00');
+      expect(resultado.nombre_archivo).toBe(
+        'Donacion_Transporte_BUMAND_Diciembre_SinFirma.pdf',
+      );
+      expect(resultado.bufer.toString()).toBe('PDF_TRANSPORTE');
     });
   });
 });

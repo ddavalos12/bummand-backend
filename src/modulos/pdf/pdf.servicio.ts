@@ -18,6 +18,71 @@ import {
   RANGOS_APROBACION_OFICIALES,
 } from '../evaluaciones/constantes/consolidado-semestral-datos.constantes';
 
+export type ClaveFirmanteInstitucional = 'ruth' | 'pamela' | 'samuel';
+
+export interface FirmanteInstitucional {
+  clave: ClaveFirmanteInstitucional;
+  nombre: string;
+  cargo: string;
+}
+
+export const CATALOGO_FIRMANTES_INSTITUCIONALES: Record<
+  ClaveFirmanteInstitucional,
+  FirmanteInstitucional
+> = {
+  ruth: {
+    clave: 'ruth',
+    nombre: 'Ruth Alesandra Choque Huanca',
+    cargo: 'ASISTENTE DE SOSTENIBILIDAD Y RESPONSABILIDAD DIACONAL',
+  },
+  pamela: {
+    clave: 'pamela',
+    nombre: 'Pamela Sanchez Cachi',
+    cargo: 'ENCARGADO DE RESPONSABILIDAD SOCIAL DIACONAL',
+  },
+  samuel: {
+    clave: 'samuel',
+    nombre: 'Samuel Martín Durán Baspineiro',
+    cargo: 'SUBGERENTE NACIONAL DE SOSTENIBILIDAD Y RESPONSABILIDAD DIACONAL',
+  },
+};
+
+export const MESES_ESPANOL: readonly string[] = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+];
+
+export function separarNombresYApellidos(nombre_completo: string): {
+  nombres: string;
+  apellidos: string;
+} {
+  const limpio = (nombre_completo || '').trim();
+  if (!limpio) {
+    return { nombres: '', apellidos: '' };
+  }
+  const partes = limpio.split(/\s+/).filter(Boolean);
+  if (partes.length === 1) {
+    return { nombres: partes[0], apellidos: '' };
+  }
+  if (partes.length === 2) {
+    return { nombres: partes[0], apellidos: partes[1] };
+  }
+  return {
+    nombres: partes.slice(0, -2).join(' '),
+    apellidos: partes.slice(-2).join(' '),
+  };
+}
+
 @Injectable()
 export class PdfServicio {
   constructor(
@@ -3935,6 +4000,883 @@ export class PdfServicio {
 
     const bufer = await this.generarPdf(html);
     const nombre_archivo = `Consolidado_Asistencia_General_${(opciones.fecha_inicio || 'general').replace(/-/g, '_')}_a_${(opciones.fecha_fin || 'actual').replace(/-/g, '_')}.pdf`;
+
+    return { bufer, nombre_archivo };
+  }
+
+  separarNombresYApellidos(nombre_completo: string): {
+    nombres: string;
+    apellidos: string;
+  } {
+    return separarNombresYApellidos(nombre_completo);
+  }
+
+  ordenarBecariosPorApellido<T extends { nombres: string; apellidos: string }>(
+    lista: T[],
+  ): T[] {
+    return [...lista].sort((a, b) => {
+      const cmp_apellidos = (a.apellidos || '').localeCompare(
+        b.apellidos || '',
+        'es',
+        { sensitivity: 'base' },
+      );
+      if (cmp_apellidos !== 0) {
+        return cmp_apellidos;
+      }
+      return (a.nombres || '').localeCompare(b.nombres || '', 'es', {
+        sensitivity: 'base',
+      });
+    });
+  }
+
+  formatearMontoBoliviano(monto: number): string {
+    const valor_seguro = Number.isFinite(Number(monto)) ? Number(monto) : 0;
+    const redondeado = Math.round((valor_seguro + Number.EPSILON) * 100) / 100;
+    const es_negativo = redondeado < 0;
+    const [parte_entera, parte_decimal] = Math.abs(redondeado)
+      .toFixed(2)
+      .split('.');
+    const entero_con_puntos = parte_entera.replace(
+      /\B(?=(\d{3})+(?!\d))/g,
+      '.',
+    );
+    return `${es_negativo ? '-' : ''}${entero_con_puntos},${parte_decimal}`;
+  }
+
+  resolverFirmantesInstitucionales(
+    firmante_1?: string,
+    firmante_2?: string,
+  ): [FirmanteInstitucional, FirmanteInstitucional] {
+    const clave_1 = String(firmante_1 || 'pamela')
+      .trim()
+      .toLowerCase() as ClaveFirmanteInstitucional;
+    const clave_2 = String(firmante_2 || 'samuel')
+      .trim()
+      .toLowerCase() as ClaveFirmanteInstitucional;
+
+    const resuelto_1 =
+      CATALOGO_FIRMANTES_INSTITUCIONALES[clave_1] ||
+      CATALOGO_FIRMANTES_INSTITUCIONALES.pamela;
+    const resuelto_2 =
+      CATALOGO_FIRMANTES_INSTITUCIONALES[clave_2] ||
+      CATALOGO_FIRMANTES_INSTITUCIONALES.samuel;
+
+    return [resuelto_1, resuelto_2];
+  }
+
+  resolverNombreMesPlanilla(opciones: {
+    mes?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): string {
+    const mes_bruto = (opciones.mes || '').trim();
+    if (mes_bruto) {
+      const coincidencia_anio_mes = mes_bruto.match(/^\d{4}-(\d{1,2})$/);
+      if (coincidencia_anio_mes) {
+        const indice = Number(coincidencia_anio_mes[1]);
+        if (indice >= 1 && indice <= 12) {
+          return MESES_ESPANOL[indice - 1];
+        }
+      }
+
+      const coincidencia_num = mes_bruto.match(/^(\d{1,2})$/);
+      if (coincidencia_num) {
+        const indice = Number(coincidencia_num[1]);
+        if (indice >= 1 && indice <= 12) {
+          return MESES_ESPANOL[indice - 1];
+        }
+      }
+
+      const encontrado = MESES_ESPANOL.find(
+        (m) => m.toLowerCase() === mes_bruto.toLowerCase(),
+      );
+      if (encontrado) {
+        return encontrado;
+      }
+
+      return (
+        mes_bruto.charAt(0).toUpperCase() + mes_bruto.slice(1).toLowerCase()
+      );
+    }
+
+    const fecha_referencia = (
+      opciones.fecha_fin ||
+      opciones.fecha_inicio ||
+      ''
+    ).trim();
+    if (fecha_referencia) {
+      const coincidencia_fecha = fecha_referencia.match(/^\d{4}-(\d{1,2})/);
+      if (coincidencia_fecha) {
+        const indice = Number(coincidencia_fecha[1]);
+        if (indice >= 1 && indice <= 12) {
+          return MESES_ESPANOL[indice - 1];
+        }
+      }
+    }
+
+    return MESES_ESPANOL[new Date().getMonth()];
+  }
+
+  resolverRangoFechasPlanilla(opciones: {
+    fecha_inicio?: string;
+    fecha_fin?: string;
+    mes?: string;
+  }): { fecha_inicio?: string; fecha_fin?: string } {
+    if (opciones.fecha_inicio || opciones.fecha_fin) {
+      return {
+        fecha_inicio: opciones.fecha_inicio,
+        fecha_fin: opciones.fecha_fin,
+      };
+    }
+
+    const mes_bruto = (opciones.mes || '').trim();
+    const coincidencia = mes_bruto.match(/^(\d{4})-(\d{2})$/);
+    if (coincidencia) {
+      const anio = Number(coincidencia[1]);
+      const mes_num = Number(coincidencia[2]);
+      if (mes_num >= 1 && mes_num <= 12) {
+        const ultimo_dia = new Date(anio, mes_num, 0).getDate();
+        return {
+          fecha_inicio: `${coincidencia[1]}-${coincidencia[2]}-01`,
+          fecha_fin: `${coincidencia[1]}-${coincidencia[2]}-${String(ultimo_dia).padStart(2, '0')}`,
+        };
+      }
+    }
+
+    return {};
+  }
+
+  generarDonacionRefrigerioHtml(opciones: {
+    refrigerios?: Partial<Refrigerio>[];
+    fecha_inicio?: string;
+    fecha_fin?: string;
+    mes?: string;
+    con_firma?: boolean | string;
+    firmante_1?: string;
+    firmante_2?: string;
+  }): string {
+    const incluir_firma =
+      opciones.con_firma === true ||
+      String(opciones.con_firma).toLowerCase() === 'true';
+    const [firma_1, firma_2] = this.resolverFirmantesInstitucionales(
+      opciones.firmante_1,
+      opciones.firmante_2,
+    );
+    const mes_titulo = this.resolverNombreMesPlanilla(opciones);
+
+    const mapa_responsables = new Map<
+      string,
+      { responsable: string; total_bs: number }
+    >();
+
+    for (const ref of opciones.refrigerios || []) {
+      const estado_norm = String(ref.estado_reposicion || '').toLowerCase();
+      if (estado_norm.includes('rechaz') || estado_norm.includes('anulad')) {
+        continue;
+      }
+
+      const nombre_responsable = (
+        ref.becario_receptor_devolucion_nombre ||
+        ref.becario_encargado_1_nombre ||
+        ref.becario_nombre ||
+        (ref.responsable as { nombre?: string } | undefined)?.nombre ||
+        ''
+      ).trim();
+
+      if (!nombre_responsable) {
+        continue;
+      }
+
+      const monto_dev = Number(ref.monto_devolucion_bs);
+      const costo_tot = Number(ref.costo_total_bs);
+      const monto_fila =
+        Number.isFinite(monto_dev) && monto_dev > 0
+          ? monto_dev
+          : Number.isFinite(costo_tot)
+            ? costo_tot
+            : 0;
+
+      const clave = nombre_responsable.toLowerCase();
+      const existente = mapa_responsables.get(clave);
+      if (existente) {
+        existente.total_bs = Number(
+          (existente.total_bs + monto_fila).toFixed(2),
+        );
+      } else {
+        mapa_responsables.set(clave, {
+          responsable: nombre_responsable,
+          total_bs: Number(monto_fila.toFixed(2)),
+        });
+      }
+    }
+
+    const filas = Array.from(mapa_responsables.values());
+    const total_gasto = Number(
+      filas.reduce((acc, f) => acc + f.total_bs, 0).toFixed(2),
+    );
+
+    const filas_html =
+      filas.length > 0
+        ? filas
+            .map(
+              (f, idx) => `
+              <tr>
+                <td class="col-num">${idx + 1}</td>
+                <td class="col-responsable">${f.responsable}</td>
+                <td class="col-monto">${this.formatearMontoBoliviano(f.total_bs)}</td>
+                ${incluir_firma ? '<td class="col-firma"></td>' : ''}
+              </tr>
+            `,
+            )
+            .join('')
+        : `
+          <tr>
+            <td class="col-num">-</td>
+            <td class="col-responsable">Sin registros en el periodo</td>
+            <td class="col-monto">${this.formatearMontoBoliviano(0)}</td>
+            ${incluir_firma ? '<td class="col-firma"></td>' : ''}
+          </tr>
+        `;
+
+    return `
+      <!DOCTYPE html>
+      <html lang="es">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Donación para refrigerio BUMAN-D - ${mes_titulo}</title>
+          <style>
+            @page { size: A4 portrait; margin: 15mm 18mm; }
+            body {
+              font-family: Arial, Helvetica, sans-serif;
+              color: #0F172A;
+              margin: 0;
+              padding: 0;
+              font-size: 11px;
+            }
+            .encabezado {
+              text-align: center;
+              margin-bottom: 18px;
+            }
+            .titulo-principal {
+              font-size: 15px;
+              font-weight: bold;
+              margin: 0 0 4px 0;
+            }
+            .subtitulo {
+              font-size: 13px;
+              font-weight: bold;
+              margin: 0 0 4px 0;
+            }
+            .mes-titulo {
+              font-size: 13px;
+              font-weight: bold;
+              margin: 0;
+            }
+            table.tabla-planilla {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+              margin-bottom: 16px;
+            }
+            table.tabla-planilla th {
+              background-color: #D6E4EA;
+              color: #0F172A;
+              border: 1px solid #334155;
+              padding: 8px 10px;
+              font-size: 11px;
+              font-weight: bold;
+              text-align: center;
+            }
+            table.tabla-planilla td {
+              border: 1px solid #334155;
+              padding: ${incluir_firma ? '12px 10px' : '8px 10px'};
+              font-size: 11px;
+              vertical-align: middle;
+            }
+            .col-num {
+              width: 45px;
+              text-align: center;
+            }
+            .col-responsable {
+              text-align: left;
+            }
+            .col-monto {
+              width: 115px;
+              text-align: right;
+              font-variant-numeric: tabular-nums;
+            }
+            .col-firma {
+              width: 160px;
+            }
+            tr.fila-total td {
+              background-color: #D6E4EA;
+              font-weight: bold;
+              padding: 8px 10px;
+            }
+            .total-etiqueta {
+              text-align: center;
+              font-weight: bold;
+            }
+            .leyenda-pie {
+              margin-top: 14px;
+              margin-bottom: 58px;
+              font-size: 11px;
+              color: #0F172A;
+            }
+            .firmas-contenedor {
+              width: 100%;
+              display: table;
+              table-layout: fixed;
+              margin-top: 48px;
+            }
+            .firma-bloque {
+              display: table-cell;
+              width: 50%;
+              text-align: center;
+              padding: 0 22px;
+              vertical-align: top;
+            }
+            .firma-linea {
+              border-top: 1px solid #0F172A;
+              padding-top: 6px;
+              margin: 0 auto;
+              width: 88%;
+            }
+            .firma-nombre {
+              font-size: 10.5px;
+              font-weight: bold;
+              color: #0F172A;
+              margin-bottom: 2px;
+            }
+            .firma-cargo {
+              font-size: 9px;
+              font-weight: bold;
+              color: #1E293B;
+              text-transform: uppercase;
+              line-height: 1.25;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="encabezado">
+            <div class="titulo-principal">Donación para refrigerio BUMAN-D</div>
+            <div class="subtitulo">Reuniones Escuela de Líderes</div>
+            <div class="mes-titulo">${mes_titulo}</div>
+          </div>
+
+          <table class="tabla-planilla">
+            <thead>
+              <tr>
+                <th class="col-num">N°</th>
+                <th>RESPONSABLE</th>
+                <th class="col-monto" style="text-align: center;">TOTAL Bs.</th>
+                ${incluir_firma ? '<th class="col-firma">FIRMA</th>' : ''}
+              </tr>
+            </thead>
+            <tbody>
+              ${filas_html}
+            </tbody>
+            <tfoot>
+              <tr class="fila-total">
+                <td colspan="2" class="total-etiqueta">TOTAL GASTO POR REFRIGERIO</td>
+                <td class="col-monto">${this.formatearMontoBoliviano(total_gasto)}</td>
+                ${incluir_firma ? '<td class="col-firma"></td>' : ''}
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="leyenda-pie">
+            El presente detalle consolida los gastos de refrigerio de las reuniones BUMAN-D.
+          </div>
+
+          <div class="firmas-contenedor">
+            <div class="firma-bloque">
+              <div class="firma-linea">
+                <div class="firma-nombre">${firma_1.nombre}</div>
+                <div class="firma-cargo">${firma_1.cargo}</div>
+              </div>
+            </div>
+            <div class="firma-bloque">
+              <div class="firma-linea">
+                <div class="firma-nombre">${firma_2.nombre}</div>
+                <div class="firma-cargo">${firma_2.cargo}</div>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  async generarDonacionRefrigerioPdf(opciones: {
+    fecha_inicio?: string;
+    fecha_fin?: string;
+    mes?: string;
+    con_firma?: boolean | string;
+    firmante_1?: string;
+    firmante_2?: string;
+  }): Promise<{ bufer: Buffer; nombre_archivo: string }> {
+    const rango = this.resolverRangoFechasPlanilla(opciones);
+    let refrigerios: Refrigerio[] = [];
+
+    if (
+      this.refrigerio_repo &&
+      typeof this.refrigerio_repo.createQueryBuilder === 'function'
+    ) {
+      const qb = this.refrigerio_repo
+        .createQueryBuilder('ref')
+        .leftJoinAndSelect('ref.responsable', 'responsable');
+
+      if (rango.fecha_inicio && rango.fecha_fin) {
+        qb.where('ref.fecha >= :inicio AND ref.fecha <= :fin', {
+          inicio: rango.fecha_inicio,
+          fin: rango.fecha_fin,
+        });
+      } else if (rango.fecha_inicio) {
+        qb.where('ref.fecha >= :inicio', { inicio: rango.fecha_inicio });
+      } else if (rango.fecha_fin) {
+        qb.where('ref.fecha <= :fin', { fin: rango.fecha_fin });
+      }
+
+      qb.orderBy('ref.fecha', 'ASC').addOrderBy('ref.id', 'ASC');
+      refrigerios = await qb.getMany();
+    }
+
+    const html = this.generarDonacionRefrigerioHtml({
+      ...opciones,
+      refrigerios,
+    });
+    const bufer = await this.generarPdf(html);
+
+    const mes_limpio = this.resolverNombreMesPlanilla(opciones).replace(
+      /[^a-zA-Z0-9_-]/g,
+      '',
+    );
+    const incluir_firma =
+      opciones.con_firma === true ||
+      String(opciones.con_firma).toLowerCase() === 'true';
+    const sufijo_firma = incluir_firma ? 'ConFirma' : 'SinFirma';
+    const nombre_archivo = `Donacion_Refrigerio_BUMAND_${mes_limpio}_${sufijo_firma}.pdf`;
+
+    return { bufer, nombre_archivo };
+  }
+
+  generarDonacionTransporteHtml(opciones: {
+    becarios?: Partial<Becario>[];
+    recorridos?: Partial<Recorrido>[];
+    solicitudes?: Partial<SolicitudPasajes>[];
+    fecha_inicio?: string;
+    fecha_fin?: string;
+    mes?: string;
+    con_firma?: boolean | string;
+    firmante_1?: string;
+    firmante_2?: string;
+  }): string {
+    const incluir_firma =
+      opciones.con_firma === true ||
+      String(opciones.con_firma).toLowerCase() === 'true';
+    const [firma_1, firma_2] = this.resolverFirmantesInstitucionales(
+      opciones.firmante_1,
+      opciones.firmante_2,
+    );
+    const mes_titulo = this.resolverNombreMesPlanilla(opciones);
+
+    const montos_por_id = new Map<number, number>();
+    const montos_por_nombre = new Map<string, number>();
+
+    const recorridos_lista = opciones.recorridos || [];
+    const solicitudes_lista = opciones.solicitudes || [];
+
+    if (recorridos_lista.length > 0) {
+      for (const rec of recorridos_lista) {
+        const estado_sol = String(
+          rec.solicitud?.estado ||
+            (rec as { estado?: string }).estado ||
+            'aprobado',
+        ).toLowerCase();
+        if (estado_sol === 'borrador' || estado_sol === 'rechazado') {
+          continue;
+        }
+
+        const tarifa_num = Number(rec.tarifa) || 0;
+        const monto_80 = tarifa_num * 0.8;
+
+        const becario_id =
+          rec.solicitud?.becario_id ??
+          rec.solicitud?.becario?.id ??
+          (rec as { becario_id?: number }).becario_id;
+
+        if (becario_id !== undefined && becario_id !== null) {
+          const id_num = Number(becario_id);
+          montos_por_id.set(
+            id_num,
+            Number(((montos_por_id.get(id_num) || 0) + monto_80).toFixed(4)),
+          );
+        } else {
+          const nombre_bec = (
+            rec.solicitud?.becario?.nombre ||
+            rec.solicitud?.becario?.usuario?.nombre ||
+            (rec.solicitud?.datos_becario as { nombre?: string } | undefined)
+              ?.nombre ||
+            (rec as { becario_nombre?: string }).becario_nombre ||
+            ''
+          )
+            .trim()
+            .toLowerCase();
+          if (nombre_bec) {
+            montos_por_nombre.set(
+              nombre_bec,
+              Number(
+                ((montos_por_nombre.get(nombre_bec) || 0) + monto_80).toFixed(
+                  4,
+                ),
+              ),
+            );
+          }
+        }
+      }
+    } else if (solicitudes_lista.length > 0) {
+      for (const sol of solicitudes_lista) {
+        const estado_sol = String(sol.estado || 'aprobado').toLowerCase();
+        if (estado_sol === 'borrador' || estado_sol === 'rechazado') {
+          continue;
+        }
+
+        const monto_dev = Number(sol.monto_devolucion);
+        const monto_tot = Number(sol.monto_total);
+        const monto_80 =
+          Number.isFinite(monto_dev) && monto_dev > 0
+            ? monto_dev
+            : Number.isFinite(monto_tot)
+              ? monto_tot * 0.8
+              : 0;
+
+        const becario_id = sol.becario_id ?? sol.becario?.id;
+        if (becario_id !== undefined && becario_id !== null) {
+          const id_num = Number(becario_id);
+          montos_por_id.set(
+            id_num,
+            Number(((montos_por_id.get(id_num) || 0) + monto_80).toFixed(4)),
+          );
+        } else {
+          const nombre_bec = (
+            sol.becario?.nombre ||
+            sol.becario?.usuario?.nombre ||
+            (sol.datos_becario as { nombre?: string } | undefined)?.nombre ||
+            ''
+          )
+            .trim()
+            .toLowerCase();
+          if (nombre_bec) {
+            montos_por_nombre.set(
+              nombre_bec,
+              Number(
+                ((montos_por_nombre.get(nombre_bec) || 0) + monto_80).toFixed(
+                  4,
+                ),
+              ),
+            );
+          }
+        }
+      }
+    }
+
+    const filas_becarios = (opciones.becarios || []).map((bec) => {
+      const nombre_completo = (
+        bec.nombre ||
+        bec.usuario?.nombre ||
+        ''
+      ).trim();
+      const { nombres, apellidos } =
+        this.separarNombresYApellidos(nombre_completo);
+      const monto_id =
+        bec.id !== undefined && bec.id !== null
+          ? montos_por_id.get(Number(bec.id)) || 0
+          : 0;
+      const monto_nombre = nombre_completo
+        ? montos_por_nombre.get(nombre_completo.toLowerCase()) || 0
+        : 0;
+      const total_bs = Number((monto_id + monto_nombre).toFixed(2));
+
+      return {
+        id: bec.id,
+        nombres,
+        apellidos,
+        total_bs,
+      };
+    });
+
+    const filas_ordenadas = this.ordenarBecariosPorApellido(filas_becarios);
+    const total_general = Number(
+      filas_ordenadas.reduce((acc, f) => acc + f.total_bs, 0).toFixed(2),
+    );
+
+    const filas_html = filas_ordenadas
+      .map(
+        (f, idx) => `
+        <tr>
+          <td class="col-num">${idx + 1}</td>
+          <td class="col-nombres">${f.nombres}</td>
+          <td class="col-apellidos">${f.apellidos}</td>
+          <td class="col-monto">${this.formatearMontoBoliviano(f.total_bs)}</td>
+          ${incluir_firma ? '<td class="col-firma"></td>' : ''}
+        </tr>
+      `,
+      )
+      .join('');
+
+    return `
+      <!DOCTYPE html>
+      <html lang="es">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Donación para transporte BUMAN-D - ${mes_titulo}</title>
+          <style>
+            @page { size: A4 portrait; margin: 10mm 14mm; }
+            body {
+              font-family: Arial, Helvetica, sans-serif;
+              color: #0F172A;
+              margin: 0;
+              padding: 0;
+              font-size: 9.5px;
+            }
+            .encabezado {
+              text-align: center;
+              margin-bottom: 10px;
+            }
+            .titulo-principal {
+              font-size: 14px;
+              font-weight: bold;
+              margin: 0 0 3px 0;
+            }
+            .mes-titulo {
+              font-size: 12.5px;
+              font-weight: bold;
+              margin: 0;
+            }
+            table.tabla-planilla {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 6px;
+              margin-bottom: 10px;
+            }
+            table.tabla-planilla th {
+              background-color: #D6E4EA;
+              color: #0F172A;
+              border: 1px solid #334155;
+              padding: 5px 6px;
+              font-size: 9.5px;
+              font-weight: bold;
+              text-align: center;
+            }
+            table.tabla-planilla td {
+              border: 1px solid #334155;
+              padding: ${incluir_firma ? '4.5px 6px' : '3.5px 6px'};
+              height: ${incluir_firma ? '17px' : '14px'};
+              font-size: 9.5px;
+              vertical-align: middle;
+            }
+            .col-num {
+              width: 32px;
+              text-align: center;
+            }
+            .col-nombres {
+              text-align: left;
+            }
+            .col-apellidos {
+              text-align: left;
+            }
+            .col-monto {
+              width: 115px;
+              text-align: right;
+              font-variant-numeric: tabular-nums;
+            }
+            .col-firma {
+              width: 135px;
+            }
+            tr.fila-total td {
+              background-color: #D6E4EA;
+              font-weight: bold;
+              padding: 5px 6px;
+            }
+            .total-etiqueta {
+              text-align: center;
+              font-weight: bold;
+            }
+            .leyenda-pie {
+              margin-top: 8px;
+              margin-bottom: 38px;
+              font-size: 9.5px;
+              color: #0F172A;
+            }
+            .firmas-contenedor {
+              width: 100%;
+              display: table;
+              table-layout: fixed;
+              margin-top: 32px;
+            }
+            .firma-bloque {
+              display: table-cell;
+              width: 50%;
+              text-align: center;
+              padding: 0 20px;
+              vertical-align: top;
+            }
+            .firma-linea {
+              border-top: 1px solid #0F172A;
+              padding-top: 5px;
+              margin: 0 auto;
+              width: 88%;
+            }
+            .firma-nombre {
+              font-size: 10px;
+              font-weight: bold;
+              color: #0F172A;
+              margin-bottom: 2px;
+            }
+            .firma-cargo {
+              font-size: 8.5px;
+              font-weight: bold;
+              color: #1E293B;
+              text-transform: uppercase;
+              line-height: 1.2;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="encabezado">
+            <div class="titulo-principal">Donación para transporte BUMAN-D</div>
+            <div class="mes-titulo">${mes_titulo}</div>
+          </div>
+
+          <table class="tabla-planilla">
+            <thead>
+              <tr>
+                <th class="col-num">N°</th>
+                <th>NOMBRES</th>
+                <th>APELLIDOS</th>
+                <th class="col-monto" style="text-align: center;">Total Gral por c/u Bs.</th>
+                ${incluir_firma ? '<th class="col-firma">FIRMA</th>' : ''}
+              </tr>
+            </thead>
+            <tbody>
+              ${filas_html}
+            </tbody>
+            <tfoot>
+              <tr class="fila-total">
+                <td colspan="3" class="total-etiqueta">Total General Bs.</td>
+                <td class="col-monto">${this.formatearMontoBoliviano(total_general)}</td>
+                ${incluir_firma ? '<td class="col-firma"></td>' : ''}
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="leyenda-pie">
+            El presente detalle consolida los gastos de transporte de los BUMAN-D para el cumplimiento de sus Prácticas Pre Profesionales.
+          </div>
+
+          <div class="firmas-contenedor">
+            <div class="firma-bloque">
+              <div class="firma-linea">
+                <div class="firma-nombre">${firma_1.nombre}</div>
+                <div class="firma-cargo">${firma_1.cargo}</div>
+              </div>
+            </div>
+            <div class="firma-bloque">
+              <div class="firma-linea">
+                <div class="firma-nombre">${firma_2.nombre}</div>
+                <div class="firma-cargo">${firma_2.cargo}</div>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  async generarDonacionTransportePdf(opciones: {
+    fecha_inicio?: string;
+    fecha_fin?: string;
+    mes?: string;
+    con_firma?: boolean | string;
+    firmante_1?: string;
+    firmante_2?: string;
+  }): Promise<{ bufer: Buffer; nombre_archivo: string }> {
+    const rango = this.resolverRangoFechasPlanilla(opciones);
+
+    let becarios: Becario[] = [];
+    if (this.becario_repo && typeof this.becario_repo.find === 'function') {
+      becarios = await this.becario_repo.find({
+        relations: { usuario: true },
+      });
+    }
+
+    let recorridos: Recorrido[] = [];
+    if (
+      this.recorrido_repo &&
+      typeof this.recorrido_repo.createQueryBuilder === 'function'
+    ) {
+      const qb = this.recorrido_repo
+        .createQueryBuilder('r')
+        .leftJoinAndSelect('r.solicitud', 'sol')
+        .leftJoinAndSelect('sol.becario', 'bec')
+        .leftJoinAndSelect('bec.usuario', 'usu');
+
+      if (rango.fecha_inicio && rango.fecha_fin) {
+        qb.where('r.fecha >= :inicio AND r.fecha <= :fin', {
+          inicio: rango.fecha_inicio,
+          fin: rango.fecha_fin,
+        });
+      } else if (rango.fecha_inicio) {
+        qb.where('r.fecha >= :inicio', { inicio: rango.fecha_inicio });
+      } else if (rango.fecha_fin) {
+        qb.where('r.fecha <= :fin', { fin: rango.fecha_fin });
+      }
+
+      qb.orderBy('r.fecha', 'ASC').addOrderBy('r.id', 'ASC');
+      recorridos = await qb.getMany();
+    }
+
+    let solicitudes: SolicitudPasajes[] = [];
+    if (
+      recorridos.length === 0 &&
+      this.solicitud_pasajes_repo &&
+      typeof this.solicitud_pasajes_repo.createQueryBuilder === 'function'
+    ) {
+      const qb_sol = this.solicitud_pasajes_repo
+        .createQueryBuilder('sol')
+        .leftJoinAndSelect('sol.becario', 'bec')
+        .leftJoinAndSelect('bec.usuario', 'usu');
+
+      if (rango.fecha_inicio && rango.fecha_fin) {
+        qb_sol.where('sol.created_at >= :inicio AND sol.created_at <= :fin', {
+          inicio: rango.fecha_inicio,
+          fin: rango.fecha_fin,
+        });
+      } else if (opciones.mes) {
+        qb_sol.where('sol.periodo = :periodo', { periodo: opciones.mes });
+      }
+
+      solicitudes = await qb_sol.getMany();
+    }
+
+    const html = this.generarDonacionTransporteHtml({
+      ...opciones,
+      becarios,
+      recorridos,
+      solicitudes,
+    });
+    const bufer = await this.generarPdf(html);
+
+    const mes_limpio = this.resolverNombreMesPlanilla(opciones).replace(
+      /[^a-zA-Z0-9_-]/g,
+      '',
+    );
+    const incluir_firma =
+      opciones.con_firma === true ||
+      String(opciones.con_firma).toLowerCase() === 'true';
+    const sufijo_firma = incluir_firma ? 'ConFirma' : 'SinFirma';
+    const nombre_archivo = `Donacion_Transporte_BUMAND_${mes_limpio}_${sufijo_firma}.pdf`;
 
     return { bufer, nombre_archivo };
   }

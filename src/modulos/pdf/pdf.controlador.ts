@@ -440,4 +440,86 @@ export class PdfControlador {
 
     respuesta.end(resultado.bufer);
   }
+
+  @Get('donacion-refrigerio')
+  @ApiOperation({
+    summary: 'Generar planilla oficial PDF de Donación para Refrigerio BUMAN-D',
+    description:
+      'Renderiza con Puppeteer la planilla oficial de Donación para Refrigerio BUMAN-D (para Contabilidad sin columna firma o para Archivo del Área con columna firma) y 2 firmas institucionales seleccionables.',
+  })
+  @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'mes', required: false, description: 'Mes de la planilla (YYYY-MM o nombre del mes)' })
+  @ApiQuery({ name: 'con_firma', required: false, description: 'Incluir columna FIRMA para archivo del área (true | false)' })
+  @ApiQuery({ name: 'firmante_1', required: false, description: 'Primer firmante institucional (ruth | pamela | samuel)' })
+  @ApiQuery({ name: 'firmante_2', required: false, description: 'Segundo firmante institucional (ruth | pamela | samuel)' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({ status: 200, description: 'Archivo binario de la planilla de donación de refrigerio en PDF.' })
+  async generarDonacionRefrigerio(
+    @Query('fecha_inicio') fecha_inicio: string | undefined,
+    @Query('fecha_fin') fecha_fin: string | undefined,
+    @Query('mes') mes: string | undefined,
+    @Query('con_firma') con_firma: string | undefined,
+    @Query('firmante_1') firmante_1: string | undefined,
+    @Query('firmante_2') firmante_2: string | undefined,
+    @Res() respuesta: Response,
+  ) {
+    const resultado = await this.pdf_servicio.generarDonacionRefrigerioPdf({
+      fecha_inicio,
+      fecha_fin,
+      mes,
+      con_firma,
+      firmante_1,
+      firmante_2,
+    });
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${resultado.nombre_archivo}`,
+      'Content-Length': resultado.bufer.length,
+    });
+
+    respuesta.end(resultado.bufer);
+  }
+
+  @Get('donacion-transporte')
+  @ApiOperation({
+    summary: 'Generar planilla oficial PDF de Donación para Transporte BUMAN-D',
+    description:
+      'Renderiza con Puppeteer la planilla oficial consolidada de Donación para Transporte BUMAN-D (todos los becarios ordenados por apellido, 80% neto sin descontar multas, con o sin columna firma) y 2 firmas institucionales seleccionables.',
+  })
+  @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'mes', required: false, description: 'Mes de la planilla (YYYY-MM o nombre del mes)' })
+  @ApiQuery({ name: 'con_firma', required: false, description: 'Incluir columna FIRMA para archivo del área (true | false)' })
+  @ApiQuery({ name: 'firmante_1', required: false, description: 'Primer firmante institucional (ruth | pamela | samuel)' })
+  @ApiQuery({ name: 'firmante_2', required: false, description: 'Segundo firmante institucional (ruth | pamela | samuel)' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({ status: 200, description: 'Archivo binario de la planilla de donación de transporte en PDF.' })
+  async generarDonacionTransporte(
+    @Query('fecha_inicio') fecha_inicio: string | undefined,
+    @Query('fecha_fin') fecha_fin: string | undefined,
+    @Query('mes') mes: string | undefined,
+    @Query('con_firma') con_firma: string | undefined,
+    @Query('firmante_1') firmante_1: string | undefined,
+    @Query('firmante_2') firmante_2: string | undefined,
+    @Res() respuesta: Response,
+  ) {
+    const resultado = await this.pdf_servicio.generarDonacionTransportePdf({
+      fecha_inicio,
+      fecha_fin,
+      mes,
+      con_firma,
+      firmante_1,
+      firmante_2,
+    });
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${resultado.nombre_archivo}`,
+      'Content-Length': resultado.bufer.length,
+    });
+
+    respuesta.end(resultado.bufer);
+  }
 }
