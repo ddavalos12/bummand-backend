@@ -4547,13 +4547,26 @@ export class EvaluacionesServicio {
       throw new BadRequestException('Repositorio de entregas no disponible');
     }
 
+    let becario_real_id = dto.becario_id;
+    if (dto.becario_id && this.becario_repo?.findOne) {
+      const becario_encontrado = await this.becario_repo.findOne({
+        where: [{ id: dto.becario_id }, { usuario_id: dto.becario_id }],
+      });
+      if (becario_encontrado) {
+        becario_real_id = becario_encontrado.id;
+      }
+    }
+
     let entrega = await this.entrega_tarea_repo.findOne({
       where: { id: entrega_id },
       relations: { becario: true, periodo: true },
     });
 
-    if (!entrega && entrega_id >= 1 && entrega_id <= 50) {
-      return this.revisarTareaPorNumeroEscuelaLideres(entrega_id, dto, revisor);
+    if (
+      (!entrega && (dto.tarea_numero || (entrega_id >= 1 && entrega_id <= 50))) ||
+      (entrega && becario_real_id && entrega.becario_id !== becario_real_id)
+    ) {
+      return this.revisarTareaPorNumeroEscuelaLideres(dto.tarea_numero ?? entrega_id, dto, revisor);
     }
 
     if (!entrega) {

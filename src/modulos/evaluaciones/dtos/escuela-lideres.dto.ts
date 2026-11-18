@@ -125,6 +125,11 @@ export class RevisarEntregaLideresDto {
   @Type(() => Number)
   @IsNumber()
   periodo_id?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  tarea_numero?: number;
 }
 
 export class GuardarTareaCatalogoLideresDto {
