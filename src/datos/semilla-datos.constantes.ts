@@ -324,7 +324,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Sinai Los Andes",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "rodrigo.solorzano@diaconia.bo",
     "horario_semanal": {
       "lunes": "13:00 - 16:30",
       "miercoles": "13:00 - 16:30",
@@ -385,7 +385,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Eli - Ezer",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "claudia.cabrera@diaconia.bo",
     "horario_semanal": {
       "lunes": "08:00 - 16:00",
       "viernes": "10:00 - 14:00"
@@ -445,7 +445,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Centró Evangelistico Caluyo",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "max.reynoso@diaconia.bo",
     "horario_semanal": {
       "martes": "10:30 - 13:30",
       "jueves": "10:30 - 13:30",
@@ -476,7 +476,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Iglesia del Nazareno El Progreso",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "elsa.quinteros@diaconia.bo",
     "horario_semanal": {
       "martes": "10:00 - 13:00",
       "jueves": "10:00 - 13:00",
@@ -507,7 +507,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Nazareno 6 de junio",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "franz.salazar@diaconia.bo",
     "horario_semanal": {
       "martes": "08:00 - 12:00",
       "jueves": "08:00 - 12:00",
@@ -538,7 +538,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Bautista para la familia",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "ramiro.riera@diaconia.bo",
     "horario_semanal": {
       "lunes": "08:00 - 12:00",
       "miercoles": "08:00 - 12:00",
@@ -569,7 +569,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "6 de Junio",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "hugo.seifert@diaconia.bo",
     "horario_semanal": {
       "lunes": "08:30 - 16:30",
       "miercoles": "08:30 - 16:30"
@@ -599,7 +599,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Ministerio misión Boliviana",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "reynaldo.alavi@diaconia.bo",
     "horario_semanal": {
       "martes": "08:30 - 12:30",
       "jueves": "08:30 - 12:30",
@@ -630,7 +630,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "CANAAN",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "elsa.quinteros@diaconia.bo",
     "horario_semanal": {
       "lunes": "08:00 - 12:00",
       "miercoles": "08:00 - 12:00",
@@ -661,7 +661,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "\"El Progreso\"",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "claudia.cabrera@diaconia.bo",
     "horario_semanal": {
       "lunes": "08:00 - 12:00",
       "miercoles": "08:00 - 12:00",
@@ -692,7 +692,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Centro Evangelistico Caluyo",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "alberto.leon@diaconia.bo",
     "horario_semanal": {
       "martes": "08:30 - 12:30",
       "jueves": "08:30 - 12:30",
@@ -723,7 +723,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Iglesia del Nazareno Río Seco",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "mildrette.rojas@diaconia.bo",
     "horario_semanal": {
       "lunes": "08:30 - 16:30",
       "miercoles": "08:30 - 16:30"
@@ -753,7 +753,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Iglesia Central El Alto",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "juan.perez@diaconia.bo",
     "horario_semanal": {
       "lunes": "08:30 - 12:30",
       "miercoles": "08:30 - 12:30"
@@ -779,7 +779,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Iglesia Central El Alto",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "cheryl.zegarra@diaconia.bo",
     "horario_semanal": {
       "martes": "08:30 - 12:30",
       "jueves": "08:30 - 12:30"
@@ -805,7 +805,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Iglesia Central El Alto",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "claudia.cabrera@diaconia.bo",
     "horario_semanal": {
       "lunes": "08:00 - 12:00",
       "miercoles": "08:00 - 12:00"
@@ -831,7 +831,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Iglesia Central El Alto",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "cheryl.zegarra@diaconia.bo",
     "horario_semanal": {
       "martes": "08:30 - 12:30",
       "jueves": "08:30 - 12:30"
@@ -857,7 +857,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Iglesia Central El Alto",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "ricardo.menacho@diaconia.bo",
     "horario_semanal": {
       "lunes": "08:30 - 12:30",
       "miercoles": "08:30 - 12:30"
@@ -883,7 +883,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Iglesia Central El Alto",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "brian.siles@diaconia.bo",
     "horario_semanal": {
       "martes": "08:00 - 12:00",
       "jueves": "08:00 - 12:00"
@@ -909,7 +909,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Iglesia Central El Alto",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "alberto.leon@diaconia.bo",
     "horario_semanal": {
       "lunes": "08:30 - 12:30",
       "miercoles": "08:30 - 12:30"
@@ -935,7 +935,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Iglesia Central El Alto",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "samuel.duran@diaconia.bo",
     "horario_semanal": {
       "martes": "08:30 - 12:30",
       "jueves": "08:30 - 12:30"
@@ -961,7 +961,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Iglesia Central El Alto",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "angel.ali@bumand.bo",
+    "supervisor_correo": "reynaldo.alavi@diaconia.bo",
     "horario_semanal": {
       "lunes": "08:30 - 12:30",
       "miercoles": "08:30 - 12:30"
@@ -975,8 +975,9 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
   "clave": "Bumand2026!",
   "universidad": "Universidad Mayor de San Andrés",
   "carrera": "Ingeniería Civil",
-  "unidad": "Oficina Central",
+  "unidad": "Seguridad Física",
   "institucion": "Diaconía FRIF-IFD",
+  "supervisor_correo": "angel.ali@bumand.bo",
   "modalidad_carrera": "Semestral",
   "tipo_beca": "650",
   "comentario_academico": "reprobo 2 materias, materia de maquinarias aun no hay notas",
@@ -989,8 +990,9 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
   "clave": "Bumand2026!",
   "universidad": "Universidad Mayor de San Andrés",
   "carrera": "Ciencias de la Comunicación Social",
-  "unidad": "Oficina Central",
+  "unidad": "Marketing y Comunicación",
   "institucion": "Diaconía FRIF-IFD",
+  "supervisor_correo": "max.reynoso@diaconia.bo",
   "modalidad_carrera": "Anual",
   "tipo_beca": "650",
   "comentario_academico": "Aprobado",
@@ -1003,8 +1005,9 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
   "clave": "Bumand2026!",
   "universidad": "Universidad Pública de El Alto",
   "carrera": "Economía",
-  "unidad": "Oficina Central",
+  "unidad": "Seguridad Física",
   "institucion": "Diaconía FRIF-IFD",
+  "supervisor_correo": "angel.ali@bumand.bo",
   "modalidad_carrera": "Mixta",
   "tipo_beca": "250",
   "comentario_academico": "Aprobado",
@@ -1017,8 +1020,9 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
   "clave": "Bumand2026!",
   "universidad": "Universidad Mayor de San Andrés",
   "carrera": "Comunicación Social",
-  "unidad": "Oficina Central",
+  "unidad": "Subgerencia de Negocios y Marketing",
   "institucion": "Diaconía FRIF-IFD",
+  "supervisor_correo": "alejandra.romay@diaconia.bo",
   "modalidad_carrera": "Anual",
   "tipo_beca": "650",
   "comentario_academico": "Aprobado",
@@ -1031,8 +1035,9 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
   "clave": "Bumand2026!",
   "universidad": "Universidad Mayor de San Andrés",
   "carrera": "Lingüística e Idiomas",
-  "unidad": "Oficina Central",
+  "unidad": "Subgerencia Nacional RSDyA",
   "institucion": "Diaconía FRIF-IFD",
+  "supervisor_correo": "anai.paye@diaconia.bo",
   "modalidad_carrera": "Semestral",
   "tipo_beca": "650",
   "comentario_academico": "Aprobado",
@@ -1045,8 +1050,9 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
   "clave": "Bumand2026!",
   "universidad": "Universidad Pública de El Alto",
   "carrera": "Administración de Empresas",
-  "unidad": "Oficina Central",
+  "unidad": "Subgerencia Nacional de Administración",
   "institucion": "Diaconía FRIF-IFD",
+  "supervisor_correo": "eilen.astorga@diaconia.bo",
   "modalidad_carrera": "Anual",
   "tipo_beca": "650",
   "comentario_academico": "Egresado",
@@ -1059,8 +1065,9 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
   "clave": "Bumand2026!",
   "universidad": "Universidad Central Sede La Paz",
   "carrera": "Ingeniería comercial",
-  "unidad": "Oficina Central",
+  "unidad": "Jefatura de Crédito Individual y Cartera Productiva",
   "institucion": "Diaconía FRIF-IFD",
+  "supervisor_correo": "carlos.alanoca@diaconia.bo",
   "modalidad_carrera": "Semestral",
   "tipo_beca": "250",
   "comentario_academico": "Aprobado",

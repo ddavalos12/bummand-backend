@@ -83,9 +83,100 @@ export class SemillaServicio implements OnModuleInit {
       } else {
         await this.asegurarAdministradorPrimario();
       }
+      await this.sincronizarSupervisoresYBecariosDesignados();
       await this.asegurarDatosOperativosInstitucionales();
     } catch (error: any) {
       this.logger.warn(`No se pudo verificar la semilla automática en inicio: ${error.message}`);
+    }
+  }
+
+  /**
+   * Sincroniza los mentores/supervisores institucionales y asegura que si en la BD
+   * todos los becarios estaban asignados al mentor por defecto o sin supervisor_id,
+   * cada becario quede vinculado estrictamente a su mentor designado por unidad/semilla.
+   */
+  async sincronizarSupervisoresYBecariosDesignados(): Promise<void> {
+    try {
+      const mapa_supervisores = new Map<string, Usuario>();
+      for (const sup of SUPERVISORES_SEMILLA) {
+        const correo_norm = sup.correo.trim().toLowerCase();
+        let u_sup = await this.usuario_repo.findOne({ where: { correo: correo_norm } });
+        if (!u_sup) {
+          u_sup = this.usuario_repo.create({
+            nombre: sup.nombre,
+            correo: correo_norm,
+            contrasena_hash: await hashearContrasena(sup.clave),
+            rol: Rol.SUPERVISOR,
+            estado: EstadoUsuario.ACTIVO,
+            correo_confirmado: true,
+          });
+          u_sup = await this.usuario_repo.save(u_sup);
+        }
+        mapa_supervisores.set(correo_norm, u_sup);
+      }
+
+      const todos_becarios = await this.becario_repo.find();
+      if (!todos_becarios || todos_becarios.length === 0) return;
+
+      const conteo_por_sup = new Map<number, number>();
+      let sin_supervisor = 0;
+      for (const b of todos_becarios) {
+        if (!b.supervisor_id) {
+          sin_supervisor++;
+        } else {
+          conteo_por_sup.set(b.supervisor_id, (conteo_por_sup.get(b.supervisor_id) || 0) + 1);
+        }
+      }
+
+      const max_asignados_a_uno = Math.max(0, ...Array.from(conteo_por_sup.values()));
+      const requiere_particion =
+        sin_supervisor > 0 ||
+        (todos_becarios.length >= 15 && max_asignados_a_uno >= Math.ceil(todos_becarios.length * 0.65));
+
+      if (requiere_particion) {
+        for (const b of todos_becarios) {
+          const ci_limpio = (b.ci || '').split(/[- ]/)[0].trim();
+          const b_semilla = BECARIOS_SEMILLA.find(
+            (bs) => bs.ci === ci_limpio || bs.nombre.toLowerCase() === (b.nombre || '').toLowerCase(),
+          );
+          if (b_semilla?.supervisor_correo) {
+            const sup_obj = mapa_supervisores.get(b_semilla.supervisor_correo.trim().toLowerCase());
+            if (sup_obj && b.supervisor_id !== sup_obj.id) {
+              b.supervisor_id = sup_obj.id;
+              await this.becario_repo.save(b);
+            }
+          }
+        }
+
+        await this.dataSource
+          .query(`
+            UPDATE solicitudes_pasajes sp
+            SET supervisor_id = b.supervisor_id
+            FROM becarios b
+            WHERE sp.becario_id = b.id AND b.supervisor_id IS NOT NULL AND sp.supervisor_id IS DISTINCT FROM b.supervisor_id;
+          `)
+          .catch(() => {});
+
+        await this.dataSource
+          .query(`
+            UPDATE justificaciones j
+            SET supervisor_id = b.supervisor_id
+            FROM becarios b
+            WHERE j.becario_id = b.id AND b.supervisor_id IS NOT NULL AND j.supervisor_id IS DISTINCT FROM b.supervisor_id;
+          `)
+          .catch(() => {});
+
+        await this.dataSource
+          .query(`
+            UPDATE asignaciones_practica ap
+            SET supervisor_id = b.supervisor_id
+            FROM becarios b
+            WHERE ap.becario_id = b.id AND b.supervisor_id IS NOT NULL AND ap.supervisor_id IS DISTINCT FROM b.supervisor_id;
+          `)
+          .catch(() => {});
+      }
+    } catch (err: any) {
+      this.logger.warn(`Aviso al sincronizar mentores y becarios designados: ${err.message}`);
     }
   }
 

@@ -1371,7 +1371,7 @@ export class PdfServicio {
 
     const nombre_estudiante_limpio = nombre_estudiante.replace(/[^a-zA-Z0-9_-]/g, '_');
     const mes_limpio = mes_nombre.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const nombre_archivo = `Expediente_Recorridos_${nombre_estudiante_limpio}_${mes_limpio}.pdf`;
+    const nombre_archivo = `Formulario_Contabilidad_Recorridos_${nombre_estudiante_limpio}_${mes_limpio}.pdf`;
 
     return {
       bufer: Buffer.from(bufer),
@@ -1644,8 +1644,8 @@ export class PdfServicio {
           <table class="header-table">
             <tr>
               <td>
-                <div class="header-title">Fundación Diaconía FRIF-IFD · Programa BUMAND</div>
-                <div class="header-subtitle">Expediente Mensual Oficial de Recorridos y Liquidación de Pasajes (80%)</div>
+                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y SRD · PROGRAMA BUMAND</div>
+                <div class="header-subtitle">Fundación Diaconía FRIF-IFD · Expediente Mensual de Recorridos y Liquidación de Pasajes (80%)</div>
               </td>
               <td style="text-align: right;">
                 <span style="background: #063A6B; color: #F8C766; font-size: 9px; font-weight: bold; padding: 4px 8px; border-radius: 4px; font-family: monospace;">
@@ -1664,7 +1664,7 @@ export class PdfServicio {
             <div class="meta-col">
               <div class="meta-item"><span class="meta-label">Sede de Prácticas:</span> <span class="meta-val">${datos.sede_estudiante}</span></div>
               <div class="meta-item"><span class="meta-label">Mentor Asignado:</span> <span class="meta-val">${datos.supervisor_nombre}</span></div>
-              <div class="meta-item"><span class="meta-label">Periodo Auditado:</span> <span class="meta-val">${datos.mes_nombre}</span></div>
+              <div class="meta-item"><span class="meta-label">Periodo Contable:</span> <span class="meta-val">${datos.mes_nombre}</span></div>
             </div>
           </div>
 
@@ -2362,7 +2362,7 @@ export class PdfServicio {
         : 'Compra Directa / Listo para Servir';
 
     const codigo_formulario = `REP-REF-${refrigerio.id.toString().padStart(5, '0')}`;
-    const codigo_auditoria = `AUD-REF-${refrigerio.id}-${Date.now().toString().slice(-4)}`;
+    const codigo_auditoria = `CONT-REF-${refrigerio.id}-${Date.now().toString().slice(-4)}`;
 
     const encargado_1 = refrigerio.becario_encargado_1_nombre || refrigerio.becario_nombre || 'Becario 1';
     const encargado_2 = refrigerio.becario_encargado_2_nombre || 'Becario 2';
@@ -2582,8 +2582,8 @@ export class PdfServicio {
           <table class="header-table">
             <tr>
               <td>
-                <div class="header-title">Fundación Diaconía FRIF-IFD · Programa BUMAND</div>
-                <div class="header-subtitle">Planilla Oficial de Rendición de Refrigerios y Solicitud de Devolución (100%)</div>
+                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y SRD · REFRIGERIOS BUMAND</div>
+                <div class="header-subtitle">Fundación Diaconía FRIF-IFD · Planilla Oficial de Rendición de Refrigerios y Solicitud de Devolución (100%)</div>
               </td>
               <td style="text-align: right;">
                 <span class="badge-codigo">${codigo_formulario}</span>
@@ -2592,7 +2592,7 @@ export class PdfServicio {
           </table>
 
           <div class="auditoria-bar">
-            <span><strong>AUDITORÍA INSTITUCIONAL:</strong> ${codigo_auditoria}</span>
+            <span><strong>CONTABILIDAD Y SRD:</strong> ${codigo_auditoria}</span>
             <span><strong>JORNADA DE VIERNES:</strong> ${fecha_formato.toUpperCase()}</span>
             <span><strong>ESTADO:</strong> ${refrigerio.estado_reposicion ? refrigerio.estado_reposicion.toUpperCase() : 'PROGRAMADO'}</span>
           </div>
@@ -2823,12 +2823,12 @@ export class PdfServicio {
           <table class="header-table">
             <tr>
               <td>
-                <div class="header-title">Fundación Diaconía FRIF-IFD · Programa BUMAND</div>
-                <div style="font-size: 10px; color: #035683; font-weight: bold;">Consolidado de Auditoría de Refrigerios y Devoluciones al 100%</div>
+                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y SRD · REFRIGERIOS BUMAND</div>
+                <div style="font-size: 10px; color: #035683; font-weight: bold;">Fundación Diaconía FRIF-IFD · Consolidado de Refrigerios y Devoluciones al 100%</div>
               </td>
               <td style="text-align: right;">
                 <span style="background: #007BBE; color: #FFFFFF; font-size: 9px; font-weight: bold; padding: 4px 8px; border-radius: 4px;">
-                  AUDITORÍA: ${rango_texto.toUpperCase()}
+                  CONTABILIDAD Y SRD: ${rango_texto.toUpperCase()}
                 </span>
               </td>
             </tr>
@@ -2880,17 +2880,17 @@ export class PdfServicio {
             </tbody>
             <tfoot>
               <tr style="background: #F1F5F9; font-weight: bold;">
-                <td colspan="4" style="text-align: right; padding: 5px;">TOTALES AUDITADOS:</td>
+                <td colspan="4" style="text-align: right; padding: 5px;">TOTALES PARA CONTABILIDAD Y SRD:</td>
                 <td style="text-align: center; font-family: monospace;">${total_raciones}</td>
                 <td style="text-align: right; font-family: monospace;">Bs ${total_gastado.toFixed(2)}</td>
                 <td style="text-align: right; font-family: monospace; color: #007BBE;">Bs ${total_devolucion.toFixed(2)}</td>
-                <td colspan="2" style="text-align: center; font-size: 8px; color: #00808E;">DEVOLUCIÓN AL 100% AUDITADA</td>
+                <td colspan="2" style="text-align: center; font-size: 8px; color: #00808E;">DEVOLUCIÓN AL 100% VERIFICADA</td>
               </tr>
             </tfoot>
           </table>
 
           <div class="footer-nota">
-            Consolidado Institucional extraído para Auditoría · Sistema BUMAND · Emisión: ${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO')}.
+            Formulario Institucional extraído para Contabilidad y SRD · Sistema BUMAND · Emisión: ${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO')}.
           </div>
         </body>
       </html>
@@ -2934,13 +2934,13 @@ export class PdfServicio {
     });
 
     const bufer = await this.generarPdf(html);
-    const nombre_archivo = `Consolidado_Refrigerios_Auditoria_${(filtros.fecha_inicio || 'inicio').replace(/-/g, '_')}_a_${(filtros.fecha_fin || 'fin').replace(/-/g, '_')}.pdf`;
+    const nombre_archivo = `Formulario_Contabilidad_Refrigerios_${(filtros.fecha_inicio || 'inicio').replace(/-/g, '_')}_a_${(filtros.fecha_fin || 'fin').replace(/-/g, '_')}.pdf`;
 
     return { bufer, nombre_archivo };
   }
 
   /**
-   * Genera el HTML oficial de Consolidado Integral de Auditoría BUMAND (TAREA-08)
+   * Genera el HTML oficial de Formulario para Contabilidad y SRD BUMAND (TAREA-08)
    */
   generarConsolidadoAuditoriaHtml(datos: {
     fecha_inicio?: string;
@@ -2959,7 +2959,7 @@ export class PdfServicio {
       ? `Desde: ${datos.fecha_inicio} · Hasta: ${datos.fecha_fin}`
       : 'Periodo de Evaluación Integral';
 
-    const codigo_auditoria = `AUD-GLOBAL-${Date.now().toString().slice(-6)}`;
+    const codigo_auditoria = `CONT-SRD-${Date.now().toString().slice(-6)}`;
     const multas_bs = Number(datos.total_multas_bs || 0);
     const liquido_pagable = Number(
       datos.monto_liquido_pagable ?? Math.max(0, Number(datos.total_monto_pasajes || 0) - multas_bs),
@@ -2995,7 +2995,7 @@ export class PdfServicio {
             <tr>
               <td>
                 <div class="header-title">FORMULARIO PARA CONTABILIDAD Y SRD - LIQUIDACIÓN DE PASAJES</div>
-                <div style="font-size: 11px; color: #035683; font-weight: 600;">Fundación Diaconía FRIF-IFD · Programa BUMAND · Consolidado de Auditoría y Fiscalización</div>
+                <div style="font-size: 11px; color: #035683; font-weight: 600;">Fundación Diaconía FRIF-IFD · Programa BUMAND · Consolidado para Contabilidad y SRD</div>
               </td>
               <td style="text-align: right;">
                 <span class="auditoria-badge">${codigo_auditoria}</span>
@@ -3004,12 +3004,12 @@ export class PdfServicio {
           </table>
 
           <div class="rango-banner">
-            <strong>INTERVALO DE AUDITORÍA:</strong> ${rango_texto.toUpperCase()} &nbsp;|&nbsp;
+            <strong>INTERVALO DE CONTABILIDAD Y SRD:</strong> ${rango_texto.toUpperCase()} &nbsp;|&nbsp;
             <strong>FECHA Y HORA DE EXTRACCIÓN:</strong> ${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO')}
           </div>
 
           <div class="card-resumen">
-            <div class="card-titulo">1. Auditoría de Asistencia y Acreditación de Horas</div>
+            <div class="card-titulo">1. Control de Asistencia y Acreditación de Horas</div>
             <table class="metric-table">
               <tr>
                 <td class="metric-lbl">Total de marcaciones de asistencia verificadas:</td>
@@ -3045,7 +3045,7 @@ export class PdfServicio {
           </div>
 
           <div class="card-resumen">
-            <div class="card-titulo">3. Auditoría de Refrigerios y Devolución Total (100%)</div>
+            <div class="card-titulo">3. Contabilidad de Refrigerios y Devolución Total (100%)</div>
             <table class="metric-table">
               <tr>
                 <td class="metric-lbl">Total suministros de refrigerio de los viernes:</td>
@@ -3074,7 +3074,7 @@ export class PdfServicio {
           </div>
 
           <div class="footer-nota">
-            Documento Oficial de Auditoría Institucional emitido mediante Puppeteer por el Sistema BUMAND (v2.0) · Rango: ${rango_texto}.
+            Formulario Oficial para Contabilidad y SRD emitido mediante Puppeteer por el Sistema BUMAND (v2.0) · Rango: ${rango_texto}.
           </div>
         </body>
       </html>
@@ -3167,7 +3167,7 @@ export class PdfServicio {
     });
 
     const bufer = await this.generarPdf(html);
-    const nombre_archivo = `Consolidado_Auditoria_BUMAND_${(filtros.fecha_inicio || 'inicio').replace(/-/g, '_')}_a_${(filtros.fecha_fin || 'fin').replace(/-/g, '_')}.pdf`;
+    const nombre_archivo = `Formulario_Contabilidad_SRD_BUMAND_${(filtros.fecha_inicio || 'inicio').replace(/-/g, '_')}_a_${(filtros.fecha_fin || 'fin').replace(/-/g, '_')}.pdf`;
 
     return { bufer, nombre_archivo };
   }
@@ -3355,7 +3355,7 @@ export class PdfServicio {
 
           <div class="meta-box">
             <div>
-              <span class="meta-label">Ventana de Auditoría:</span> <span class="meta-val">${rango_texto}</span> &nbsp;|&nbsp;
+              <span class="meta-label">Periodo de Contabilidad y SRD:</span> <span class="meta-val">${rango_texto}</span> &nbsp;|&nbsp;
               <span class="meta-label">Estudiantes Evaluados:</span> <span class="meta-val">${becarios_unicos} becarios</span>
             </div>
             <div>
@@ -3448,7 +3448,7 @@ export class PdfServicio {
     `;
 
     const bufer = await this.generarPdf(html);
-    const nombre_archivo = `Consolidado_Pasajes_General_${(opciones.fecha_inicio || 'general').replace(/-/g, '_')}_a_${(opciones.fecha_fin || 'actual').replace(/-/g, '_')}.pdf`;
+    const nombre_archivo = `Formulario_Contabilidad_Pasajes_${(opciones.fecha_inicio || 'general').replace(/-/g, '_')}_a_${(opciones.fecha_fin || 'actual').replace(/-/g, '_')}.pdf`;
 
     return { bufer, nombre_archivo };
   }

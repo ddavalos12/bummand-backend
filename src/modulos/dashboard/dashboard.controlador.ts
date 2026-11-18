@@ -6,6 +6,7 @@ import { RolesGuardia } from '../autenticacion/roles.guardia';
 import { Roles } from '../autenticacion/roles.decorador';
 import { UsuarioActual } from '../autenticacion/usuario-actual.decorador';
 import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
+import { esRolMentor } from '../../utilidades/filtro-mentor.utilidad';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth('JWT-auth')
@@ -33,8 +34,8 @@ export class DashboardControlador {
     @Query('fecha_fin') fecha_fin?: string,
     @UsuarioActual() usuario?: Usuario,
   ): Promise<EstadisticasDashboard> {
-    const id_filtro = supervisor_id ?? (usuario?.rol === Rol.SUPERVISOR ? usuario.id : undefined);
-    return this.dashboard_servicio.obtenerEstadisticas(id_filtro, fecha_inicio, fecha_fin);
+    const id_filtro = supervisor_id ?? (esRolMentor(usuario?.rol) ? usuario?.id : undefined);
+    return this.dashboard_servicio.obtenerEstadisticas(id_filtro, fecha_inicio, fecha_fin, usuario);
   }
 
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
@@ -51,8 +52,8 @@ export class DashboardControlador {
     @Query('fecha') fecha?: string,
     @UsuarioActual() usuario?: Usuario,
   ): Promise<SeguimientoSemanal> {
-    const id_filtro = supervisor_id ?? (usuario?.rol === Rol.SUPERVISOR ? usuario.id : undefined);
-    return this.dashboard_servicio.obtenerSeguimientoSemanal(id_filtro, fecha);
+    const id_filtro = supervisor_id ?? (esRolMentor(usuario?.rol) ? usuario?.id : undefined);
+    return this.dashboard_servicio.obtenerSeguimientoSemanal(id_filtro, fecha, usuario);
   }
 
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
@@ -71,7 +72,7 @@ export class DashboardControlador {
     @Query('fecha_fin') fecha_fin?: string,
     @UsuarioActual() usuario?: Usuario,
   ): Promise<EstadisticasDashboard> {
-    const id_filtro = supervisor_id ?? (usuario?.rol === Rol.SUPERVISOR ? usuario.id : undefined);
-    return this.dashboard_servicio.obtenerEstadisticas(id_filtro, fecha_inicio, fecha_fin);
+    const id_filtro = supervisor_id ?? (esRolMentor(usuario?.rol) ? usuario?.id : undefined);
+    return this.dashboard_servicio.obtenerEstadisticas(id_filtro, fecha_inicio, fecha_fin, usuario);
   }
 }

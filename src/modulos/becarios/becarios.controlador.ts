@@ -13,6 +13,7 @@ import { RolesGuardia } from '../autenticacion/roles.guardia';
 import { Roles } from '../autenticacion/roles.decorador';
 import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 import { UsuarioActual } from '../autenticacion/usuario-actual.decorador';
+import { esRolMentor } from '../../utilidades/filtro-mentor.utilidad';
 
 @ApiTags('Becarios')
 @ApiBearerAuth('JWT-auth')
@@ -206,7 +207,7 @@ export class BecariosControlador {
     @Param('id', ParseIntPipe) id: number,
     @UsuarioActual() usuarioAutenticado: Usuario,
   ) {
-    if (usuarioAutenticado.rol === Rol.SUPERVISOR) {
+    if (esRolMentor(usuarioAutenticado?.rol)) {
       await this.becariosServicio.obtener(id, usuarioAutenticado);
     }
     return this.becariosServicio.obtenerHorarios(id);
@@ -233,7 +234,7 @@ export class BecariosControlador {
     },
     @UsuarioActual() usuarioAutenticado: Usuario,
   ) {
-    if (usuarioAutenticado.rol === Rol.SUPERVISOR) {
+    if (esRolMentor(usuarioAutenticado?.rol)) {
       await this.becariosServicio.obtener(id, usuarioAutenticado);
     }
     return this.becariosServicio.guardarHorarios(id, dto);

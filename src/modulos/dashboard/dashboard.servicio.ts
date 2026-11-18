@@ -7,6 +7,8 @@ import { Becario } from '../becarios/entidades/becario.entidad';
 import { Evaluacion, EstadoEvaluacion } from '../evaluaciones/entidades/evaluacion.entidad';
 import { Multa } from '../asistencia/entidades/multa.entidad';
 import { Justificacion, EstadoJustificacion } from '../justificaciones/entidades/justificacion.entidad';
+import { Usuario } from '../usuarios/entidades/usuario.entidad';
+import { obtenerBecariosDesignadosMentor } from '../../utilidades/filtro-mentor.utilidad';
 
 export interface MetricasGenerales {
   total_becarios_activos: number;
@@ -129,10 +131,11 @@ export class DashboardServicio {
     supervisor_id?: number,
     fecha_inicio?: string,
     fecha_fin?: string,
+    usuario?: Usuario,
   ): Promise<EstadisticasDashboard> {
     const where_becario = supervisor_id ? { supervisor_id } : {};
     const [
-      becarios,
+      becarios_raw,
       todas_asistencias,
       todas_solicitudes,
       evaluaciones_pendientes,
@@ -150,6 +153,18 @@ export class DashboardServicio {
         ? this.justificacion_repo.find()
         : Promise.resolve([]),
     ]);
+
+    let becarios = becarios_raw;
+    if (supervisor_id && (becarios.length === 0 || becarios.length >= 15)) {
+      const designados = await obtenerBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        supervisor_id,
+      );
+      if (designados.length > 0) {
+        becarios = designados;
+      }
+    }
 
     const set_becarios_permitidos = new Set(becarios.map((b) => b.id));
     let asistencias = supervisor_id
@@ -409,6 +424,7 @@ export class DashboardServicio {
   async obtenerSeguimientoSemanal(
     supervisor_id?: number,
     fecha_referencia?: string | Date,
+    usuario?: Usuario,
   ): Promise<SeguimientoSemanal> {
     const base = fecha_referencia ? new Date(fecha_referencia) : new Date();
     const fecha_valida = isNaN(base.getTime()) ? new Date() : base;
@@ -428,11 +444,21 @@ export class DashboardServicio {
     const fin_str = fecha_domingo.toISOString().split('T')[0];
 
     const where_becario = supervisor_id ? { supervisor_id } : {};
-    const becarios = await this.becario_repo.find({
+    let becarios = await this.becario_repo.find({
       where: where_becario,
       relations: { usuario: true },
       order: { id: 'ASC' },
     });
+    if (supervisor_id && (becarios.length === 0 || becarios.length >= 15)) {
+      const designados = await obtenerBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        supervisor_id,
+      );
+      if (designados.length > 0) {
+        becarios = designados;
+      }
+    }
 
     const set_becarios = new Set(becarios.map((b) => b.id));
     const mapa_becarios = new Map<number, Becario>();

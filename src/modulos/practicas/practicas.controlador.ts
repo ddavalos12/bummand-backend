@@ -35,11 +35,11 @@ export class PracticasControlador {
   @Get('aprobaciones')
   @ApiOperation({
     summary: 'Listar aprobaciones de prácticas',
-    description: 'Retorna todas las certificaciones mensuales de prácticas emitidas.',
+    description: 'Retorna todas las certificaciones mensuales de prácticas emitidas (filtradas por mentor si aplica).',
   })
   @ApiResponse({ status: 200, description: 'Certificaciones obtenidas.', type: [AprobacionPracticas] })
-  listar() {
-    return this.servicio.listar();
+  listar(@UsuarioActual() usuario?: Usuario) {
+    return this.servicio.listar(usuario);
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)

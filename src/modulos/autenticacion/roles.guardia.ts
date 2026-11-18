@@ -23,9 +23,14 @@ export class RolesGuardia implements CanActivate {
       throw new ForbiddenException('No hay usuario autenticado');
     }
 
+    const rol_usuario = String(usuario.rol).toLowerCase().trim();
+    const rol_normalizado = rol_usuario === 'mentor' ? String(Rol.SUPERVISOR).toLowerCase() : rol_usuario;
+
     if (
       roles_requeridos.some(
-        (rol) => String(usuario.rol).toLowerCase().trim() === String(rol).toLowerCase().trim(),
+        (rol) =>
+          rol_usuario === String(rol).toLowerCase().trim() ||
+          rol_normalizado === String(rol).toLowerCase().trim(),
       )
     ) {
       return true;

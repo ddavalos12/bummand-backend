@@ -56,6 +56,14 @@ import { Usuario, Rol } from '../usuarios/entidades/usuario.entidad';
 import { NotificacionesServicio } from '../notificaciones/notificaciones.servicio';
 import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
 import { compararContrasena } from '../../utilidades/hash.utilidad';
+import {
+  esRolMentor,
+  limpiarCi,
+  normalizarTextoMentor,
+  obtenerBecariosDesignadosMentor,
+  obtenerIdsBecariosDesignadosMentor,
+  obtenerSemillaDesignadaMentor,
+} from '../../utilidades/filtro-mentor.utilidad';
 
 export interface TareaCatalogoLideres {
   numero: number;
@@ -944,8 +952,12 @@ export class EvaluacionesServicio {
     return pastor;
   }
 
-  async obtenerNominaF03(): Promise<Array<{
+  async obtenerNominaF03(
+    usuario?: Usuario,
+    supervisor_id?: number,
+  ): Promise<Array<{
     becario_id: number;
+    supervisor_id?: number | null;
     nombre: string;
     ci: string;
     evaluacion_id: number | null;
@@ -957,12 +969,32 @@ export class EvaluacionesServicio {
     campos_formulario: Record<string, unknown> | null;
     fecha_evaluacion: string | null;
   }>> {
-    const becarios = this.becario_repo
+    let becarios = this.becario_repo
       ? await this.becario_repo.find({
-          relations: { usuario: true, iglesia: true },
+          relations: { usuario: true, iglesia: true, supervisor: true },
           order: { id: 'ASC' },
         })
       : [];
+
+    if (esRolMentor(usuario?.rol) || supervisor_id) {
+      const designados = await obtenerBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        supervisor_id ?? usuario?.id,
+        this.usuario_repo,
+      );
+      if (designados.length > 0) {
+        const ids_set = new Set(designados.map((d) => d.id));
+        becarios = becarios.filter((b) => ids_set.has(b.id));
+      } else {
+        const sup_id = supervisor_id ?? usuario?.id;
+        becarios = becarios.filter((b) => b.supervisor_id === sup_id);
+      }
+    } else if (usuario?.rol === Rol.BECARIO) {
+      becarios = becarios.filter(
+        (b) => b.usuario_id === usuario.id || b.id === usuario.id,
+      );
+    }
 
     let periodo_id = 2;
     if (this.periodo_repo) {
@@ -1000,6 +1032,7 @@ export class EvaluacionesServicio {
 
     const resultado: Array<{
       becario_id: number;
+      supervisor_id?: number | null;
       nombre: string;
       ci: string;
       evaluacion_id: number | null;
@@ -1113,6 +1146,7 @@ export class EvaluacionesServicio {
 
       resultado.push({
         becario_id: b.id,
+        supervisor_id: b.supervisor_id ?? b.supervisor?.id ?? null,
         nombre: nombre_becario,
         ci: b.ci || '—',
         evaluacion_id: ev.id,
@@ -1220,10 +1254,10 @@ export class EvaluacionesServicio {
     return this.periodo_repo.save(periodo);
   }
 
-  async obtenerTodas(): Promise<Evaluacion[]> {
-    return this.evaluacion_repo.find({
+  async obtenerTodas(usuario?: Usuario, supervisor_id?: number): Promise<Evaluacion[]> {
+    let evaluaciones = await this.evaluacion_repo.find({
       relations: {
-        becario: { usuario: true },
+        becario: { usuario: true, supervisor: true },
         modulo: true,
         periodo: true,
         evaluador: true,
@@ -1231,6 +1265,23 @@ export class EvaluacionesServicio {
       },
       order: { id: 'DESC' },
     });
+
+    if (esRolMentor(usuario?.rol) || supervisor_id) {
+      const ids_permitidos = await obtenerIdsBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        supervisor_id ?? usuario?.id,
+        this.usuario_repo,
+      );
+      if (ids_permitidos.size > 0) {
+        evaluaciones = evaluaciones.filter((e) => ids_permitidos.has(e.becario_id));
+      } else {
+        const sup_id = supervisor_id ?? usuario?.id;
+        evaluaciones = evaluaciones.filter((e) => e.becario?.supervisor_id === sup_id);
+      }
+    }
+
+    return evaluaciones;
   }
 
   async obtenerPorId(id: number): Promise<Evaluacion> {
@@ -1775,11 +1826,25 @@ export class EvaluacionesServicio {
     };
   }
 
-  async obtenerPendientesSupervisor(supervisor_usuario_id: number, periodo_id?: number) {
-    const becarios =
-      (await this.becario_repo?.find({
-        where: { supervisor_id: supervisor_usuario_id },
-      })) || [];
+  async obtenerPendientesSupervisor(
+    supervisor_usuario_id: number,
+    periodo_id?: number,
+    usuario?: Usuario,
+  ) {
+    let becarios =
+      (await obtenerBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        supervisor_usuario_id,
+        this.usuario_repo,
+      )) || [];
+
+    if (becarios.length === 0 && this.becario_repo?.find) {
+      becarios =
+        (await this.becario_repo.find({
+          where: { supervisor_id: supervisor_usuario_id },
+        })) || [];
+    }
 
     if (becarios.length === 0) return [];
 
@@ -1798,7 +1863,10 @@ export class EvaluacionesServicio {
     return query.orderBy('evaluacion.created_at', 'DESC').getMany();
   }
 
-  async obtenerPendientesAdministracion(periodo_id?: number) {
+  async obtenerPendientesAdministracion(periodo_id?: number, usuario?: Usuario) {
+    if (esRolMentor(usuario?.rol) && usuario?.id) {
+      return this.obtenerPendientesSupervisor(usuario.id, periodo_id, usuario);
+    }
     const query = this.evaluacion_repo
       .createQueryBuilder('evaluacion')
       .leftJoinAndSelect('evaluacion.becario', 'becario')
@@ -2242,16 +2310,37 @@ export class EvaluacionesServicio {
     return mapa;
   }
 
-  async obtenerNominaSocioeconomica(periodo_id?: number) {
+  async obtenerNominaSocioeconomica(
+    periodo_id?: number,
+    usuario?: Usuario,
+    supervisor_id?: number,
+  ) {
     let becarios_bd: Becario[] = [];
     if (this.becario_repo?.find) {
       try {
         becarios_bd = await this.becario_repo.find({
-          relations: { usuario: true },
+          relations: { usuario: true, supervisor: true },
           order: { id: 'ASC' },
         });
       } catch {
         becarios_bd = [];
+      }
+    }
+
+    const filtrar_por_mentor = esRolMentor(usuario?.rol) || Boolean(supervisor_id);
+    if (filtrar_por_mentor && becarios_bd.length > 0) {
+      const designados = await obtenerBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        supervisor_id ?? usuario?.id,
+        this.usuario_repo,
+      );
+      if (designados.length > 0) {
+        const ids_set = new Set(designados.map((d) => d.id));
+        becarios_bd = becarios_bd.filter((b) => ids_set.has(b.id));
+      } else {
+        const sup_id = supervisor_id ?? usuario?.id;
+        becarios_bd = becarios_bd.filter((b) => b.supervisor_id === sup_id);
       }
     }
 
@@ -2305,6 +2394,7 @@ export class EvaluacionesServicio {
         return {
           id: ev?.id || b.id || idx + 1,
           becario_id: b.id,
+          supervisor_id: b.supervisor_id ?? b.supervisor?.id ?? null,
           nombre_completo: b.nombre || b.usuario?.nombre || `Becario #${b.id}`,
           ci: b.ci || ref_sem2?.ci || 'S/N',
           universidad: b.universidad || ref_sem2?.universidad || 'Universidad Mayor de San Andrés',
@@ -2328,7 +2418,21 @@ export class EvaluacionesServicio {
       });
     }
 
-    return REGISTROS_CONSOLIDADO_SEM_II.map((r, idx) => {
+    let registros_fallback = REGISTROS_CONSOLIDADO_SEM_II;
+    if (filtrar_por_mentor) {
+      const { cis, nombres } = obtenerSemillaDesignadaMentor(
+        usuario,
+        supervisor_id ?? usuario?.id,
+      );
+      const filtrados_semilla = REGISTROS_CONSOLIDADO_SEM_II.filter(
+        (r) => cis.has(limpiarCi(r.ci)) || nombres.has(normalizarTextoMentor(r.nombre_completo)),
+      );
+      if (filtrados_semilla.length > 0) {
+        registros_fallback = filtrados_semilla;
+      }
+    }
+
+    return registros_fallback.map((r, idx) => {
       const puntaje_sobre_20 = r.socioeconomico;
       const puntaje_sobre_100 = Number(((puntaje_sobre_20 / 20) * 100).toFixed(1));
       const semaforo: 'verde' | 'amarillo' | 'rojo' =
@@ -2338,6 +2442,7 @@ export class EvaluacionesServicio {
       return {
         id: idx + 1,
         becario_id: idx + 1,
+        supervisor_id: supervisor_id ?? usuario?.id ?? null,
         nombre_completo: r.nombre_completo,
         ci: r.ci,
         universidad: r.universidad,
@@ -2835,7 +2940,11 @@ export class EvaluacionesServicio {
     return 'Reprobó y debe abandonar el programa';
   }
 
-  async obtenerConsolidadoSemestral(periodo?: string): Promise<{
+  async obtenerConsolidadoSemestral(
+    periodo?: string,
+    usuario?: Usuario,
+    supervisor_id?: number,
+  ): Promise<{
     periodo: string;
     total_becarios: number;
     criterios_oficiales: CriteriosOficiales;
@@ -2843,7 +2952,62 @@ export class EvaluacionesServicio {
     registros: RegistroConsolidadoSemestral[];
   }> {
     const periodo_nombre = periodo || 'II-2025';
-    const registros_copia = REGISTROS_CONSOLIDADO_SEM_II.map((r) => ({ ...r }));
+    let registros_copia: Array<RegistroConsolidadoSemestral & { becario_id?: number; supervisor_id?: number | null }> =
+      REGISTROS_CONSOLIDADO_SEM_II.map((r, idx) => ({
+        ...r,
+        becario_id: idx + 1,
+        supervisor_id: null,
+      }));
+
+    if (this.becario_repo?.find) {
+      try {
+        const becarios_bd = await this.becario_repo.find({
+          relations: { usuario: true, supervisor: true },
+        });
+        for (const reg of registros_copia) {
+          const ci_reg = limpiarCi(reg.ci);
+          const nom_reg = normalizarTextoMentor(reg.nombre_completo);
+          const match_b = becarios_bd.find(
+            (b) =>
+              (ci_reg && limpiarCi(b.ci) === ci_reg) ||
+              (nom_reg && normalizarTextoMentor(b.nombre || b.usuario?.nombre) === nom_reg),
+          );
+          if (match_b) {
+            reg.becario_id = match_b.id;
+            reg.supervisor_id = match_b.supervisor_id ?? match_b.supervisor?.id ?? null;
+          }
+        }
+      } catch {}
+    }
+
+    if (esRolMentor(usuario?.rol) || supervisor_id) {
+      const designados = await obtenerBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        supervisor_id ?? usuario?.id,
+        this.usuario_repo,
+      );
+      const { cis, nombres } = obtenerSemillaDesignadaMentor(
+        usuario,
+        supervisor_id ?? usuario?.id,
+      );
+      for (const d of designados) {
+        if (d.ci) cis.add(limpiarCi(d.ci));
+        if (d.nombre) nombres.add(normalizarTextoMentor(d.nombre));
+        if (d.usuario?.nombre) nombres.add(normalizarTextoMentor(d.usuario.nombre));
+      }
+
+      const filtrados = registros_copia.filter(
+        (r) => cis.has(limpiarCi(r.ci)) || nombres.has(normalizarTextoMentor(r.nombre_completo)),
+      );
+      if (filtrados.length > 0) {
+        const sup_id = supervisor_id ?? usuario?.id ?? null;
+        registros_copia = filtrados.map((r) => ({
+          ...r,
+          supervisor_id: r.supervisor_id ?? sup_id,
+        }));
+      }
+    }
 
     if (this.evaluacion_repo?.find) {
       try {
@@ -3062,7 +3226,18 @@ export class EvaluacionesServicio {
   async obtenerCasosPastorales(filtros?: {
     estado?: string;
     becario_id?: number;
+    usuario?: Usuario;
   }): Promise<any[]> {
+    let ids_mentor_permitidos: Set<number> | null = null;
+    if (esRolMentor(filtros?.usuario?.rol)) {
+      ids_mentor_permitidos = await obtenerIdsBecariosDesignadosMentor(
+        this.becario_repo,
+        filtros?.usuario,
+        filtros?.usuario?.id,
+        this.usuario_repo,
+      );
+    }
+
     if (this.caso_pastoral_repo) {
       try {
         const qb = this.caso_pastoral_repo
@@ -3079,7 +3254,10 @@ export class EvaluacionesServicio {
         }
 
         qb.orderBy('caso.created_at', 'DESC');
-        const casos = await qb.getMany();
+        let casos = await qb.getMany();
+        if (ids_mentor_permitidos && ids_mentor_permitidos.size > 0) {
+          casos = casos.filter((c) => ids_mentor_permitidos!.has(c.becario_id));
+        }
 
         if (casos.length > 0) {
           return casos;
@@ -3089,7 +3267,16 @@ export class EvaluacionesServicio {
       }
     }
 
-    const por_defecto = this.obtenerCasosPastoralesPorDefecto();
+    let por_defecto = this.obtenerCasosPastoralesPorDefecto();
+    if (esRolMentor(filtros?.usuario?.rol)) {
+      const { nombres } = obtenerSemillaDesignadaMentor(filtros?.usuario, filtros?.usuario?.id);
+      const filtrados = por_defecto.filter(
+        (c) =>
+          (ids_mentor_permitidos && ids_mentor_permitidos.has(c.becario_id)) ||
+          nombres.has(normalizarTextoMentor(c.becario?.nombre)),
+      );
+      por_defecto = filtrados;
+    }
     if (filtros?.estado && filtros.estado !== 'todos') {
       return por_defecto.filter((c) => c.estado === filtros.estado);
     }
@@ -3670,18 +3857,13 @@ export class EvaluacionesServicio {
   async obtenerBecariosAsignadosModulo3(usuario: Usuario, periodo_id?: number) {
     let becarios: Becario[] = [];
     if (this.becario_repo) {
-      if (usuario.rol === Rol.SUPERVISOR) {
-        becarios = await this.becario_repo.find({
-          where: { supervisor_id: usuario.id },
-          relations: { usuario: true, supervisor: true },
-          order: { nombre: 'ASC' },
-        });
-        if (becarios.length === 0) {
-          becarios = await this.becario_repo.find({
-            relations: { usuario: true, supervisor: true },
-            order: { nombre: 'ASC' },
-          });
-        }
+      if (esRolMentor(usuario?.rol)) {
+        becarios = await obtenerBecariosDesignadosMentor(
+          this.becario_repo,
+          usuario,
+          usuario.id,
+          this.usuario_repo,
+        );
       } else {
         becarios = await this.becario_repo.find({
           relations: { usuario: true, supervisor: true },
@@ -4048,6 +4230,21 @@ export class EvaluacionesServicio {
         if (becario) target_becario_id = becario.id;
       }
       if (!target_becario_id) target_becario_id = usuario.id;
+    } else if (esRolMentor(usuario?.rol) && this.becario_repo) {
+      const designados = await obtenerBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        usuario.id,
+        this.usuario_repo,
+      );
+      if (designados.length > 0) {
+        const match = target_becario_id
+          ? designados.find((d) => d.id === target_becario_id || d.usuario_id === target_becario_id)
+          : null;
+        target_becario_id = match ? match.id : designados[0].id;
+      } else if (!target_becario_id) {
+        target_becario_id = 1;
+      }
     } else if (target_becario_id && this.becario_repo) {
       const becario = await this.becario_repo.findOne({
         where: [{ id: target_becario_id }, { usuario_id: target_becario_id }],

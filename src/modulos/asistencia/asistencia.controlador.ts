@@ -143,11 +143,17 @@ export class AsistenciaControlador {
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
   @ApiOperation({
     summary: 'Listar multas institucionales por retraso',
-    description: 'Retorna todas las multas acumuladas por retrasos en Escuela de Líderes u otros eventos.',
+    description: 'Retorna todas las multas acumuladas por retrasos en Escuela de Líderes u otros eventos (filtradas por mentor si aplica).',
   })
   @ApiResponse({ status: 200, description: 'Catálogo de multas aplicadas.', type: [Multa] })
-  obtenerMultas(): Promise<Multa[]> {
-    return this.asistenciaServicio.obtenerMultas();
+  obtenerMultas(
+    @UsuarioActual() usuario?: Usuario,
+    @Query('supervisor_id') supervisor_id?: number,
+  ): Promise<Multa[]> {
+    return this.asistenciaServicio.obtenerMultas(
+      usuario,
+      supervisor_id ? Number(supervisor_id) : undefined,
+    );
   }
 
   @Get('multas/mis-multas')
@@ -182,7 +188,7 @@ export class AsistenciaControlador {
     @Query('mes') mes?: string,
   ) {
     const usuario_id = req?.user?.id || req?.user?.sub || usuario?.id;
-    return this.asistenciaServicio.obtenerExtractoMensual(usuario_id, mes, true);
+    return this.asistenciaServicio.obtenerExtractoMensual(usuario_id, mes, true, usuario);
   }
 
   @Get('extracto-mensual/:becario_id')
@@ -209,22 +215,23 @@ export class AsistenciaControlador {
   obtenerExtractoMensualPorBecario(
     @Param('becario_id', ParseIntPipe) becario_id: number,
     @Query('mes') mes?: string,
+    @UsuarioActual() usuario?: Usuario,
   ) {
-    return this.asistenciaServicio.obtenerExtractoMensual(becario_id, mes, false);
+    return this.asistenciaServicio.obtenerExtractoMensual(becario_id, mes, false, usuario);
   }
 
   @Get('mis-asistencias')
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @ApiOperation({
     summary: 'Consultar asistencias del becario autenticado',
-    description: 'Retorna el historial de marcaciones del becario en sesión.',
+    description: 'Retorna el historial de marcaciones del becario en sesión (o de los becarios designados si es mentor).',
   })
   @ApiResponse({ status: 200, description: 'Listado personal de asistencias.', type: [RegistroAsistencia] })
   obtenerMisAsistencias(
     @UsuarioActual() usuario: Usuario,
     @Query('becario_id') becario_id?: number,
   ): Promise<RegistroAsistencia[]> {
-    return this.asistenciaServicio.obtenerPorUsuario(usuario.id, becario_id);
+    return this.asistenciaServicio.obtenerPorUsuario(usuario.id, becario_id, usuario);
   }
 
   @Get('horas-mensuales')
@@ -237,15 +244,21 @@ export class AsistenciaControlador {
     status: 200,
     description: 'Resumen consolidado de horas trabajadas por mes.',
   })
-  obtenerHorasMensuales() {
-    return this.asistenciaServicio.obtenerHorasMensuales();
+  obtenerHorasMensuales(
+    @UsuarioActual() usuario?: Usuario,
+    @Query('supervisor_id') supervisor_id?: number,
+  ) {
+    return this.asistenciaServicio.obtenerHorasMensuales(
+      usuario,
+      supervisor_id ? Number(supervisor_id) : undefined,
+    );
   }
 
   @Get()
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
   @ApiOperation({
     summary: 'Listar registros de asistencia',
-    description: 'Retorna el historial consolidado de marcaciones de asistencia. Si el usuario autenticado es becario, filtra automáticamente sus registros para evitar error 403 Forbidden.',
+    description: 'Retorna el historial consolidado de marcaciones de asistencia. Si el usuario autenticado es becario o mentor, filtra automáticamente sus registros.',
   })
   @ApiResponse({
     status: 200,
@@ -258,18 +271,18 @@ export class AsistenciaControlador {
     @Query('tipo') tipo?: string,
     @Query('fecha_inicio') fecha_inicio?: string,
     @Query('fecha_fin') fecha_fin?: string,
+    @Query('supervisor_id') supervisor_id?: number,
   ): Promise<RegistroAsistencia[]> {
     if (usuario && usuario.rol === Rol.BECARIO) {
-      return this.asistenciaServicio.obtenerPorUsuario(usuario.id, becario_id);
-    }
-    if (becario_id) {
-      return this.asistenciaServicio.obtenerPorUsuario(usuario?.id, becario_id);
+      return this.asistenciaServicio.obtenerPorUsuario(usuario.id, becario_id, usuario);
     }
     return this.asistenciaServicio.obtenerTodos({
       tipo,
       fecha_inicio,
       fecha_fin,
-      becario_id,
+      becario_id: becario_id ? Number(becario_id) : undefined,
+      usuario,
+      supervisor_id: supervisor_id ? Number(supervisor_id) : undefined,
     });
   }
 }

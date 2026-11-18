@@ -18,6 +18,10 @@ import {
   RevisarSupervisorPasajeDto,
   AprobarAdminPasajeDto,
 } from './dtos/revisar-solicitud-pasaje.dto';
+import {
+  esRolMentor,
+  obtenerIdsBecariosDesignadosMentor,
+} from '../../utilidades/filtro-mentor.utilidad';
 
 export interface CalculoReembolsoPasajes {
   monto_total: number;
@@ -456,6 +460,7 @@ export class PasajesServicio {
 
     return {
       ...s,
+      supervisor_id: s.becario?.supervisor_id ?? s.supervisor_id ?? null,
       monto_total,
       monto_devolucion,
       multas_asistencia_bs,
@@ -475,23 +480,55 @@ export class PasajesServicio {
     } as unknown as SolicitudPasajes;
   }
 
-  async listarSolicitudes(): Promise<SolicitudPasajes[]> {
-    return this.obtenerTodas();
+  async listarSolicitudes(usuario?: Usuario, supervisor_id?: number): Promise<SolicitudPasajes[]> {
+    return this.obtenerTodas(usuario, supervisor_id);
   }
 
-  async obtenerMisSolicitudes(id_referencia: number): Promise<SolicitudPasajes[]> {
-    return this.obtenerPorBecario(id_referencia);
+  async obtenerSolicitudesPendientes(
+    usuario?: Usuario,
+    supervisor_id?: number,
+  ): Promise<SolicitudPasajes[]> {
+    const todas = await this.obtenerTodas(usuario, supervisor_id);
+    return todas.filter(
+      (s) =>
+        s.estado === EstadoSolicitud.PENDIENTE ||
+        s.estado === EstadoSolicitud.REVISADO_SUPERVISOR,
+    );
   }
 
-  async obtenerSolicitudesPorBecario(id_referencia: number): Promise<SolicitudPasajes[]> {
-    return this.obtenerPorBecario(id_referencia);
+  async obtenerMisSolicitudes(id_referencia: number, usuario?: Usuario): Promise<SolicitudPasajes[]> {
+    if (esRolMentor(usuario?.rol)) {
+      return this.obtenerTodas(usuario);
+    }
+    return this.obtenerPorBecario(id_referencia, usuario);
   }
 
-  async obtenerTodas(): Promise<SolicitudPasajes[]> {
-    const solicitudes = await this.solicitudRepositorio.find({
-      relations: { recorridos: true, becario: { usuario: true } },
+  async obtenerSolicitudesPorBecario(id_referencia: number, usuario?: Usuario): Promise<SolicitudPasajes[]> {
+    return this.obtenerPorBecario(id_referencia, usuario);
+  }
+
+  async obtenerTodas(usuario?: Usuario, supervisor_id?: number): Promise<SolicitudPasajes[]> {
+    let solicitudes = await this.solicitudRepositorio.find({
+      relations: { recorridos: true, becario: { usuario: true, supervisor: true, lugar_practica: true } },
       order: { id: 'DESC' },
     });
+
+    if (esRolMentor(usuario?.rol) || supervisor_id) {
+      const ids_permitidos = await obtenerIdsBecariosDesignadosMentor(
+        this.becarioRepositorio,
+        usuario,
+        supervisor_id ?? usuario?.id,
+      );
+      if (ids_permitidos.size > 0) {
+        solicitudes = solicitudes.filter((s) => ids_permitidos.has(s.becario_id));
+      } else {
+        const sup_id = supervisor_id ?? usuario?.id;
+        solicitudes = solicitudes.filter(
+          (s) => (s.becario?.supervisor_id ?? s.supervisor_id) === sup_id,
+        );
+      }
+    }
+
     const mapa_multas = await this.obtenerMapaMultasVigentes();
     return solicitudes.map((s) =>
       this.mapearSolicitudConMultas(s, mapa_multas.get(s.becario_id) || 0),
@@ -501,7 +538,7 @@ export class PasajesServicio {
   async obtenerPorId(id: number): Promise<SolicitudPasajes> {
     const solicitud = await this.solicitudRepositorio.findOne({
       where: { id },
-      relations: { recorridos: true, becario: { usuario: true } },
+      relations: { recorridos: true, becario: { usuario: true, supervisor: true } },
     });
     if (!solicitud) {
       throw new NotFoundException(`Solicitud de pasaje con ID ${id} no encontrada.`);
@@ -515,14 +552,25 @@ export class PasajesServicio {
     );
   }
 
-  async obtenerPorBecario(id_referencia: number): Promise<SolicitudPasajes[]> {
+  async obtenerPorBecario(id_referencia: number, usuario?: Usuario): Promise<SolicitudPasajes[]> {
     const becario_id_real = await this.resolverBecarioId(id_referencia);
+    if (esRolMentor(usuario?.rol)) {
+      const ids_permitidos = await obtenerIdsBecariosDesignadosMentor(
+        this.becarioRepositorio,
+        usuario,
+        usuario?.id,
+      );
+      if (ids_permitidos.size > 0 && !ids_permitidos.has(becario_id_real)) {
+        return [];
+      }
+    }
+
     const solicitudes = await this.solicitudRepositorio.find({
       where: [
         { becario_id: becario_id_real },
         { becario: { usuario_id: id_referencia } },
       ],
-      relations: { recorridos: true },
+      relations: { recorridos: true, becario: { usuario: true, supervisor: true } },
       order: { created_at: 'DESC' },
     });
     const mapa_multas = await this.obtenerMapaMultasVigentes([becario_id_real, id_referencia]);
@@ -671,9 +719,25 @@ export class PasajesServicio {
     ciudad?: string;
     usuario_autenticado?: Usuario;
   }) {
+    let ids_mentor_permitidos: Set<number> | null = null;
     if (filtros.usuario_autenticado && filtros.usuario_autenticado.rol === Rol.BECARIO) {
       const becario_id_real = await this.resolverBecarioId(filtros.usuario_autenticado.id);
       filtros.becario_id = becario_id_real;
+    } else if (esRolMentor(filtros.usuario_autenticado?.rol)) {
+      ids_mentor_permitidos = await obtenerIdsBecariosDesignadosMentor(
+        this.becarioRepositorio,
+        filtros.usuario_autenticado,
+        filtros.usuario_autenticado?.id,
+      );
+      if (filtros.becario_id && ids_mentor_permitidos.size > 0 && !ids_mentor_permitidos.has(filtros.becario_id)) {
+        return {
+          total_recorridos: 0,
+          total_gastado_bs: 0,
+          total_devolucion_bs: 0,
+          paradas_mas_frecuentes: [],
+          recorridos: [],
+        };
+      }
     }
 
     let recorridos_db: Recorrido[] = [];
@@ -706,6 +770,12 @@ export class PasajesServicio {
 
       qb.orderBy('recorrido.fecha', 'DESC').addOrderBy('recorrido.id', 'DESC');
       recorridos_db = await qb.getMany();
+      if (ids_mentor_permitidos && ids_mentor_permitidos.size > 0) {
+        recorridos_db = recorridos_db.filter((r) => {
+          const b_id = r.solicitud?.becario_id ?? r.solicitud?.becario?.id;
+          return b_id ? ids_mentor_permitidos!.has(b_id) : false;
+        });
+      }
     }
 
     const nombres_dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -753,8 +823,9 @@ export class PasajesServicio {
       return {
         id: r.id,
         solicitud_id: r.solicitud_id,
-        becario_nombre: r.solicitud?.becario?.usuario?.nombre || 'Becario Institucional',
+        becario_nombre: r.solicitud?.becario?.usuario?.nombre || r.solicitud?.becario?.nombre || 'Becario Institucional',
         becario_id: r.solicitud?.becario_id,
+        supervisor_id: r.solicitud?.becario?.supervisor_id ?? r.solicitud?.supervisor_id ?? null,
         fecha: fecha_fmt,
         dia_semana: dia_str,
         tramo: tramo_str,
@@ -822,6 +893,41 @@ export class PasajesServicio {
       const id_sesion = parametros.usuario_autenticado.id;
       if (becario && becario.usuario_id && becario.usuario_id !== id_sesion && becario.id !== id_sesion) {
         throw new BadRequestException('No tiene autorización para consultar el historial de paradas de otro estudiante.');
+      }
+    } else if (esRolMentor(parametros.usuario_autenticado?.rol) && becario) {
+      const ids_permitidos = await obtenerIdsBecariosDesignadosMentor(
+        this.becarioRepositorio,
+        parametros.usuario_autenticado,
+        parametros.usuario_autenticado?.id,
+      );
+      if (ids_permitidos.size > 0 && !ids_permitidos.has(becario.id)) {
+        return {
+          becario: {
+            id: becario.id,
+            nombre: becario.usuario?.nombre || becario.nombre || `Estudiante BUMAND #${becario.id}`,
+            ci: becario.ci || '—',
+            carrera: becario.carrera || 'Contabilidad',
+            universidad: becario.universidad || 'Universidad Mayor de San Andrés',
+            sede: becario.lugar_practica?.nombre || 'Oficina Central',
+          },
+          intervalo: {
+            fecha_inicio: parametros.fecha_inicio || null,
+            fecha_fin: parametros.fecha_fin || null,
+            dias_filtrados: 0,
+          },
+          resumen: {
+            total_recorridos: 0,
+            total_paradas_registradas: 0,
+            gasto_total_bs: 0,
+            devolucion_80_bs: 0,
+            multas_asistencia_bs: 0,
+            multas_asistencia_centavos: 0,
+            monto_liquido_pagable: 0,
+            monto_liquido_pagable_centavos: 0,
+            paradas_unicas_frecuentes: [],
+          },
+          historial: [],
+        };
       }
     }
 
@@ -1232,7 +1338,7 @@ export class PasajesServicio {
         nombre:
           becario?.usuario?.nombre || becario?.nombre || `Estudiante BUMAND #${parametros.id_estudiante}`,
         ci: becario?.ci || '9943280 LP',
-        carrera: becario?.carrera || 'Auditoría / Contabilidad',
+        carrera: becario?.carrera || 'Contabilidad y Finanzas',
         universidad: becario?.universidad || 'Universidad Mayor de San Andrés',
         sede:
           becario?.lugar_practica?.nombre || (becario as any)?.ubicacion || 'Oficina Central Bloque A',

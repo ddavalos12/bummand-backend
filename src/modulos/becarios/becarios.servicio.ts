@@ -11,6 +11,11 @@ import { ActualizarConfiguracionPasajesDto } from './dtos/actualizar-configuraci
 import { Iglesia } from '../iglesias/entidades/iglesia.entidad';
 import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.entidad';
 import { hashearContrasena } from '../../utilidades/hash.utilidad';
+import {
+  esRolMentor,
+  obtenerBecariosDesignadosMentor,
+  obtenerIdsBecariosDesignadosMentor,
+} from '../../utilidades/filtro-mentor.utilidad';
 import { ExcepcionBumand } from '../../nucleo/errores/excepcion-bumand';
 import { CODIGOS_ERROR } from '../../nucleo/errores/codigos-error.constante';
 
@@ -121,11 +126,29 @@ export class BecariosServicio {
       .leftJoinAndSelect('becario.iglesia', 'iglesia')
       .orderBy('becario.id', 'ASC');
 
-    if (usuario.rol === Rol.SUPERVISOR) {
+    if (esRolMentor(usuario?.rol)) {
       query.where('becario.supervisor_id = :id', { id: usuario.id });
     }
 
-    return query.getMany();
+    const lista = await query.getMany();
+
+    if (
+      esRolMentor(usuario?.rol) &&
+      (lista.length === 0 || lista.length >= 15) &&
+      typeof this.becarioRepositorio.find === 'function'
+    ) {
+      const designados = await obtenerBecariosDesignadosMentor(
+        this.becarioRepositorio,
+        usuario,
+        usuario.id,
+        this.usuarioRepositorio,
+      );
+      if (designados.length > 0) {
+        return designados;
+      }
+    }
+
+    return lista;
   }
 
   async obtener(id: number, usuario: Usuario): Promise<Becario> {
@@ -136,8 +159,19 @@ export class BecariosServicio {
 
     if (!becario) throw new NotFoundException('Becario no encontrado');
 
-    if (usuario.rol === Rol.SUPERVISOR && becario.supervisor?.id !== usuario.id) {
-      throw new NotFoundException('Becario no encontrado'); // No revelar si existe
+    if (esRolMentor(usuario?.rol)) {
+      const sup_id = becario.supervisor?.id ?? becario.supervisor_id;
+      if (sup_id !== usuario.id) {
+        const ids_mentor = await obtenerIdsBecariosDesignadosMentor(
+          this.becarioRepositorio,
+          usuario,
+          usuario.id,
+          this.usuarioRepositorio,
+        );
+        if (!ids_mentor.has(becario.id)) {
+          throw new NotFoundException('Becario no encontrado'); // No revelar si existe
+        }
+      }
     }
 
     return becario;

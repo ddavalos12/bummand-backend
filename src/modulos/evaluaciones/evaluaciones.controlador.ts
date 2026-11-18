@@ -189,22 +189,32 @@ export class EvaluacionesControlador {
   @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get('academica/pendientes-supervisor')
   @ApiOperation({
-    summary: 'Listar evaluaciones académicas asignadas al supervisor para pre-evaluación',
+    summary: 'Listar evaluaciones académicas asignadas al mentor para pre-evaluación',
   })
   obtenerPendientesSupervisor(
     @UsuarioActual() usuario: Usuario,
     @Query('periodo_id') periodo_id?: number,
   ) {
-    return this.evaluaciones_servicio.obtenerPendientesSupervisor(usuario.id, periodo_id ? Number(periodo_id) : undefined);
+    return this.evaluaciones_servicio.obtenerPendientesSupervisor(
+      usuario.id,
+      periodo_id ? Number(periodo_id) : undefined,
+      usuario,
+    );
   }
 
-  @Roles(Rol.ADMINISTRADOR)
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get('academica/pendientes-administracion')
   @ApiOperation({
-    summary: 'Listar evaluaciones académicas en proceso para administración',
+    summary: 'Listar evaluaciones académicas en proceso para administración (o mentor)',
   })
-  obtenerPendientesAdministracion(@Query('periodo_id') periodo_id?: number) {
-    return this.evaluaciones_servicio.obtenerPendientesAdministracion(periodo_id ? Number(periodo_id) : undefined);
+  obtenerPendientesAdministracion(
+    @Query('periodo_id') periodo_id?: number,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.evaluaciones_servicio.obtenerPendientesAdministracion(
+      periodo_id ? Number(periodo_id) : undefined,
+      usuario,
+    );
   }
 
   @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
@@ -306,11 +316,19 @@ export class EvaluacionesControlador {
   @Get('consolidado-semestral')
   @ApiOperation({
     summary: 'Obtener consolidado y matriz semestral de evaluaciones',
-    description: 'Retorna los criterios oficiales (23.jpeg), rangos de aprobación y la nómina completa de 21 becarios con notas y comentarios de Evaluacion_semestre_II.',
+    description: 'Retorna los criterios oficiales, rangos de aprobación y la nómina de becarios con notas y comentarios (filtrada por mentor si aplica).',
   })
   @ApiResponse({ status: 200, description: 'Consolidado semestral obtenido con éxito.' })
-  obtenerConsolidadoSemestral(@Query('periodo') periodo?: string) {
-    return this.evaluaciones_servicio.obtenerConsolidadoSemestral(periodo);
+  obtenerConsolidadoSemestral(
+    @Query('periodo') periodo?: string,
+    @UsuarioActual() usuario?: Usuario,
+    @Query('supervisor_id') supervisor_id?: number,
+  ) {
+    return this.evaluaciones_servicio.obtenerConsolidadoSemestral(
+      periodo,
+      usuario,
+      supervisor_id ? Number(supervisor_id) : undefined,
+    );
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
@@ -345,13 +363,19 @@ export class EvaluacionesControlador {
   @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get('socioeconomica/nomina')
   @ApiOperation({
-    summary: 'Obtener nómina completa de becarios para Evaluación Socioeconómica (Módulo 5)',
-    description: 'Retorna todos los becarios con su puntaje sobre 20 y 100, semáforo, estado, respuestas detalladas y convalidación.',
+    summary: 'Obtener nómina de becarios para Evaluación Socioeconómica (Módulo 5)',
+    description: 'Retorna los becarios con su puntaje sobre 20 y 100, semáforo, estado, respuestas detalladas y convalidación (filtrada por mentor si aplica).',
   })
   @ApiQuery({ name: 'periodo_id', required: false, type: Number })
-  obtenerNominaSocioeconomica(@Query('periodo_id') periodo_id?: number) {
+  obtenerNominaSocioeconomica(
+    @Query('periodo_id') periodo_id?: number,
+    @UsuarioActual() usuario?: Usuario,
+    @Query('supervisor_id') supervisor_id?: number,
+  ) {
     return this.evaluaciones_servicio.obtenerNominaSocioeconomica(
       periodo_id ? Number(periodo_id) : undefined,
+      usuario,
+      supervisor_id ? Number(supervisor_id) : undefined,
     );
   }
 
@@ -418,11 +442,17 @@ export class EvaluacionesControlador {
   @Get()
   @ApiOperation({
     summary: 'Listar todas las evaluaciones',
-    description: 'Retorna todas las evaluaciones semestrales registradas en el sistema.',
+    description: 'Retorna las evaluaciones semestrales registradas en el sistema (filtradas por mentor si aplica).',
   })
   @ApiResponse({ status: 200, description: 'Listado de evaluaciones.', type: [Evaluacion] })
-  obtenerTodas() {
-    return this.evaluaciones_servicio.obtenerTodas();
+  obtenerTodas(
+    @UsuarioActual() usuario?: Usuario,
+    @Query('supervisor_id') supervisor_id?: number,
+  ) {
+    return this.evaluaciones_servicio.obtenerTodas(
+      usuario,
+      supervisor_id ? Number(supervisor_id) : undefined,
+    );
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
@@ -496,10 +526,12 @@ export class EvaluacionesControlador {
   obtenerCasosPastorales(
     @Query('estado') estado?: string,
     @Query('becario_id') becario_id?: number,
+    @UsuarioActual() usuario?: Usuario,
   ) {
     return this.evaluaciones_servicio.obtenerCasosPastorales({
       estado,
       becario_id: becario_id ? Number(becario_id) : undefined,
+      usuario,
     });
   }
 
@@ -558,22 +590,34 @@ export class EvaluacionesControlador {
   @Get('f03/nomina')
   @ApiOperation({
     summary: 'Nómina de becarios y estado de su evaluación F-03',
-    description: 'Devuelve la lista de todos los becarios activos junto con los datos de su evaluación F-03.',
+    description: 'Devuelve la lista de becarios activos junto con los datos de su evaluación F-03 (filtrada por mentor si aplica).',
   })
   @ApiResponse({ status: 200, description: 'Nómina F-03 de becarios.' })
-  obtenerNominaF03() {
-    return this.evaluaciones_servicio.obtenerNominaF03();
+  obtenerNominaF03(
+    @UsuarioActual() usuario?: Usuario,
+    @Query('supervisor_id') supervisor_id?: number,
+  ) {
+    return this.evaluaciones_servicio.obtenerNominaF03(
+      usuario,
+      supervisor_id ? Number(supervisor_id) : undefined,
+    );
   }
 
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
   @Get('f03')
   @ApiOperation({
     summary: 'Listado general de evaluaciones pastorales F-03',
-    description: 'Retorna la nómina completa de becarios con sus formularios F-03 y 13 respuestas.',
+    description: 'Retorna la nómina de becarios con sus formularios F-03 y 13 respuestas (filtrada por mentor si aplica).',
   })
   @ApiResponse({ status: 200, description: 'Nómina F-03 de becarios.' })
-  obtenerF03General() {
-    return this.evaluaciones_servicio.obtenerNominaF03();
+  obtenerF03General(
+    @UsuarioActual() usuario?: Usuario,
+    @Query('supervisor_id') supervisor_id?: number,
+  ) {
+    return this.evaluaciones_servicio.obtenerNominaF03(
+      usuario,
+      supervisor_id ? Number(supervisor_id) : undefined,
+    );
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)

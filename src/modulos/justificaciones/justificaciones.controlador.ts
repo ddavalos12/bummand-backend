@@ -5,6 +5,7 @@ import {
   Patch,
   Body,
   Param,
+  Query,
   ParseIntPipe,
   UseGuards,
   UseInterceptors,
@@ -111,14 +112,37 @@ export class JustificacionesControlador {
   }
 
   @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('pendientes-supervisor')
+  @ApiOperation({
+    summary: 'Listar justificaciones pendientes de revisión para el mentor',
+    description: 'Retorna las justificaciones de los becarios designados al mentor autenticado.',
+  })
+  @ApiResponse({ status: 200, description: 'Listado de justificaciones del mentor.', type: [Justificacion] })
+  listarPendientesSupervisor(
+    @UsuarioActual() usuario: Usuario,
+    @Query('supervisor_id') supervisor_id?: number,
+  ): Promise<Justificacion[]> {
+    return this.justificaciones_servicio.listarPendientesSupervisor(
+      usuario,
+      supervisor_id ? Number(supervisor_id) : undefined,
+    );
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get()
   @ApiOperation({
     summary: 'Listar todas las justificaciones',
-    description: 'Permite a supervisores y administradores consultar la bandeja integral de justificaciones radicadas.',
+    description: 'Permite a mentores y administradores consultar la bandeja de justificaciones radicadas (filtrada por mentor si aplica).',
   })
   @ApiResponse({ status: 200, description: 'Listado completo de justificaciones.', type: [Justificacion] })
-  obtenerTodas(): Promise<Justificacion[]> {
-    return this.justificaciones_servicio.obtenerTodas();
+  obtenerTodas(
+    @UsuarioActual() usuario?: Usuario,
+    @Query('supervisor_id') supervisor_id?: number,
+  ): Promise<Justificacion[]> {
+    return this.justificaciones_servicio.obtenerTodas(
+      usuario,
+      supervisor_id ? Number(supervisor_id) : undefined,
+    );
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
@@ -129,7 +153,7 @@ export class JustificacionesControlador {
   })
   @ApiResponse({ status: 200, description: 'Historial de justificaciones del usuario.', type: [Justificacion] })
   obtenerMisJustificaciones(@UsuarioActual() usuario: Usuario): Promise<Justificacion[]> {
-    return this.justificaciones_servicio.obtenerPorBecario(usuario.id);
+    return this.justificaciones_servicio.obtenerPorBecario(usuario.id, usuario);
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)

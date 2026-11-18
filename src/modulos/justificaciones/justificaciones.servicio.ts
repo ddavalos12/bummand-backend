@@ -21,9 +21,13 @@ import {
   RevisarSupervisorJustificacionDto,
   AprobarAdminJustificacionDto,
 } from './dtos/revisar-justificacion.dto';
-import { Rol } from '../usuarios/entidades/usuario.entidad';
+import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
 import { NotificacionesServicio } from '../notificaciones/notificaciones.servicio';
+import {
+  esRolMentor,
+  obtenerIdsBecariosDesignadosMentor,
+} from '../../utilidades/filtro-mentor.utilidad';
 
 @Injectable()
 export class JustificacionesServicio {
@@ -132,17 +136,57 @@ export class JustificacionesServicio {
     return guardada;
   }
 
-  async obtenerTodas(): Promise<Justificacion[]> {
-    return this.justificacion_repo.find({
-      relations: { becario: { usuario: true, lugar_practica: true }, supervisor: true },
+  async listarTodas(usuario?: Usuario, supervisor_id?: number): Promise<Justificacion[]> {
+    return this.obtenerTodas(usuario, supervisor_id);
+  }
+
+  async listarPendientesSupervisor(
+    usuario?: Usuario,
+    supervisor_id?: number,
+  ): Promise<Justificacion[]> {
+    const todas = await this.obtenerTodas(usuario, supervisor_id);
+    return todas.filter(
+      (j) =>
+        j.estado === EstadoJustificacion.PENDIENTE ||
+        j.estado === EstadoJustificacion.REVISADO_SUPERVISOR,
+    );
+  }
+
+  async obtenerTodas(usuario?: Usuario, supervisor_id?: number): Promise<Justificacion[]> {
+    let justificaciones = await this.justificacion_repo.find({
+      relations: {
+        becario: { usuario: true, lugar_practica: true, supervisor: true },
+        supervisor: true,
+      },
       order: { created_at: 'DESC' },
     });
+
+    if (esRolMentor(usuario?.rol) || supervisor_id) {
+      const ids_permitidos = await obtenerIdsBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        supervisor_id ?? usuario?.id,
+      );
+      if (ids_permitidos.size > 0) {
+        justificaciones = justificaciones.filter((j) => ids_permitidos.has(j.becario_id));
+      } else {
+        const sup_id = supervisor_id ?? usuario?.id;
+        justificaciones = justificaciones.filter(
+          (j) => (j.becario?.supervisor_id ?? j.supervisor_id) === sup_id,
+        );
+      }
+    }
+
+    return justificaciones;
   }
 
   async obtenerPorId(id: number): Promise<Justificacion> {
     const justificacion = await this.justificacion_repo.findOne({
       where: { id },
-      relations: { becario: { usuario: true, lugar_practica: true }, supervisor: true },
+      relations: {
+        becario: { usuario: true, lugar_practica: true, supervisor: true },
+        supervisor: true,
+      },
     });
 
     if (!justificacion) {
@@ -152,7 +196,11 @@ export class JustificacionesServicio {
     return justificacion;
   }
 
-  async obtenerPorBecario(identificador: number): Promise<Justificacion[]> {
+  async obtenerPorBecario(identificador: number, usuario?: Usuario): Promise<Justificacion[]> {
+    if (esRolMentor(usuario?.rol)) {
+      return this.obtenerTodas(usuario);
+    }
+
     let becario_id = identificador;
     if (this.becario_repo) {
       let becario = await this.becario_repo.findOne({
@@ -170,7 +218,10 @@ export class JustificacionesServicio {
 
     return this.justificacion_repo.find({
       where: { becario_id },
-      relations: { becario: { usuario: true, lugar_practica: true }, supervisor: true },
+      relations: {
+        becario: { usuario: true, lugar_practica: true, supervisor: true },
+        supervisor: true,
+      },
       order: { created_at: 'DESC' },
     });
   }

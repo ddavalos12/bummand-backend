@@ -103,7 +103,7 @@ export class PasajesControlador {
     return this.pasajesServicio.sembrarParadas();
   }
 
-  @Roles(Rol.BECARIO)
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get('mis-solicitudes')
   @ApiOperation({
     summary: 'Listar solicitudes de pasajes del usuario autenticado',
@@ -111,7 +111,7 @@ export class PasajesControlador {
   })
   @ApiResponse({ status: 200, description: 'Historial de solicitudes del usuario autenticado.', type: [SolicitudPasajes] })
   obtenerMisSolicitudes(@UsuarioActual() usuario: Usuario): Promise<SolicitudPasajes[]> {
-    return this.pasajesServicio.obtenerPorBecario(usuario.id);
+    return this.pasajesServicio.obtenerMisSolicitudes(usuario.id, usuario);
   }
 
   @Roles(Rol.BECARIO)
@@ -197,19 +197,45 @@ export class PasajesControlador {
   })
   @ApiParam({ name: 'becario_id', description: 'Identificador del becario', type: Number, example: 1 })
   @ApiResponse({ status: 200, description: 'Historial de solicitudes del becario.', type: [SolicitudPasajes] })
-  obtenerPorBecario(@Param('becario_id', ParseIntPipe) becario_id: number): Promise<SolicitudPasajes[]> {
-    return this.pasajesServicio.obtenerPorBecario(becario_id);
+  obtenerPorBecario(
+    @Param('becario_id', ParseIntPipe) becario_id: number,
+    @UsuarioActual() usuario?: Usuario,
+  ): Promise<SolicitudPasajes[]> {
+    return this.pasajesServicio.obtenerPorBecario(becario_id, usuario);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('pendientes')
+  @ApiOperation({
+    summary: 'Listar solicitudes de pasajes pendientes',
+    description: 'Retorna las solicitudes de pasajes pendientes filtradas por mentor si aplica.',
+  })
+  @ApiResponse({ status: 200, description: 'Listado de solicitudes pendientes.', type: [SolicitudPasajes] })
+  obtenerSolicitudesPendientes(
+    @UsuarioActual() usuario?: Usuario,
+    @Query('supervisor_id') supervisor_id?: number,
+  ): Promise<SolicitudPasajes[]> {
+    return this.pasajesServicio.obtenerSolicitudesPendientes(
+      usuario,
+      supervisor_id ? Number(supervisor_id) : undefined,
+    );
   }
 
   @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get()
   @ApiOperation({
     summary: 'Listar todas las solicitudes de pasajes',
-    description: 'Retorna el catálogo completo de solicitudes de viáticos para revisión y auditoría.',
+    description: 'Retorna el catálogo completo de solicitudes de viáticos para revisión y auditoría (filtrado por mentor si aplica).',
   })
   @ApiResponse({ status: 200, description: 'Listado de solicitudes.', type: [SolicitudPasajes] })
-  obtenerTodas(): Promise<SolicitudPasajes[]> {
-    return this.pasajesServicio.obtenerTodas();
+  obtenerTodas(
+    @UsuarioActual() usuario?: Usuario,
+    @Query('supervisor_id') supervisor_id?: number,
+  ): Promise<SolicitudPasajes[]> {
+    return this.pasajesServicio.obtenerTodas(
+      usuario,
+      supervisor_id ? Number(supervisor_id) : undefined,
+    );
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)

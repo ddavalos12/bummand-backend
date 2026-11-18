@@ -7,6 +7,8 @@ import {
   RevisarSupervisorPracticasDto,
   AprobarAdminPracticasDto,
 } from './dtos/revisar-aprobacion-practicas.dto';
+import { Usuario } from '../usuarios/entidades/usuario.entidad';
+import { esRolMentor } from '../../utilidades/filtro-mentor.utilidad';
 
 @Injectable()
 export class PracticasServicio {
@@ -24,14 +26,25 @@ export class PracticasServicio {
     return this.aprobacion_repo.save(aprobacion);
   }
 
-  async listar(): Promise<AprobacionPracticas[]> {
-    return this.aprobacion_repo.find({
+  async listar(usuario?: Usuario): Promise<AprobacionPracticas[]> {
+    const lista = await this.aprobacion_repo.find({
       relations: {
-        becario: { usuario: true },
+        becario: { usuario: true, supervisor: true },
         supervisor: true,
       },
       order: { id: 'DESC' },
     });
+
+    if (esRolMentor(usuario?.rol) && usuario?.id) {
+      return lista.filter(
+        (a) =>
+          a.supervisor_id === usuario.id ||
+          a.becario?.supervisor_id === usuario.id ||
+          a.becario?.supervisor?.id === usuario.id,
+      );
+    }
+
+    return lista;
   }
 
   async obtenerPorBecario(becario_id: number): Promise<AprobacionPracticas[]> {

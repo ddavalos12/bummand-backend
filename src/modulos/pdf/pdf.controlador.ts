@@ -251,8 +251,8 @@ export class PdfControlador {
 
   @Get('refrigerios/consolidado')
   @ApiOperation({
-    summary: 'Generar y descargar informe consolidado de refrigerios en PDF para auditoría',
-    description: 'Genera el PDF con el resumen institucional de los refrigerios del intervalo con desglose de duplas, montos y becarios receptores.',
+    summary: 'Generar y descargar formulario consolidado de refrigerios en PDF para Contabilidad y SRD',
+    description: 'Genera el PDF con el resumen institucional para Contabilidad y SRD de los refrigerios del intervalo con desglose de duplas, montos y becarios receptores.',
   })
   @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
   @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
@@ -279,7 +279,7 @@ export class PdfControlador {
 
   @Get('refrigerios/:id')
   @ApiOperation({
-    summary: 'Generar y descargar planilla oficial de refrigerio en PDF (TAREA-07, TAREA-15)',
+    summary: 'Generar y descargar planilla oficial de refrigerio en PDF para Contabilidad y SRD (TAREA-07, TAREA-15)',
     description: 'Renderiza mediante Puppeteer la planilla oficial con membrete Diaconía, los 2 becarios de la dupla, ingredientes, devolución al 100% y becario receptor único.',
   })
   @ApiParam({ name: 'id', description: 'ID del refrigerio', type: String, example: '1' })
@@ -303,8 +303,8 @@ export class PdfControlador {
 
   @Get('refrigerios')
   @ApiOperation({
-    summary: 'Generar reporte de refrigerios en PDF con intervalo de fechas (TAREA-07, TAREA-08)',
-    description: 'Genera el reporte consolidado de refrigerios por intervalo de auditoría.',
+    summary: 'Generar formulario de refrigerios en PDF para Contabilidad y SRD con intervalo de fechas (TAREA-07, TAREA-08)',
+    description: 'Genera el formulario consolidado de refrigerios para Contabilidad y SRD.',
   })
   @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
   @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
@@ -329,15 +329,15 @@ export class PdfControlador {
     respuesta.end(resultado.bufer);
   }
 
-  @Get('consolidado-auditoria')
+  @Get(['consolidado-auditoria', 'consolidado-contabilidad', 'formulario-contabilidad'])
   @ApiOperation({
-    summary: 'Generar informe consolidado global de auditoría institucional en PDF (TAREA-08)',
-    description: 'Consolida horas de asistencia, liquidación de pasajes (80%) y reembolsos de refrigerio (100%) por intervalo de fechas.',
+    summary: 'Generar Formulario para Contabilidad y SRD consolidado en PDF (TAREA-08)',
+    description: 'Consolida horas de asistencia, liquidación de pasajes (80%) descontando multas y reembolsos de refrigerio (100%) para Contabilidad y SRD por intervalo de fechas.',
   })
   @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
   @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
   @ApiProduces('application/pdf')
-  @ApiResponse({ status: 200, description: 'Archivo binario del consolidado de auditoría en PDF descargado.' })
+  @ApiResponse({ status: 200, description: 'Archivo binario del Formulario para Contabilidad y SRD en PDF descargado.' })
   async generarConsolidadoAuditoria(
     @Query('fecha_inicio') fecha_inicio: string | undefined,
     @Query('fecha_fin') fecha_fin: string | undefined,
@@ -359,8 +359,8 @@ export class PdfControlador {
 
   @Get('pasajes-general')
   @ApiOperation({
-    summary: 'Generar y descargar informe consolidado general de pasajes en PDF (TAREA-07, TAREA-01)',
-    description: 'Genera el PDF oficial de auditoría de recorridos y solicitud de pasajes con detalle de tramos, calles declaradas (origen -> calles -> destino) y liquidación del 80%.',
+    summary: 'Generar y descargar Formulario para Contabilidad y SRD de pasajes en PDF (TAREA-07, TAREA-01)',
+    description: 'Genera el Formulario para Contabilidad y SRD de recorridos y solicitud de pasajes con detalle de tramos, calles declaradas (origen -> calles -> destino), liquidación del 80% y descuento de multas.',
   })
   @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
   @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })

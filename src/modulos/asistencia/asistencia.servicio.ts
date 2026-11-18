@@ -16,6 +16,12 @@ import { Evento, TipoEvento, EstadoEvento } from '../eventos/entidades/evento.en
 import { NotificacionesServicio } from '../notificaciones/notificaciones.servicio';
 import { calcularDistanciaMetros } from '../../utilidades/geo.utilidad';
 import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
+import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
+import {
+  esRolMentor,
+  obtenerBecariosDesignadosMentor,
+  obtenerIdsBecariosDesignadosMentor,
+} from '../../utilidades/filtro-mentor.utilidad';
 
 const MARGEN_GPS_MAXIMO_M = 10;
 export const META_HORAS_SEMANAL = 9;
@@ -644,12 +650,28 @@ export class AsistenciaServicio {
     };
   }
 
-  async obtenerMultas(): Promise<Multa[]> {
+  async obtenerMultas(usuario?: Usuario, supervisor_id?: number): Promise<Multa[]> {
     if (!this.multaRepositorio) return [];
-    return this.multaRepositorio.find({
-      relations: { becario: { usuario: true }, asistencia: true },
+    let multas = await this.multaRepositorio.find({
+      relations: { becario: { usuario: true, supervisor: true }, asistencia: true },
       order: { fecha_aplicacion: 'DESC' },
     });
+
+    if (esRolMentor(usuario?.rol) || supervisor_id) {
+      const ids_permitidos = await obtenerIdsBecariosDesignadosMentor(
+        this.becarioRepositorio,
+        usuario,
+        supervisor_id ?? usuario?.id,
+      );
+      if (ids_permitidos.size > 0) {
+        multas = multas.filter((m) => ids_permitidos.has(m.becario_id));
+      } else {
+        const sup_id = supervisor_id ?? usuario?.id;
+        multas = multas.filter((m) => m.becario?.supervisor_id === sup_id);
+      }
+    }
+
+    return multas;
   }
 
   async obtenerMisMultas(usuario_id: number): Promise<Multa[]> {
@@ -733,7 +755,18 @@ export class AsistenciaServicio {
     });
   }
 
-  async obtenerPorUsuario(usuario_id?: number, becario_id?: number): Promise<RegistroAsistencia[]> {
+  async obtenerPorUsuario(
+    usuario_id?: number,
+    becario_id?: number,
+    usuario_autenticado?: Usuario,
+  ): Promise<RegistroAsistencia[]> {
+    if (esRolMentor(usuario_autenticado?.rol)) {
+      return this.obtenerTodos({
+        becario_id: becario_id ? Number(becario_id) : undefined,
+        usuario: usuario_autenticado,
+      });
+    }
+
     let id_becario = becario_id;
     if (!id_becario && usuario_id) {
       let becario = await this.becarioRepositorio.findOne({
@@ -755,9 +788,31 @@ export class AsistenciaServicio {
     }
     return this.asistenciaRepositorio.find({
       where: { becario_id: id_becario },
-      relations: { becario: { usuario: true } },
+      relations: { becario: { usuario: true, supervisor: true } },
       order: { fecha: 'DESC', created_at: 'DESC' },
     });
+  }
+
+  async listarAsistencias(opciones?: {
+    tipo?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+    becario_id?: number;
+    usuario?: Usuario;
+    supervisor_id?: number;
+  }): Promise<RegistroAsistencia[]> {
+    return this.obtenerTodos(opciones);
+  }
+
+  async obtenerAuditorias(opciones?: {
+    tipo?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+    becario_id?: number;
+    usuario?: Usuario;
+    supervisor_id?: number;
+  }): Promise<RegistroAsistencia[]> {
+    return this.obtenerTodos(opciones);
   }
 
   async obtenerTodos(opciones?: {
@@ -765,7 +820,25 @@ export class AsistenciaServicio {
     fecha_inicio?: string;
     fecha_fin?: string;
     becario_id?: number;
+    usuario?: Usuario;
+    supervisor_id?: number;
   }): Promise<RegistroAsistencia[]> {
+    let ids_mentor_permitidos: Set<number> | null = null;
+    if (esRolMentor(opciones?.usuario?.rol) || opciones?.supervisor_id) {
+      ids_mentor_permitidos = await obtenerIdsBecariosDesignadosMentor(
+        this.becarioRepositorio,
+        opciones?.usuario,
+        opciones?.supervisor_id ?? opciones?.usuario?.id,
+      );
+      if (
+        opciones?.becario_id &&
+        ids_mentor_permitidos.size > 0 &&
+        !ids_mentor_permitidos.has(Number(opciones.becario_id))
+      ) {
+        return [];
+      }
+    }
+
     const qb = this.asistenciaRepositorio
       .createQueryBuilder('asistencia')
       .leftJoinAndSelect('asistencia.becario', 'becario')
@@ -786,7 +859,16 @@ export class AsistenciaServicio {
     }
 
     qb.orderBy('asistencia.fecha', 'DESC').addOrderBy('asistencia.created_at', 'DESC');
-    return qb.getMany();
+    let registros = await qb.getMany();
+
+    if (ids_mentor_permitidos && ids_mentor_permitidos.size > 0) {
+      registros = registros.filter((r) => ids_mentor_permitidos!.has(r.becario_id));
+    } else if (esRolMentor(opciones?.usuario?.rol) || opciones?.supervisor_id) {
+      const sup_id = opciones?.supervisor_id ?? opciones?.usuario?.id;
+      registros = registros.filter((r) => r.becario?.supervisor_id === sup_id);
+    }
+
+    return registros;
   }
 
   private calcularMultaEscuelaLideres(minutos: number): { monto_bs: number; tramo: string } {
@@ -802,10 +884,14 @@ export class AsistenciaServicio {
     return { monto_bs: 50, tramo: 'más de 60 minutos (Bs 50)' };
   }
 
-  async obtenerHorasMensuales(): Promise<
+  async obtenerHorasMensuales(
+    usuario?: Usuario,
+    supervisor_id?: number,
+  ): Promise<
     Array<{
       becario_id: number;
       usuario_id: number;
+      supervisor_id?: number | null;
       nombre: string;
       correo: string;
       carrera: string;
@@ -822,10 +908,11 @@ export class AsistenciaServicio {
       meses: Record<string, number>;
     }>
   > {
-    const [becarios, todas_justificaciones] = await Promise.all([
+    const [todos_becarios, todas_justificaciones] = await Promise.all([
       this.becarioRepositorio.find({
         relations: {
           usuario: true,
+          supervisor: true,
           registros_asistencia: true,
         },
         order: { id: 'ASC' },
@@ -839,6 +926,25 @@ export class AsistenciaServicio {
           })
         : Promise.resolve([]),
     ]);
+
+    let becarios = todos_becarios;
+    if (esRolMentor(usuario?.rol) || supervisor_id) {
+      const ids_permitidos = await obtenerIdsBecariosDesignadosMentor(
+        this.becarioRepositorio,
+        usuario,
+        supervisor_id ?? usuario?.id,
+      );
+      if (ids_permitidos.size > 0) {
+        becarios = todos_becarios.filter((b) => ids_permitidos.has(b.id));
+      } else {
+        const sup_id = supervisor_id ?? usuario?.id;
+        becarios = todos_becarios.filter((b) => b.supervisor_id === sup_id);
+      }
+    } else if (usuario?.rol === Rol.BECARIO) {
+      becarios = todos_becarios.filter(
+        (b) => b.usuario_id === usuario.id || b.id === usuario.id,
+      );
+    }
 
     const permisos_por_becario = new Map<number, Set<string>>();
     for (const j of todas_justificaciones || []) {
@@ -912,6 +1018,7 @@ export class AsistenciaServicio {
       return {
         becario_id: becario.id,
         usuario_id: becario.usuario_id || 0,
+        supervisor_id: becario.supervisor_id ?? becario.supervisor?.id ?? null,
         nombre: becario.usuario?.nombre || becario.nombre || '',
         correo: becario.usuario?.correo || '',
         carrera: becario.carrera,
@@ -1083,17 +1190,26 @@ export class AsistenciaServicio {
     identificador: number,
     mes_consulta?: string,
     es_usuario_id: boolean = false,
+    usuario?: Usuario,
   ): Promise<RespuestaExtractoMensual> {
-    return this.obtenerExtractoMensual(identificador, mes_consulta, es_usuario_id);
+    return this.obtenerExtractoMensual(identificador, mes_consulta, es_usuario_id, usuario);
   }
 
   async obtenerExtractoMensual(
     identificador: number,
     mes_consulta?: string,
     es_usuario_id: boolean = false,
+    usuario?: Usuario,
   ): Promise<RespuestaExtractoMensual> {
     let becario: Becario | null = null;
-    if (es_usuario_id) {
+    if (es_usuario_id && esRolMentor(usuario?.rol)) {
+      const designados = await obtenerBecariosDesignadosMentor(
+        this.becarioRepositorio,
+        usuario,
+        usuario?.id,
+      );
+      becario = designados[0] || null;
+    } else if (es_usuario_id) {
       becario = await this.becarioRepositorio.findOne({
         where: { usuario_id: identificador },
         relations: { lugar_practica: true, iglesia: true, usuario: true },
@@ -1109,6 +1225,25 @@ export class AsistenciaServicio {
         where: [{ id: identificador }, { usuario_id: identificador }],
         relations: { lugar_practica: true, iglesia: true, usuario: true },
       });
+      if (esRolMentor(usuario?.rol) && becario) {
+        const ids_permitidos = await obtenerIdsBecariosDesignadosMentor(
+          this.becarioRepositorio,
+          usuario,
+          usuario?.id,
+        );
+        if (ids_permitidos.size > 0 && !ids_permitidos.has(becario.id)) {
+          return {
+            becario_id: becario.id,
+            total_horas_gestion: 0,
+            promedio_mensual: 0,
+            total_meses: 0,
+            dias_permiso_aprobado: 0,
+            horas_compensadas_permiso: 0,
+            extracto_actual: null,
+            extractos: [],
+          };
+        }
+      }
     }
 
     const becario_id = becario?.id || identificador;
