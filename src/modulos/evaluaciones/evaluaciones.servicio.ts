@@ -4094,14 +4094,20 @@ export class EvaluacionesServicio {
   ) {
     const catalogo_actual = await this.obtenerCatalogoTareasEscuelaLideres();
     const max_numero = catalogo_actual.reduce((max, t) => Math.max(max, Number(t.numero || 0)), 0);
-    const numero_final = Number(numero_forzado ?? dto.numero ?? max_numero + 1);
+    const numero_final = Number(numero_forzado ?? dto.numero ?? dto.tarea_numero ?? max_numero + 1);
     const indice_existente = catalogo_actual.findIndex((t) => Number(t.numero) === numero_final);
     const previo = indice_existente >= 0 ? catalogo_actual[indice_existente] : null;
 
-    let lecturas_pdf: Array<{ nombre: string; url: string; tamano?: string }> = Array.isArray(
+    const lecturas_pdf: Array<{ nombre: string; url: string; tamano?: string }> = Array.isArray(
       dto.lecturas_pdf,
     )
-      ? dto.lecturas_pdf.filter((p) => p && p.url)
+      ? dto.lecturas_pdf
+          .filter((p) => p && typeof p.url === 'string' && p.url.trim().length > 0)
+          .map((p) => ({
+            nombre: (p.nombre || 'Material de lectura PDF').trim(),
+            url: p.url.trim(),
+            ...(p.tamano ? { tamano: String(p.tamano).trim() } : {}),
+          }))
       : Array.isArray(previo?.lecturas_pdf)
       ? [...previo.lecturas_pdf]
       : [];
@@ -4113,8 +4119,13 @@ export class EvaluacionesServicio {
       });
     }
 
-    let enlaces_lectura: Array<{ titulo: string; url: string }> = Array.isArray(dto.enlaces_lectura)
-      ? dto.enlaces_lectura.filter((e) => e && e.url)
+    const enlaces_lectura: Array<{ titulo: string; url: string }> = Array.isArray(dto.enlaces_lectura)
+      ? dto.enlaces_lectura
+          .filter((e) => e && typeof e.url === 'string' && e.url.trim().length > 0)
+          .map((e) => ({
+            titulo: (e.titulo || 'Enlace de lectura complementaria').trim(),
+            url: e.url.trim(),
+          }))
       : Array.isArray(previo?.enlaces_lectura)
       ? [...previo.enlaces_lectura]
       : [];
@@ -4130,17 +4141,30 @@ export class EvaluacionesServicio {
       numero: numero_final,
       codigo: dto.codigo || previo?.codigo || `CETI-${String(numero_final).padStart(2, '0')}`,
       titulo: (dto.titulo || previo?.titulo || `Tarea Formativa #${numero_final}`).trim(),
-      modulo: (dto.modulo || previo?.modulo || 'Módulo Formativo Escuela de Líderes').trim(),
+      modulo: (
+        dto.modulo ||
+        dto.modulo_tematico ||
+        previo?.modulo ||
+        'Módulo Formativo Escuela de Líderes'
+      ).trim(),
       descripcion: (dto.descripcion || dto.instrucciones || previo?.descripcion || '').trim(),
       fecha_limite: dto.fecha_limite || previo?.fecha_limite || new Date().toISOString().split('T')[0],
       ponderacion: Number(dto.ponderacion ?? dto.puntaje_maximo ?? previo?.ponderacion ?? 8.33),
-      publicada_apk: dto.publicada_apk ?? dto.enviar_apk ?? true,
+      publicada_apk: dto.publicada_apk ?? dto.publicar_apk ?? dto.enviar_apk ?? true,
       lecturas_pdf,
       enlaces_lectura,
-      lectura_pdf_url: dto.lectura_pdf_url ?? lecturas_pdf[0]?.url ?? previo?.lectura_pdf_url ?? null,
+      lectura_pdf_url:
+        dto.lectura_pdf_url ??
+        lecturas_pdf[0]?.url ??
+        (Array.isArray(dto.lecturas_pdf) ? null : previo?.lectura_pdf_url ?? null),
       lectura_pdf_nombre:
-        dto.lectura_pdf_nombre ?? lecturas_pdf[0]?.nombre ?? previo?.lectura_pdf_nombre ?? null,
-      enlace_lectura: dto.enlace_lectura ?? enlaces_lectura[0]?.url ?? previo?.enlace_lectura ?? null,
+        dto.lectura_pdf_nombre ??
+        lecturas_pdf[0]?.nombre ??
+        (Array.isArray(dto.lecturas_pdf) ? null : previo?.lectura_pdf_nombre ?? null),
+      enlace_lectura:
+        dto.enlace_lectura ??
+        enlaces_lectura[0]?.url ??
+        (Array.isArray(dto.enlaces_lectura) ? null : previo?.enlace_lectura ?? null),
     };
 
     if (indice_existente >= 0) {

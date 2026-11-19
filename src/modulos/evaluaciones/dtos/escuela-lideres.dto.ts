@@ -147,6 +147,11 @@ export class GuardarTareaCatalogoLideresDto {
   numero?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  tarea_numero?: number;
+
+  @IsOptional()
   @IsString()
   codigo?: string;
 
@@ -157,6 +162,10 @@ export class GuardarTareaCatalogoLideresDto {
   @IsOptional()
   @IsString()
   modulo?: string;
+
+  @IsOptional()
+  @IsString()
+  modulo_tematico?: string;
 
   @IsOptional()
   @IsString()
@@ -183,6 +192,10 @@ export class GuardarTareaCatalogoLideresDto {
   @IsOptional()
   @IsBoolean()
   publicada_apk?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  publicar_apk?: boolean;
 
   @IsOptional()
   @IsBoolean()

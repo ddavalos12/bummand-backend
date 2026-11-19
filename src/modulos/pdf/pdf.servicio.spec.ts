@@ -337,5 +337,225 @@ describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transport
       );
       expect(resultado.bufer.toString()).toBe('PDF_TRANSPORTE');
     });
+
+    it('excluye recorridos de Escuela de Líderes en generarDonacionTransporteHtml y generarDonacionTransportePdf', async () => {
+      const becarios_mock = [
+        { id: 1, nombre: 'Juan Carlos Aruquipa Mamani' },
+        { id: 2, nombre: 'Maria Belen Condori Quispe' },
+      ];
+      const recorridos_mixtos = [
+        {
+          id: 1,
+          tarifa: 100,
+          tipo_actividad: 'practicas',
+          solicitud: { becario_id: 1, estado: EstadoSolicitud.APROBADO },
+        },
+        {
+          id: 2,
+          tarifa: 200,
+          tipo_actividad: 'escuela_lideres',
+          solicitud: { becario_id: 1, estado: EstadoSolicitud.APROBADO },
+        },
+        {
+          id: 3,
+          tarifa: 150,
+          tipo_actividad: 'Escuela de Líderes',
+          solicitud: { becario_id: 2, estado: EstadoSolicitud.APROBADO },
+        },
+        {
+          id: 4,
+          tarifa: 50,
+          tipo_actividad: 'acciones_servicio',
+          solicitud: { becario_id: 2, estado: EstadoSolicitud.APROBADO },
+        },
+      ];
+
+      const html = servicio.generarDonacionTransporteHtml({
+        mes: '2026-11',
+        con_firma: 'false',
+        becarios: becarios_mock as never,
+        recorridos: recorridos_mixtos as never,
+      });
+
+      expect(html).toContain('80,00');
+      expect(html).toContain('40,00');
+      expect(html).toContain('120,00');
+      expect(html).not.toContain('240,00');
+
+      const qb_recorridos = crearConstructorConsultaMock(recorridos_mixtos);
+      const servicio_pdf = new PdfServicio(
+        undefined,
+        undefined,
+        undefined,
+        { find: jest.fn().mockResolvedValue(becarios_mock) } as never,
+        undefined,
+        { createQueryBuilder: jest.fn().mockReturnValue(qb_recorridos) } as never,
+      );
+      const espia_pdf = jest
+        .spyOn(servicio_pdf, 'generarPdf')
+        .mockResolvedValue(Buffer.from('PDF_OK'));
+
+      await servicio_pdf.generarDonacionTransportePdf({
+        fecha_inicio: '2026-11-01',
+        fecha_fin: '2026-11-30',
+      });
+
+      const html_pdf = espia_pdf.mock.calls[0][0];
+      expect(html_pdf).toContain('120,00');
+      expect(html_pdf).not.toContain('240,00');
+    });
+  });
+
+  describe('Informe general de pasajes (generarPasajesGeneralPdf)', () => {
+    it('excluye Escuela de Líderes y usa tabla liviana sin badges en rangos cortos (<= 400 tramos)', async () => {
+      const recorridos_cortos = [
+        {
+          id: 1,
+          fecha: new Date('2026-10-05T10:00:00Z'),
+          tramo: 'ida',
+          origen: 'Ceja El Alto',
+          destino: 'San Francisco',
+          calles_declaradas: 'Autopista LP-EA',
+          medio_transporte: 'Minibús',
+          tarifa: 10,
+          tipo_actividad: 'practicas',
+          solicitud: {
+            becario_id: 1,
+            estado: EstadoSolicitud.APROBADO,
+            becario: { id: 1, ci: '9123841 LP', usuario: { nombre: 'Juan Carlos Aruquipa Mamani' } },
+          },
+        },
+        {
+          id: 2,
+          fecha: new Date('2026-10-09T14:00:00Z'),
+          tramo: 'ida',
+          origen: 'Obelisco',
+          destino: 'Auditorio Central',
+          calles_declaradas: 'Av. Arce',
+          medio_transporte: 'Mi Teleférico',
+          tarifa: 50,
+          tipo_actividad: 'Escuela de Líderes',
+          solicitud: {
+            becario_id: 1,
+            estado: EstadoSolicitud.APROBADO,
+            becario: { id: 1, ci: '9123841 LP', usuario: { nombre: 'Juan Carlos Aruquipa Mamani' } },
+          },
+        },
+      ];
+
+      const qb = crearConstructorConsultaMock(recorridos_cortos);
+      const servicio_pdf = new PdfServicio(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { createQueryBuilder: jest.fn().mockReturnValue(qb) } as never,
+      );
+      const espia_pdf = jest
+        .spyOn(servicio_pdf, 'generarPdf')
+        .mockResolvedValue(Buffer.from('PDF_CORTO'));
+
+      const res = await servicio_pdf.generarPasajesGeneralPdf({
+        fecha_inicio: '2026-10-01',
+        fecha_fin: '2026-10-31',
+      });
+
+      expect(res.bufer.toString()).toBe('PDF_CORTO');
+      const html = espia_pdf.mock.calls[0][0];
+      expect(html).toContain('Bs 10.00');
+      expect(html).toContain('Bs 8.00');
+      expect(html).not.toContain('Auditorio Central');
+      expect(html).not.toContain('class="badge');
+      expect(html).not.toContain('Resumen consolidado por volumen del periodo');
+    });
+
+    it('consolida por becario y mes cuando existen más de 400 tramos excluyendo Escuela de Líderes', async () => {
+      const recorridos_masivos = [];
+      for (let i = 0; i < 260; i++) {
+        recorridos_masivos.push({
+          id: i + 1,
+          fecha: new Date(i < 130 ? '2026-06-10T10:00:00Z' : '2026-07-10T10:00:00Z'),
+          tramo: i % 2 === 0 ? 'ida' : 'vuelta',
+          origen: 'Ceja El Alto',
+          destino: 'Centro',
+          tarifa: 2.5,
+          tipo_actividad: 'practicas',
+          solicitud: {
+            becario_id: 1,
+            estado: EstadoSolicitud.APROBADO,
+            becario: { id: 1, ci: '111111 LP', usuario: { nombre: 'Ana Lucia Condori Quispe' } },
+          },
+        });
+        recorridos_masivos.push({
+          id: 1000 + i,
+          fecha: new Date(i < 130 ? '2026-06-15T10:00:00Z' : '2026-07-15T10:00:00Z'),
+          tramo: i % 2 === 0 ? 'ida' : 'vuelta',
+          origen: 'Villa Adela',
+          destino: 'Agencia Central',
+          tarifa: 3.0,
+          tipo_actividad: 'acciones_servicio',
+          solicitud: {
+            becario_id: 2,
+            estado: EstadoSolicitud.APROBADO,
+            becario: { id: 2, ci: '222222 LP', usuario: { nombre: 'Joel Alex Quisbert Alanoca' } },
+          },
+        });
+      }
+      recorridos_masivos.push({
+        id: 9999,
+        fecha: new Date('2026-06-20T14:00:00Z'),
+        tramo: 'ida',
+        origen: 'Obelisco',
+        destino: 'Auditorio',
+        tarifa: 100,
+        tipo_actividad: 'escuela_lideres',
+        solicitud: {
+          becario_id: 1,
+          estado: EstadoSolicitud.APROBADO,
+          becario: { id: 1, ci: '111111 LP', usuario: { nombre: 'Ana Lucia Condori Quispe' } },
+        },
+      });
+
+      const qb = crearConstructorConsultaMock(recorridos_masivos);
+      const multa_repo_mock = {
+        find: jest.fn().mockResolvedValue([
+          { id: 1, becario_id: 1, monto_bs: 20, fecha_aplicacion: new Date('2026-06-12T10:00:00Z') },
+        ]),
+      };
+
+      const servicio_pdf = new PdfServicio(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { createQueryBuilder: jest.fn().mockReturnValue(qb) } as never,
+        undefined,
+        undefined,
+        multa_repo_mock as never,
+      );
+      const espia_pdf = jest
+        .spyOn(servicio_pdf, 'generarPdf')
+        .mockResolvedValue(Buffer.from('PDF_CONSOLIDADO'));
+
+      const res = await servicio_pdf.generarPasajesGeneralPdf({
+        fecha_inicio: '2026-06-01',
+        fecha_fin: '2026-11-24',
+      });
+
+      expect(res.bufer.toString()).toBe('PDF_CONSOLIDADO');
+      const html = espia_pdf.mock.calls[0][0];
+      expect(html).toContain('Resumen consolidado por volumen del periodo — 520 tramos totales');
+      expect(html).toContain('Junio 2026');
+      expect(html).toContain('Julio 2026');
+      expect(html).toContain('Bs 1430.00');
+      expect(html).toContain('Bs 1144.00');
+      expect(html).toContain('Bs 1124.00');
+      const tbody_match = html.match(/<tbody>([\s\S]*?)<\/tbody>/);
+      expect(tbody_match).not.toBeNull();
+      const filas_tbody = (tbody_match![1].match(/<tr>/g) || []).length;
+      expect(filas_tbody).toBe(4);
+    });
   });
 });

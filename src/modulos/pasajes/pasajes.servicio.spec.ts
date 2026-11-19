@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { PasajesServicio } from './pasajes.servicio';
+import { PasajesServicio, esActividadReembolsablePasaje } from './pasajes.servicio';
 import { SolicitudPasajes, EstadoSolicitud } from './entidades/solicitud-pasaje.entidad';
 import { Recorrido, Tramo } from './entidades/recorrido.entidad';
 
@@ -310,6 +310,37 @@ describe('PasajesServicio', () => {
 
   describe('Historial de paradas por estudiante en intervalo de tiempo', () => {
     it('debe recuperar el historial de paradas, secuencia y métricas consolidadas', async () => {
+      recorrido_repo.createQueryBuilder().getMany.mockResolvedValueOnce([
+        {
+          id: 101,
+          solicitud_id: 1,
+          fecha: '2026-10-02',
+          tramo: Tramo.IDA,
+          origen: 'La Ceja - Calle 1',
+          destino: 'Pérez Velasco',
+          calles_declaradas: 'La Ceja - Calle 1 → Autopista LP-EA → Av. Montes → Pérez Velasco',
+          medio_transporte: 'Minibús Interciudad',
+          tipo_actividad: 'practicas',
+          apoyo_realizado: 'Conciliación de expedientes',
+          tarifa: 3.5,
+          solicitud: { periodo: 'Octubre 2026' },
+        },
+        {
+          id: 102,
+          solicitud_id: 1,
+          fecha: '2026-10-02',
+          tramo: Tramo.VUELTA,
+          origen: 'Pérez Velasco',
+          destino: 'La Ceja - Calle 1',
+          calles_declaradas: 'Pérez Velasco → Av. Montes → Autopista LP-EA → La Ceja - Calle 1',
+          medio_transporte: 'Minibús Interciudad',
+          tipo_actividad: 'practicas',
+          apoyo_realizado: 'Retorno de jornada',
+          tarifa: 3.5,
+          solicitud: { periodo: 'Octubre 2026' },
+        },
+      ]);
+
       const resultado = await servicio.obtenerHistorialParadasEstudiante({
         id_estudiante: 1,
         fecha_inicio: '2026-10-01',
@@ -331,6 +362,49 @@ describe('PasajesServicio', () => {
       expect(primer_item.paradas_secuencia.length).toBeGreaterThanOrEqual(2);
       expect(primer_item.origen).toBeDefined();
       expect(primer_item.destino).toBeDefined();
+    });
+
+    it('debe excluir recorridos de escuela_lideres en obtenerHistorialParadasEstudiante', async () => {
+      recorrido_repo.createQueryBuilder().getMany.mockResolvedValueOnce([
+        {
+          id: 201,
+          solicitud_id: 1,
+          fecha: '2026-10-05',
+          tramo: Tramo.IDA,
+          origen: 'Villa Adela',
+          destino: 'Cruce Viacha',
+          calles_declaradas: 'Villa Adela → Av. Bolivia → Cruce Viacha',
+          medio_transporte: 'Minibús Tramo Corto',
+          tipo_actividad: 'practicas',
+          tarifa: 2.0,
+          solicitud: { periodo: 'Octubre 2026' },
+        },
+        {
+          id: 202,
+          solicitud_id: 1,
+          fecha: '2026-10-06',
+          tramo: Tramo.IDA,
+          origen: 'Obelisco',
+          destino: 'Auditorio Central',
+          calles_declaradas: 'Obelisco → Auditorio Central',
+          medio_transporte: 'Minibús Urbano',
+          tipo_actividad: 'escuela_lideres',
+          tarifa: 3.0,
+          solicitud: { periodo: 'Octubre 2026' },
+        },
+      ]);
+
+      const resultado = await servicio.obtenerHistorialParadasEstudiante({
+        id_estudiante: 1,
+        fecha_inicio: '2026-10-01',
+        fecha_fin: '2026-10-15',
+        tramo: 'todos',
+      });
+
+      expect(resultado.resumen.total_recorridos).toBe(1);
+      expect(resultado.historial).toHaveLength(1);
+      expect(resultado.historial[0].id).toBe(201);
+      expect(resultado.historial[0].tipo_actividad).toBe('practicas');
     });
   });
 
@@ -375,6 +449,82 @@ describe('PasajesServicio', () => {
       expect(resultado.aprobado_por_admin_id).toBe(1);
       expect(resultado.fecha_aprobacion_admin).toBeInstanceOf(Date);
       expect(resultado.observacion_admin).toBe('Planilla aprobada para desembolso financiero');
+    });
+  });
+
+  describe('Exclusión de Escuela de Líderes del reembolso del 80%', () => {
+    it('esActividadReembolsablePasaje rechaza variantes de Escuela de Líderes y permite prácticas/acciones', () => {
+      expect(esActividadReembolsablePasaje('escuela_lideres')).toBe(false);
+      expect(esActividadReembolsablePasaje('Escuela de Líderes')).toBe(false);
+      expect(esActividadReembolsablePasaje('ESCUELA DE LIDERES')).toBe(false);
+      expect(esActividadReembolsablePasaje('practicas')).toBe(true);
+      expect(esActividadReembolsablePasaje('acciones_servicio')).toBe(true);
+      expect(esActividadReembolsablePasaje(undefined)).toBe(true);
+    });
+
+    it('rechaza con BadRequestException el registro de recorridos de Escuela de Líderes', async () => {
+      await expect(
+        servicio.agregarRecorrido({
+          becario_id: 5,
+          fecha: '2026-10-16',
+          tramo: Tramo.IDA,
+          origen: 'Obelisco',
+          destino: 'Auditorio Central',
+          tarifa: 3.0,
+          tipo_actividad: 'escuela_lideres',
+        }),
+      ).rejects.toThrow(
+        'Los pasajes de Escuela de Líderes no son reembolsables. Solo se reconocen Prácticas Pre Profesionales o Acciones de Servicio.',
+      );
+    });
+
+    it('excluye recorridos históricos de Escuela de Líderes al recalcular 80% en agregarRecorrido y obtenerTodas', async () => {
+      solicitud_repo.findOne.mockResolvedValue({
+        id: 1,
+        becario_id: 5,
+        estado: EstadoSolicitud.BORRADOR,
+        monto_total: 0,
+        monto_devolucion: 0,
+      });
+      recorrido_repo.find.mockResolvedValue([
+        { tarifa: 10.0, tipo_actividad: 'practicas' },
+        { tarifa: 50.0, tipo_actividad: 'escuela_lideres' },
+      ]);
+
+      await servicio.agregarRecorrido({
+        becario_id: 5,
+        fecha: '2026-10-16',
+        tramo: Tramo.IDA,
+        origen: 'Ceja',
+        destino: 'Centro',
+        tarifa: 10.0,
+        tipo_actividad: 'practicas',
+      });
+
+      expect(solicitud_repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          monto_total: 10.0,
+          monto_devolucion: 8.0,
+        }),
+      );
+
+      solicitud_repo.find.mockResolvedValue([
+        {
+          id: 2,
+          becario_id: 5,
+          monto_total: 60.0,
+          monto_devolucion: 48.0,
+          recorridos: [
+            { id: 1, tarifa: 10.0, tipo_actividad: 'practicas' },
+            { id: 2, tarifa: 50.0, tipo_actividad: 'Escuela de Líderes' },
+          ],
+        },
+      ]);
+
+      const solicitudes = await servicio.obtenerTodas();
+      expect(solicitudes[0].monto_total).toBe(10.0);
+      expect(solicitudes[0].monto_devolucion).toBe(8.0);
+      expect(solicitudes[0].recorridos).toHaveLength(1);
     });
   });
 });

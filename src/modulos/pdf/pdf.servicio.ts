@@ -10,6 +10,7 @@ import { Multa } from '../asistencia/entidades/multa.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { SolicitudPasajes } from '../pasajes/entidades/solicitud-pasaje.entidad';
 import { Recorrido, Tramo } from '../pasajes/entidades/recorrido.entidad';
+import { esActividadReembolsablePasaje } from '../pasajes/pasajes.servicio';
 import { Refrigerio } from '../refrigerios/entidades/refrigerio.entidad';
 import { Justificacion } from '../justificaciones/entidades/justificacion.entidad';
 import {
@@ -170,15 +171,20 @@ export class PdfServicio {
 
   async generarPdf(html: string): Promise<Buffer> {
     const navegador = await this.lanzarNavegador();
-    const pagina = await navegador.newPage();
-    await pagina.setContent(html, { waitUntil: 'domcontentloaded' });
-    const bufer = await pagina.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '15mm', right: '15mm', bottom: '15mm', left: '15mm' },
-    });
-    await navegador.close();
-    return Buffer.from(bufer);
+    try {
+      const pagina = await navegador.newPage();
+      pagina.setDefaultTimeout(120000);
+      await pagina.setContent(html, { waitUntil: 'domcontentloaded', timeout: 120000 });
+      const bufer = await pagina.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '15mm', right: '15mm', bottom: '15mm', left: '15mm' },
+        timeout: 120000,
+      });
+      return Buffer.from(bufer);
+    } finally {
+      await navegador.close().catch(() => {});
+    }
   }
 
   async generarPdfEvaluacionF03(evaluacion: any): Promise<Buffer> {
@@ -1345,9 +1351,16 @@ export class PdfServicio {
       recorridos_db = await qb.getMany();
     }
 
+    const hubo_registros_db = recorridos_db.length > 0;
+    const recorridos_reembolsables = recorridos_db.filter((r) =>
+      esActividadReembolsablePasaje(
+        r.tipo_actividad || (r as { tipoActividad?: string }).tipoActividad,
+      ),
+    );
+
     const nombres_dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
-    let items_render = recorridos_db.map((r, idx) => {
+    let items_render = recorridos_reembolsables.map((r, idx) => {
       const fecha_obj = r.fecha ? new Date(r.fecha) : new Date(fecha_inicio);
       const dia_str = nombres_dias[fecha_obj.getDay()];
       const fecha_fmt = fecha_obj.toISOString().split('T')[0];
@@ -1378,20 +1391,19 @@ export class PdfServicio {
       };
     });
 
-    if (items_render.length === 0) {
-      // Fallback institucional oficial con rutas auténticas La Paz - El Alto
+    if (!hubo_registros_db && items_render.length === 0) {
       const mes_prefijo = `${anio}-${String(mes_num).padStart(2, '0')}`;
       items_render = [
         { numero: 1, fecha: `${mes_prefijo}-02`, dia_semana: 'Viernes', tramo: 'Ida', origen: 'Ceja El Alto', destino: 'San Francisco (Centro LP)', calles_declaradas: 'Av. 6 de Marzo, Autopista LP-EA, Av. Montes', medio_transporte: 'Minibús Interciudad', tipo_actividad: 'Prácticas', apoyo_realizado: 'Conciliación de expedientes de cartera crediticia', tarifa: 3.50 },
         { numero: 2, fecha: `${mes_prefijo}-02`, dia_semana: 'Viernes', tramo: 'Vuelta', origen: 'San Francisco (Centro LP)', destino: 'Ceja El Alto', calles_declaradas: 'Av. Montes, Autopista LP-EA, Av. Franco Valle', medio_transporte: 'Minibús Interciudad', tipo_actividad: 'Prácticas', apoyo_realizado: 'Retorno de turno vespertino', tarifa: 3.50 },
         { numero: 3, fecha: `${mes_prefijo}-05`, dia_semana: 'Lunes', tramo: 'Ida', origen: 'Villa Adela', destino: 'Cruce Viacha', calles_declaradas: 'Av. Bolivia, Av. Ladislao Cabrera', medio_transporte: 'Minibús Tramo Corto', tipo_actividad: 'Prácticas', apoyo_realizado: 'Digitalización y archivo de comprobantes contables', tarifa: 2.00 },
         { numero: 4, fecha: `${mes_prefijo}-05`, dia_semana: 'Lunes', tramo: 'Vuelta', origen: 'Cruce Viacha', destino: 'Villa Adela', calles_declaradas: 'Av. Ladislao Cabrera, Av. Bolivia', medio_transporte: 'Minibús Tramo Corto', tipo_actividad: 'Prácticas', apoyo_realizado: 'Retorno de jornada de prácticas', tarifa: 2.00 },
-        { numero: 5, fecha: `${mes_prefijo}-09`, dia_semana: 'Viernes', tramo: 'Ida', origen: 'Estación Obelisco', destino: 'Estación San Jorge', calles_declaradas: 'Red Mi Teleférico Línea Morada', medio_transporte: 'Mi Teleférico', tipo_actividad: 'Escuela de Líderes', apoyo_realizado: 'Asistencia y apoyo logístico en Escuela de Líderes', tarifa: 3.00 },
-        { numero: 6, fecha: `${mes_prefijo}-09`, dia_semana: 'Viernes', tramo: 'Vuelta', origen: 'Estación San Jorge', destino: 'Estación Obelisco', calles_declaradas: 'Red Mi Teleférico Línea Morada', medio_transporte: 'Mi Teleférico', tipo_actividad: 'Escuela de Líderes', apoyo_realizado: 'Retorno de taller de liderazgo eclesial', tarifa: 3.00 },
+        { numero: 5, fecha: `${mes_prefijo}-09`, dia_semana: 'Viernes', tramo: 'Ida', origen: 'Estación Obelisco', destino: 'Estación San Jorge', calles_declaradas: 'Red Mi Teleférico Línea Morada', medio_transporte: 'Mi Teleférico', tipo_actividad: 'Prácticas', apoyo_realizado: 'Apoyo operativo en ventanilla institucional', tarifa: 3.00 },
+        { numero: 6, fecha: `${mes_prefijo}-09`, dia_semana: 'Viernes', tramo: 'Vuelta', origen: 'Estación San Jorge', destino: 'Estación Obelisco', calles_declaradas: 'Red Mi Teleférico Línea Morada', medio_transporte: 'Mi Teleférico', tipo_actividad: 'Prácticas', apoyo_realizado: 'Retorno de jornada de prácticas en sede San Jorge', tarifa: 3.00 },
         { numero: 7, fecha: `${mes_prefijo}-13`, dia_semana: 'Martes', tramo: 'Ida', origen: 'Pérez Velasco', destino: 'Miraflores (Hospital Obrero)', calles_declaradas: 'Av. Saavedra, Plaza Uyuni, Av. Busch', medio_transporte: 'Micro / Colectivo Urbano', tipo_actividad: 'Prácticas', apoyo_realizado: 'Atención a usuarios y verificación de solicitudes', tarifa: 1.50 },
         { numero: 8, fecha: `${mes_prefijo}-13`, dia_semana: 'Martes', tramo: 'Vuelta', origen: 'Miraflores', destino: 'Pérez Velasco', calles_declaradas: 'Av. Busch, Calle Juan de la Riva, Comercio', medio_transporte: 'Micro / Colectivo Urbano', tipo_actividad: 'Prácticas', apoyo_realizado: 'Retorno de asignación en consultorio', tarifa: 1.50 },
-        { numero: 9, fecha: `${mes_prefijo}-16`, dia_semana: 'Viernes', tramo: 'Ida', origen: 'Ciudad Satélite', destino: 'Plaza Murillo', calles_declaradas: 'Av. Satélite, Autopista LP-EA, Calle Yanacocha', medio_transporte: 'Minibús Tramo Directo', tipo_actividad: 'Escuela de Líderes', apoyo_realizado: 'Coordinación devocional y estudio teológico CETI', tarifa: 2.60 },
-        { numero: 10, fecha: `${mes_prefijo}-16`, dia_semana: 'Viernes', tramo: 'Vuelta', origen: 'Plaza Murillo', destino: 'Ciudad Satélite', calles_declaradas: 'Calle Ingavi, Autopista LP-EA, Av. Satélite', medio_transporte: 'Minibús Tramo Directo', tipo_actividad: 'Escuela de Líderes', apoyo_realizado: 'Retorno a residencia', tarifa: 2.60 },
+        { numero: 9, fecha: `${mes_prefijo}-16`, dia_semana: 'Viernes', tramo: 'Ida', origen: 'Ciudad Satélite', destino: 'Plaza Murillo', calles_declaradas: 'Av. Satélite, Autopista LP-EA, Calle Yanacocha', medio_transporte: 'Minibús Tramo Directo', tipo_actividad: 'Prácticas', apoyo_realizado: 'Clasificación y verificación documental en agencia', tarifa: 2.60 },
+        { numero: 10, fecha: `${mes_prefijo}-16`, dia_semana: 'Viernes', tramo: 'Vuelta', origen: 'Plaza Murillo', destino: 'Ciudad Satélite', calles_declaradas: 'Calle Ingavi, Autopista LP-EA, Av. Satélite', medio_transporte: 'Minibús Tramo Directo', tipo_actividad: 'Prácticas', apoyo_realizado: 'Retorno a residencia', tarifa: 2.60 },
         { numero: 11, fecha: `${mes_prefijo}-20`, dia_semana: 'Martes', tramo: 'Ida', origen: 'Estación 16 de Julio', destino: 'Estación Central (Taypi Uta)', calles_declaradas: 'Red Mi Teleférico Línea Roja', medio_transporte: 'Mi Teleférico', tipo_actividad: 'Prácticas', apoyo_realizado: 'Procesamiento de datos en plataforma institucional', tarifa: 3.00 },
         { numero: 12, fecha: `${mes_prefijo}-20`, dia_semana: 'Martes', tramo: 'Vuelta', origen: 'Estación Central', destino: 'Estación 16 de Julio', calles_declaradas: 'Red Mi Teleférico Línea Roja', medio_transporte: 'Mi Teleférico', tipo_actividad: 'Prácticas', apoyo_realizado: 'Retorno de actividades asignadas', tarifa: 3.00 },
       ];
@@ -1424,15 +1436,21 @@ export class PdfServicio {
     });
 
     const navegador = await this.lanzarNavegador();
-    const pagina = await navegador.newPage();
-    await pagina.setContent(html, { waitUntil: 'domcontentloaded' });
-    const bufer = await pagina.pdf({
-      format: 'A4',
-      landscape: true,
-      printBackground: true,
-      margin: { top: '8mm', right: '10mm', bottom: '8mm', left: '10mm' },
-    });
-    await navegador.close();
+    let bufer: Uint8Array;
+    try {
+      const pagina = await navegador.newPage();
+      pagina.setDefaultTimeout(120000);
+      await pagina.setContent(html, { waitUntil: 'domcontentloaded', timeout: 120000 });
+      bufer = await pagina.pdf({
+        format: 'A4',
+        landscape: true,
+        printBackground: true,
+        margin: { top: '8mm', right: '10mm', bottom: '8mm', left: '10mm' },
+        timeout: 120000,
+      });
+    } finally {
+      await navegador.close().catch(() => {});
+    }
 
     const nombre_estudiante_limpio = nombre_estudiante.replace(/[^a-zA-Z0-9_-]/g, '_');
     const mes_limpio = mes_nombre.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -3244,14 +3262,17 @@ export class PdfServicio {
     fecha_inicio?: string;
     fecha_fin?: string;
   }): Promise<{ bufer: Buffer; nombre_archivo: string }> {
+    const UMBRAL_CONSOLIDADO_TRAMOS = 400;
     const fecha_actual = new Date();
     const rango_texto =
       opciones.fecha_inicio && opciones.fecha_fin
         ? `${opciones.fecha_inicio} al ${opciones.fecha_fin}`
         : 'Periodo Semestral Vigente';
 
+    let hubo_registros_db = false;
     let items_render: Array<{
       numero: number;
+      becario_id: number | null;
       becario_nombre: string;
       ci: string;
       fecha: string;
@@ -3282,19 +3303,28 @@ export class PdfServicio {
       qb.orderBy('r.fecha', 'ASC').addOrderBy('r.id', 'ASC');
 
       const recorridos_db = await qb.getMany();
+      hubo_registros_db = recorridos_db.length > 0;
+      const recorridos_reembolsables = recorridos_db.filter((r) =>
+        esActividadReembolsablePasaje(
+          r.tipo_actividad || (r as { tipoActividad?: string }).tipoActividad,
+        ),
+      );
 
-      items_render = recorridos_db.map((r, idx) => {
+      items_render = recorridos_reembolsables.map((r, idx) => {
         const fecha_str = r.fecha ? new Date(r.fecha).toISOString().split('T')[0] : '2026-10-01';
         const tarifa_val = Number(r.tarifa) || 0;
         const devolucion_val = Number((tarifa_val * 0.8).toFixed(2));
+        const becario_id = r.solicitud?.becario_id ?? r.solicitud?.becario?.id ?? null;
         const nombre_completo =
           r.solicitud?.becario?.usuario?.nombre ||
+          r.solicitud?.becario?.nombre ||
           r.solicitud?.datos_becario?.nombre ||
           'Estudiante Becario';
         const ci_val = r.solicitud?.becario?.ci || 'S/C';
 
         return {
           numero: idx + 1,
+          becario_id: becario_id !== null ? Number(becario_id) : null,
           becario_nombre: nombre_completo,
           ci: ci_val,
           fecha: fecha_str,
@@ -3310,65 +3340,206 @@ export class PdfServicio {
       });
     }
 
-    if (items_render.length === 0) {
+    if (!hubo_registros_db && items_render.length === 0) {
       items_render = [
-        { numero: 1, becario_nombre: 'Aruquipa Mamani Juan Carlos', ci: '9123841 LP', fecha: '2026-10-02', tramo: 'Ida', medio_transporte: 'Minibús Interciudad', origen: 'Ceja El Alto', calles: 'Av. 6 de Marzo, Autopista LP-EA, Av. Montes', destino: 'San Francisco (Centro LP)', tarifa: 3.50, reembolso_80: 2.80, estado: 'APROBADO' },
-        { numero: 2, becario_nombre: 'Aruquipa Mamani Juan Carlos', ci: '9123841 LP', fecha: '2026-10-02', tramo: 'Vuelta', medio_transporte: 'Minibús Interciudad', origen: 'San Francisco (Centro LP)', calles: 'Av. Montes, Autopista LP-EA, Av. Franco Valle', destino: 'Ceja El Alto', tarifa: 3.50, reembolso_80: 2.80, estado: 'APROBADO' },
-        { numero: 3, becario_nombre: 'Condori Quispe Maria Belen', ci: '8492018 LP', fecha: '2026-10-05', tramo: 'Ida', medio_transporte: 'Minibús Tramo Corto', origen: 'Villa Adela', calles: 'Av. Bolivia, Av. Ladislao Cabrera', destino: 'Cruce Viacha', tarifa: 2.00, reembolso_80: 1.60, estado: 'APROBADO' },
-        { numero: 4, becario_nombre: 'Condori Quispe Maria Belen', ci: '8492018 LP', fecha: '2026-10-05', tramo: 'Vuelta', medio_transporte: 'Minibús Tramo Corto', origen: 'Cruce Viacha', calles: 'Av. Ladislao Cabrera, Av. Bolivia', destino: 'Villa Adela', tarifa: 2.00, reembolso_80: 1.60, estado: 'APROBADO' },
-        { numero: 5, becario_nombre: 'Flores Choque Samuel David', ci: '10293847 LP', fecha: '2026-10-09', tramo: 'Ida', medio_transporte: 'Mi Teleférico Morado', origen: 'Estación Obelisco', calles: 'Red Mi Teleférico Línea Morada', destino: 'Estación San Jorge', tarifa: 3.00, reembolso_80: 2.40, estado: 'APROBADO' },
-        { numero: 6, becario_nombre: 'Flores Choque Samuel David', ci: '10293847 LP', fecha: '2026-10-09', tramo: 'Vuelta', medio_transporte: 'Mi Teleférico Morado', origen: 'Estación San Jorge', calles: 'Red Mi Teleférico Línea Morada', destino: 'Estación Obelisco', tarifa: 3.00, reembolso_80: 2.40, estado: 'APROBADO' },
-        { numero: 7, becario_nombre: 'Mamani Gutierrez Noemi Ruth', ci: '7392011 LP', fecha: '2026-10-13', tramo: 'Ida', medio_transporte: 'Micro Urbano', origen: 'Pérez Velasco', calles: 'Av. Saavedra, Plaza Uyuni, Av. Busch', destino: 'Miraflores (Hospital Obrero)', tarifa: 1.50, reembolso_80: 1.20, estado: 'APROBADO' },
-        { numero: 8, becario_nombre: 'Mamani Gutierrez Noemi Ruth', ci: '7392011 LP', fecha: '2026-10-13', tramo: 'Vuelta', medio_transporte: 'Micro Urbano', origen: 'Miraflores (Hospital Obrero)', calles: 'Av. Busch, Calle Juan de la Riva', destino: 'Pérez Velasco', tarifa: 1.50, reembolso_80: 1.20, estado: 'APROBADO' },
-        { numero: 9, becario_nombre: 'Quisbert Alanoca Joel Alex', ci: '8910293 LP', fecha: '2026-10-16', tramo: 'Ida', medio_transporte: 'Minibús Directo', origen: 'Ciudad Satélite', calles: 'Av. Satélite, Autopista LP-EA, Calle Yanacocha', destino: 'Plaza Murillo', tarifa: 2.60, reembolso_80: 2.08, estado: 'APROBADO' },
-        { numero: 10, becario_nombre: 'Quisbert Alanoca Joel Alex', ci: '8910293 LP', fecha: '2026-10-16', tramo: 'Vuelta', medio_transporte: 'Minibús Directo', origen: 'Plaza Murillo', calles: 'Calle Ingavi, Autopista LP-EA, Av. Satélite', destino: 'Ciudad Satélite', tarifa: 2.60, reembolso_80: 2.08, estado: 'APROBADO' },
+        { numero: 1, becario_id: 1, becario_nombre: 'Aruquipa Mamani Juan Carlos', ci: '9123841 LP', fecha: '2026-10-02', tramo: 'Ida', medio_transporte: 'Minibús Interciudad', origen: 'Ceja El Alto', calles: 'Av. 6 de Marzo, Autopista LP-EA, Av. Montes', destino: 'San Francisco (Centro LP)', tarifa: 3.50, reembolso_80: 2.80, estado: 'APROBADO' },
+        { numero: 2, becario_id: 1, becario_nombre: 'Aruquipa Mamani Juan Carlos', ci: '9123841 LP', fecha: '2026-10-02', tramo: 'Vuelta', medio_transporte: 'Minibús Interciudad', origen: 'San Francisco (Centro LP)', calles: 'Av. Montes, Autopista LP-EA, Av. Franco Valle', destino: 'Ceja El Alto', tarifa: 3.50, reembolso_80: 2.80, estado: 'APROBADO' },
+        { numero: 3, becario_id: 2, becario_nombre: 'Condori Quispe Maria Belen', ci: '8492018 LP', fecha: '2026-10-05', tramo: 'Ida', medio_transporte: 'Minibús Tramo Corto', origen: 'Villa Adela', calles: 'Av. Bolivia, Av. Ladislao Cabrera', destino: 'Cruce Viacha', tarifa: 2.00, reembolso_80: 1.60, estado: 'APROBADO' },
+        { numero: 4, becario_id: 2, becario_nombre: 'Condori Quispe Maria Belen', ci: '8492018 LP', fecha: '2026-10-05', tramo: 'Vuelta', medio_transporte: 'Minibús Tramo Corto', origen: 'Cruce Viacha', calles: 'Av. Ladislao Cabrera, Av. Bolivia', destino: 'Villa Adela', tarifa: 2.00, reembolso_80: 1.60, estado: 'APROBADO' },
+        { numero: 5, becario_id: 3, becario_nombre: 'Flores Choque Samuel David', ci: '10293847 LP', fecha: '2026-10-09', tramo: 'Ida', medio_transporte: 'Mi Teleférico Morado', origen: 'Estación Obelisco', calles: 'Red Mi Teleférico Línea Morada', destino: 'Estación San Jorge', tarifa: 3.00, reembolso_80: 2.40, estado: 'APROBADO' },
+        { numero: 6, becario_id: 3, becario_nombre: 'Flores Choque Samuel David', ci: '10293847 LP', fecha: '2026-10-09', tramo: 'Vuelta', medio_transporte: 'Mi Teleférico Morado', origen: 'Estación San Jorge', calles: 'Red Mi Teleférico Línea Morada', destino: 'Estación Obelisco', tarifa: 3.00, reembolso_80: 2.40, estado: 'APROBADO' },
+        { numero: 7, becario_id: 4, becario_nombre: 'Mamani Gutierrez Noemi Ruth', ci: '7392011 LP', fecha: '2026-10-13', tramo: 'Ida', medio_transporte: 'Micro Urbano', origen: 'Pérez Velasco', calles: 'Av. Saavedra, Plaza Uyuni, Av. Busch', destino: 'Miraflores (Hospital Obrero)', tarifa: 1.50, reembolso_80: 1.20, estado: 'APROBADO' },
+        { numero: 8, becario_id: 4, becario_nombre: 'Mamani Gutierrez Noemi Ruth', ci: '7392011 LP', fecha: '2026-10-13', tramo: 'Vuelta', medio_transporte: 'Micro Urbano', origen: 'Miraflores (Hospital Obrero)', calles: 'Av. Busch, Calle Juan de la Riva', destino: 'Pérez Velasco', tarifa: 1.50, reembolso_80: 1.20, estado: 'APROBADO' },
+        { numero: 9, becario_id: 5, becario_nombre: 'Quisbert Alanoca Joel Alex', ci: '8910293 LP', fecha: '2026-10-16', tramo: 'Ida', medio_transporte: 'Minibús Directo', origen: 'Ciudad Satélite', calles: 'Av. Satélite, Autopista LP-EA, Calle Yanacocha', destino: 'Plaza Murillo', tarifa: 2.60, reembolso_80: 2.08, estado: 'APROBADO' },
+        { numero: 10, becario_id: 5, becario_nombre: 'Quisbert Alanoca Joel Alex', ci: '8910293 LP', fecha: '2026-10-16', tramo: 'Vuelta', medio_transporte: 'Minibús Directo', origen: 'Plaza Murillo', calles: 'Calle Ingavi, Autopista LP-EA, Av. Satélite', destino: 'Ciudad Satélite', tarifa: 2.60, reembolso_80: 2.08, estado: 'APROBADO' },
       ];
     }
 
     let total_multas_bs = 0;
+    const mapa_multas_becario_mes = new Map<string, number>();
+    const mapa_multas_becario_sin_mes = new Map<number, number>();
     if (this.multa_repo && typeof this.multa_repo.find === 'function') {
       try {
         const multas = await this.multa_repo.find();
-        total_multas_bs = Number(
-          (multas || [])
-            .reduce((acc, m) => acc + Math.max(0, Number(m.monto_bs || 0)), 0)
-            .toFixed(2),
-        );
+        for (const m of multas || []) {
+          const monto = Math.max(0, Number(m.monto_bs || 0));
+          if (monto <= 0) continue;
+          total_multas_bs = Number((total_multas_bs + monto).toFixed(2));
+          if (m.becario_id) {
+            const id_bec = Number(m.becario_id);
+            const fecha_ref = m.fecha_aplicacion || m.created_at;
+            const fecha_valida = fecha_ref ? new Date(fecha_ref) : null;
+            if (fecha_valida && !isNaN(fecha_valida.getTime())) {
+              const clave_mes = `${id_bec}|${fecha_valida.toISOString().slice(0, 7)}`;
+              mapa_multas_becario_mes.set(
+                clave_mes,
+                Number(((mapa_multas_becario_mes.get(clave_mes) || 0) + monto).toFixed(2)),
+              );
+            } else {
+              mapa_multas_becario_sin_mes.set(
+                id_bec,
+                Number(((mapa_multas_becario_sin_mes.get(id_bec) || 0) + monto).toFixed(2)),
+              );
+            }
+          }
+        }
       } catch {}
     }
 
-    const total_bruto = items_render.reduce((acc, r) => acc + r.tarifa, 0);
-    const total_devolucion = items_render.reduce((acc, r) => acc + r.reembolso_80, 0);
+    const total_bruto = Number(items_render.reduce((acc, r) => acc + r.tarifa, 0).toFixed(2));
+    const total_devolucion = Number(items_render.reduce((acc, r) => acc + r.reembolso_80, 0).toFixed(2));
     const monto_liquido_pagable = Math.max(0, Number((total_devolucion - total_multas_bs).toFixed(2)));
     const total_tramos = items_render.length;
     const becarios_unicos = new Set(items_render.map((r) => r.becario_nombre)).size;
+    const es_consolidado = total_tramos > UMBRAL_CONSOLIDADO_TRAMOS;
 
-    const filas_html = items_render
-      .map(
-        (r) => `
-        <tr>
-          <td style="text-align: center; font-weight: bold; font-family: monospace;">${r.numero}</td>
-          <td>
-            <strong>${r.becario_nombre}</strong><br/>
-            <small style="color: #64748B; font-family: monospace;">CI: ${r.ci}</small>
-          </td>
-          <td style="text-align: center; font-family: monospace;">${r.fecha}</td>
-          <td style="text-align: center;">
-            <span class="badge ${r.tramo === 'Ida' ? 'badge-ida' : 'badge-vuelta'}">${r.tramo}</span>
-          </td>
-          <td style="text-align: center; font-size: 8px;">${r.medio_transporte}</td>
-          <td>
-            <strong>${r.origen}</strong> <span style="color: #94A3B8;">&rarr;</span> <span style="color: #0284C7; font-weight: 500;">${r.calles}</span> <span style="color: #94A3B8;">&rarr;</span> <strong>${r.destino}</strong>
-          </td>
-          <td style="text-align: right; font-family: monospace;">Bs ${r.tarifa.toFixed(2)}</td>
-          <td style="text-align: right; font-family: monospace; font-weight: bold; color: #007BBE;">Bs ${r.reembolso_80.toFixed(2)}</td>
-          <td style="text-align: center;">
-            <span class="badge badge-aprobado">${r.estado}</span>
-          </td>
-        </tr>
-      `,
-      )
-      .join('');
+    let nota_volumen_html = '';
+    let tabla_html = '';
+
+    if (es_consolidado) {
+      const grupos = new Map<
+        string,
+        {
+          becario_id: number | null;
+          becario_nombre: string;
+          ci: string;
+          mes_clave: string;
+          mes_etiqueta: string;
+          total_tramos: number;
+          gasto_bruto_centavos: number;
+          reembolso_centavos: number;
+        }
+      >();
+
+      for (const r of items_render) {
+        const mes_clave = /^\d{4}-\d{2}/.test(r.fecha) ? r.fecha.slice(0, 7) : 'Sin-Mes';
+        const clave_becario = r.becario_id !== null ? `id:${r.becario_id}` : `nom:${r.becario_nombre}|${r.ci}`;
+        const clave_grupo = `${clave_becario}|${mes_clave}`;
+        let grupo = grupos.get(clave_grupo);
+        if (!grupo) {
+          let mes_etiqueta = mes_clave;
+          if (/^\d{4}-\d{2}$/.test(mes_clave)) {
+            const [anio_s, mes_s] = mes_clave.split('-');
+            const idx_mes = Number(mes_s) - 1;
+            mes_etiqueta =
+              idx_mes >= 0 && idx_mes < MESES_ESPANOL.length
+                ? `${MESES_ESPANOL[idx_mes]} ${anio_s}`
+                : mes_clave;
+          }
+          grupo = {
+            becario_id: r.becario_id,
+            becario_nombre: r.becario_nombre,
+            ci: r.ci,
+            mes_clave,
+            mes_etiqueta,
+            total_tramos: 0,
+            gasto_bruto_centavos: 0,
+            reembolso_centavos: 0,
+          };
+          grupos.set(clave_grupo, grupo);
+        }
+        grupo.total_tramos += 1;
+        grupo.gasto_bruto_centavos += Math.round(r.tarifa * 100);
+        grupo.reembolso_centavos += Math.round(r.reembolso_80 * 100);
+      }
+
+      const lista_consolidada = Array.from(grupos.values()).sort((a, b) => {
+        const cmp_mes = a.mes_clave.localeCompare(b.mes_clave);
+        if (cmp_mes !== 0) return cmp_mes;
+        return a.becario_nombre.localeCompare(b.becario_nombre, 'es');
+      });
+
+      const becarios_con_multa_general_aplicada = new Set<number>();
+      const filas_consolidadas = lista_consolidada
+        .map((g, idx) => {
+          const gasto_bruto = g.gasto_bruto_centavos / 100;
+          const reembolso_80 = g.reembolso_centavos / 100;
+          let multas_fila = 0;
+          if (g.becario_id !== null) {
+            const clave_m = `${g.becario_id}|${g.mes_clave}`;
+            multas_fila += mapa_multas_becario_mes.get(clave_m) || 0;
+            if (
+              !becarios_con_multa_general_aplicada.has(g.becario_id) &&
+              mapa_multas_becario_sin_mes.has(g.becario_id)
+            ) {
+              multas_fila += mapa_multas_becario_sin_mes.get(g.becario_id) || 0;
+              becarios_con_multa_general_aplicada.add(g.becario_id);
+            }
+          }
+          multas_fila = Number(multas_fila.toFixed(2));
+          const liquido_fila = Math.max(0, Number((reembolso_80 - multas_fila).toFixed(2)));
+          return `<tr><td class="tc mono bold">${idx + 1}</td><td><strong>${g.becario_nombre}</strong><br/><span class="sub-ci">CI: ${g.ci}</span></td><td class="tc">${g.mes_etiqueta}</td><td class="tc mono bold">${g.total_tramos}</td><td class="tr mono">Bs ${gasto_bruto.toFixed(2)}</td><td class="tr mono bold txt-pri">Bs ${reembolso_80.toFixed(2)}</td><td class="tr mono txt-warn">Bs ${multas_fila.toFixed(2)}</td><td class="tr mono bold txt-ok">Bs ${liquido_fila.toFixed(2)}</td></tr>`;
+        })
+        .join('');
+
+      nota_volumen_html = `<div class="nota-volumen"><strong>Resumen consolidado por volumen del periodo — ${total_tramos} tramos totales.</strong> Al superar los ${UMBRAL_CONSOLIDADO_TRAMOS} tramos en el rango seleccionado, se presenta el consolidado por becario y mes.</div>`;
+
+      tabla_html = `
+          <table class="tabla-datos">
+            <thead>
+              <tr>
+                <th style="width: 28px;">#</th>
+                <th>Becario / Carnet</th>
+                <th style="width: 95px;">Mes</th>
+                <th style="width: 70px;">Total Tramos</th>
+                <th style="width: 90px; text-align: right;">Gasto Bruto</th>
+                <th style="width: 95px; text-align: right;">80% Reconocido</th>
+                <th style="width: 85px; text-align: right;">(-) Multas</th>
+                <th style="width: 95px; text-align: right;">Líquido Pagable</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filas_consolidadas}
+            </tbody>
+            <tfoot>
+              <tr class="fila-total">
+                <td colspan="3" class="tr">TOTAL CONSOLIDADO DEL PERIODO:</td>
+                <td class="tc mono">${total_tramos}</td>
+                <td class="tr mono">Bs ${total_bruto.toFixed(2)}</td>
+                <td class="tr mono txt-pri">Bs ${total_devolucion.toFixed(2)}</td>
+                <td class="tr mono txt-warn">Bs ${total_multas_bs.toFixed(2)}</td>
+                <td class="tr mono txt-ok">Bs ${monto_liquido_pagable.toFixed(2)}</td>
+              </tr>
+            </tfoot>
+          </table>`;
+    } else {
+      const filas_html = items_render
+        .map(
+          (r) =>
+            `<tr><td class="tc mono bold">${r.numero}</td><td><strong>${r.becario_nombre}</strong><br/><span class="sub-ci">CI: ${r.ci}</span></td><td class="tc mono">${r.fecha}</td><td class="tc bold ${r.tramo === 'Ida' ? 'txt-ida' : 'txt-vuelta'}">${r.tramo}</td><td class="tc fs-sm">${r.medio_transporte}</td><td><strong>${r.origen}</strong> &rarr; <span class="ruta-calles">${r.calles}</span> &rarr; <strong>${r.destino}</strong></td><td class="tr mono">Bs ${r.tarifa.toFixed(2)}</td><td class="tr mono bold txt-pri">Bs ${r.reembolso_80.toFixed(2)}</td><td class="tc bold txt-ok fs-sm">${r.estado}</td></tr>`,
+        )
+        .join('');
+
+      tabla_html = `
+          <table class="tabla-datos">
+            <thead>
+              <tr>
+                <th style="width: 25px;">#</th>
+                <th style="width: 140px;">Becario / Carnet</th>
+                <th style="width: 65px;">Fecha</th>
+                <th style="width: 45px;">Tramo</th>
+                <th style="width: 90px;">Transporte</th>
+                <th>Ruta y Calles Declaradas (Origen &rarr; Calles &rarr; Destino)</th>
+                <th style="width: 55px; text-align: right;">Tarifa</th>
+                <th style="width: 65px; text-align: right;">80% (Bs)</th>
+                <th style="width: 75px;">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filas_html}
+            </tbody>
+            <tfoot>
+              <tr class="fila-total">
+                <td colspan="6" class="tr">
+                  REEMBOLSO 80%: Bs ${total_devolucion.toFixed(2)} &nbsp;|&nbsp; (-) MULTAS: Bs ${total_multas_bs.toFixed(2)} &nbsp;|&nbsp; LÍQUIDO PAGABLE NETO:
+                </td>
+                <td class="tr mono">Bs ${total_bruto.toFixed(2)}</td>
+                <td class="tr mono txt-ok">Bs ${monto_liquido_pagable.toFixed(2)}</td>
+                <td class="tc fs-sm txt-ok">NETO PAGABLE</td>
+              </tr>
+            </tfoot>
+          </table>`;
+    }
 
     const html = `
       <!DOCTYPE html>
@@ -3378,26 +3549,37 @@ export class PdfServicio {
           <title>FORMULARIO PARA CONTABILIDAD Y SRD - LIQUIDACIÓN DE PASAJES</title>
           <style>
             @page { size: A4 landscape; margin: 8mm 10mm; }
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1E293B; margin: 0; padding: 0; font-size: 9px; }
-            .header-table { width: 100%; border-collapse: collapse; border-bottom: 2px solid #007BBE; padding-bottom: 6px; margin-bottom: 10px; }
-            .header-title { font-size: 15px; font-weight: 800; color: #007BBE; text-transform: uppercase; }
-            .header-subtitle { font-size: 10px; color: #5B6D77; font-weight: 600; }
-            .meta-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 6px 12px; margin-bottom: 10px; display: flex; justify-content: space-between; font-size: 8.5px; }
+            body { font-family: Helvetica, Arial, sans-serif; color: #1E293B; margin: 0; padding: 0; font-size: 9px; }
+            .header-table { width: 100%; border-collapse: collapse; border-bottom: 2px solid #007BBE; margin-bottom: 8px; }
+            .header-title { font-size: 14px; font-weight: bold; color: #007BBE; text-transform: uppercase; }
+            .header-subtitle { font-size: 9.5px; color: #5B6D77; font-weight: 600; }
+            .meta-table { width: 100%; border-collapse: collapse; background: #F8FAFC; border: 1px solid #E2E8F0; margin-bottom: 8px; font-size: 8.5px; }
+            .meta-table td { padding: 5px 10px; }
             .meta-label { color: #64748B; font-weight: bold; text-transform: uppercase; }
-            .meta-val { color: #063A6B; font-weight: 800; }
-            .kpi-row { width: 100%; display: table; table-layout: fixed; margin-bottom: 10px; }
-            .kpi-col { display: table-cell; padding: 0 4px; }
-            .kpi-card { border: 1px solid #CBD5E1; border-radius: 6px; padding: 6px 8px; background: #FFFFFF; text-align: center; }
-            .kpi-title { font-size: 8px; font-weight: bold; text-transform: uppercase; color: #64748B; margin-bottom: 2px; }
-            .kpi-value { font-size: 13px; font-weight: 900; color: #007BBE; }
-            .tabla-datos { width: 100%; border-collapse: collapse; font-size: 8.5px; }
-            .tabla-datos th { background-color: #007BBE; color: #FFFFFF; padding: 5px 4px; text-transform: uppercase; font-size: 8px; letter-spacing: 0.3px; border: 1px solid #007BBE; }
-            .tabla-datos td { padding: 4px; border: 1px solid #E2E8F0; vertical-align: middle; }
-            .badge { display: inline-block; padding: 2px 5px; border-radius: 4px; font-size: 7.5px; font-weight: bold; }
-            .badge-ida { background: #E0F2FE; color: #0369A1; }
-            .badge-vuelta { background: #FEF3C7; color: #92400E; }
-            .badge-aprobado { background: #D1FAE5; color: #065F46; }
-            .firmas-row { width: 100%; display: table; table-layout: fixed; margin-top: 20px; }
+            .meta-val { color: #063A6B; font-weight: bold; }
+            .kpi-row { width: 100%; display: table; table-layout: fixed; margin-bottom: 8px; }
+            .kpi-col { display: table-cell; padding: 0 3px; }
+            .kpi-card { border: 1px solid #CBD5E1; padding: 5px 6px; background: #FFFFFF; text-align: center; }
+            .kpi-title { font-size: 7.5px; font-weight: bold; text-transform: uppercase; color: #64748B; margin-bottom: 2px; }
+            .kpi-value { font-size: 12px; font-weight: bold; color: #007BBE; }
+            .nota-volumen { background: #EFF6FF; border: 1px solid #93C5FD; color: #1E3A8A; padding: 6px 10px; margin-bottom: 8px; font-size: 8.5px; }
+            .tabla-datos { width: 100%; border-collapse: collapse; font-size: 8px; }
+            .tabla-datos th { background-color: #007BBE; color: #FFFFFF; padding: 4px; text-transform: uppercase; font-size: 7.5px; border: 1px solid #007BBE; }
+            .tabla-datos td { padding: 3px 4px; border: 1px solid #CBD5E1; vertical-align: middle; }
+            .fila-total { background: #F1F5F9; font-weight: bold; }
+            .tc { text-align: center; }
+            .tr { text-align: right; }
+            .mono { font-family: monospace; }
+            .bold { font-weight: bold; }
+            .fs-sm { font-size: 7.5px; }
+            .sub-ci { color: #64748B; font-family: monospace; font-size: 7.5px; }
+            .ruta-calles { color: #0284C7; }
+            .txt-pri { color: #007BBE; }
+            .txt-ida { color: #0369A1; }
+            .txt-vuelta { color: #92400E; }
+            .txt-warn { color: #B45309; }
+            .txt-ok { color: #065F46; }
+            .firmas-row { width: 100%; display: table; table-layout: fixed; margin-top: 18px; }
             .firma-col { display: table-cell; text-align: center; padding: 0 15px; }
             .firma-linea { border-top: 1px solid #475569; padding-top: 4px; font-weight: bold; font-size: 8px; color: #1E293B; }
             .footer-nota { font-size: 7.5px; color: #94A3B8; text-align: right; margin-top: 10px; border-top: 1px solid #E2E8F0; padding-top: 4px; }
@@ -3411,22 +3593,24 @@ export class PdfServicio {
                 <div class="header-subtitle">Fundación Diaconía FRIF-IFD · Programa BUMAND · Consolidado de Recorridos (80%) y Descuento de Multas</div>
               </td>
               <td style="text-align: right;">
-                <span style="background: #007BBE; color: #FFFFFF; font-size: 9px; font-weight: bold; padding: 4px 8px; border-radius: 4px; font-family: monospace;">
+                <span style="background: #007BBE; color: #FFFFFF; font-size: 8.5px; font-weight: bold; padding: 4px 8px; font-family: monospace;">
                   CONTABILIDAD Y SRD
                 </span>
               </td>
             </tr>
           </table>
 
-          <div class="meta-box">
-            <div>
-              <span class="meta-label">Periodo de Contabilidad y SRD:</span> <span class="meta-val">${rango_texto}</span> &nbsp;|&nbsp;
-              <span class="meta-label">Estudiantes Evaluados:</span> <span class="meta-val">${becarios_unicos} becarios</span>
-            </div>
-            <div>
-              <span class="meta-label">Fecha y Hora de Emisión:</span> <span class="meta-val">${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO')}</span>
-            </div>
-          </div>
+          <table class="meta-table">
+            <tr>
+              <td>
+                <span class="meta-label">Periodo de Contabilidad y SRD:</span> <span class="meta-val">${rango_texto}</span> &nbsp;|&nbsp;
+                <span class="meta-label">Estudiantes Evaluados:</span> <span class="meta-val">${becarios_unicos} becarios</span>
+              </td>
+              <td class="tr">
+                <span class="meta-label">Fecha y Hora de Emisión:</span> <span class="meta-val">${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO')}</span>
+              </td>
+            </tr>
+          </table>
 
           <div class="kpi-row">
             <div class="kpi-col">
@@ -3461,34 +3645,8 @@ export class PdfServicio {
             </div>
           </div>
 
-          <table class="tabla-datos">
-            <thead>
-              <tr>
-                <th style="width: 25px;">#</th>
-                <th style="width: 140px;">Becario / Carnet</th>
-                <th style="width: 65px;">Fecha</th>
-                <th style="width: 45px;">Tramo</th>
-                <th style="width: 90px;">Transporte</th>
-                <th>Ruta y Calles Declaradas (Origen &rarr; Calles &rarr; Destino)</th>
-                <th style="width: 55px; text-align: right;">Tarifa</th>
-                <th style="width: 65px; text-align: right;">80% (Bs)</th>
-                <th style="width: 75px;">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filas_html}
-            </tbody>
-            <tfoot>
-              <tr style="background: #F1F5F9; font-weight: bold;">
-                <td colspan="6" style="text-align: right; padding: 6px;">
-                  REEMBOLSO 80%: Bs ${total_devolucion.toFixed(2)} &nbsp;|&nbsp; (-) MULTAS: Bs ${total_multas_bs.toFixed(2)} &nbsp;|&nbsp; LÍQUIDO PAGABLE NETO:
-                </td>
-                <td style="text-align: right; font-family: monospace;">Bs ${total_bruto.toFixed(2)}</td>
-                <td style="text-align: right; font-family: monospace; color: #065F46;">Bs ${monto_liquido_pagable.toFixed(2)}</td>
-                <td style="text-align: center; font-size: 7.5px; color: #065F46;">NETO PAGABLE</td>
-              </tr>
-            </tfoot>
-          </table>
+          ${nota_volumen_html}
+          ${tabla_html}
 
           <div class="firmas-row">
             <div class="firma-col">
@@ -4489,6 +4647,12 @@ export class PdfServicio {
 
     if (recorridos_lista.length > 0) {
       for (const rec of recorridos_lista) {
+        const tipo_actividad =
+          rec.tipo_actividad ?? (rec as { tipoActividad?: string }).tipoActividad;
+        if (!esActividadReembolsablePasaje(tipo_actividad)) {
+          continue;
+        }
+
         const estado_sol = String(
           rec.solicitud?.estado ||
             (rec as { estado?: string }).estado ||
@@ -4542,10 +4706,17 @@ export class PdfServicio {
           continue;
         }
 
+        const recorridos_sol = Array.isArray(sol.recorridos) ? sol.recorridos : [];
+        const tiene_excluidos = recorridos_sol.some(
+          (r) => !esActividadReembolsablePasaje(r.tipo_actividad),
+        );
         const monto_dev = Number(sol.monto_devolucion);
         const monto_tot = Number(sol.monto_total);
-        const monto_80 =
-          Number.isFinite(monto_dev) && monto_dev > 0
+        const monto_80 = tiene_excluidos
+          ? recorridos_sol
+              .filter((r) => esActividadReembolsablePasaje(r.tipo_actividad))
+              .reduce((acc, r) => acc + (Number(r.tarifa) || 0) * 0.8, 0)
+          : Number.isFinite(monto_dev) && monto_dev > 0
             ? monto_dev
             : Number.isFinite(monto_tot)
               ? monto_tot * 0.8
@@ -4812,6 +4983,7 @@ export class PdfServicio {
     }
 
     let recorridos: Recorrido[] = [];
+    let hubo_recorridos_db = false;
     if (
       this.recorrido_repo &&
       typeof this.recorrido_repo.createQueryBuilder === 'function'
@@ -4834,11 +5006,18 @@ export class PdfServicio {
       }
 
       qb.orderBy('r.fecha', 'ASC').addOrderBy('r.id', 'ASC');
-      recorridos = await qb.getMany();
+      const recorridos_db = await qb.getMany();
+      hubo_recorridos_db = recorridos_db.length > 0;
+      recorridos = recorridos_db.filter((r) =>
+        esActividadReembolsablePasaje(
+          r.tipo_actividad || (r as { tipoActividad?: string }).tipoActividad,
+        ),
+      );
     }
 
     let solicitudes: SolicitudPasajes[] = [];
     if (
+      !hubo_recorridos_db &&
       recorridos.length === 0 &&
       this.solicitud_pasajes_repo &&
       typeof this.solicitud_pasajes_repo.createQueryBuilder === 'function'

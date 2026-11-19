@@ -79,7 +79,7 @@ export class AgregarRecorridoDto {
 
   @ApiPropertyOptional({
     example: 'practicas',
-    description: 'Tipo de actividad del recorrido (practicas, escuela_lideres, acciones_servicio)',
+    description: 'Tipo de actividad reembolsable del recorrido (practicas, acciones_servicio)',
     default: 'practicas',
   })
   @IsOptional()

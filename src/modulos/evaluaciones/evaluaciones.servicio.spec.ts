@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ValidationPipe } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EvaluacionesServicio, PESOS_PONDERADOS_MODULOS } from './evaluaciones.servicio';
 import { Evaluacion, EstadoEvaluacion } from './entidades/evaluacion.entidad';
@@ -9,8 +10,10 @@ import { EvaluacionPastor } from './entidades/evaluacion-pastor.entidad';
 import { PreguntaBienestar } from './entidades/pregunta-bienestar.entidad';
 import { EntregaTareaLideres, EstadoEntregaTarea } from './entidades/entrega-tarea-lideres.entidad';
 import { DocumentoSemestralBecario } from '../becarios/entidades/documento-semestral-becario.entidad';
+import { ConfiguracionInstitucional } from '../becarios/entidades/configuracion-institucional.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
+import { GuardarTareaCatalogoLideresDto } from './dtos/escuela-lideres.dto';
 
 describe('EvaluacionesServicio', () => {
   let servicio: EvaluacionesServicio;
@@ -23,6 +26,7 @@ describe('EvaluacionesServicio', () => {
   let becario_repo: any;
   let entrega_tarea_repo: any;
   let documento_semestral_repo: any;
+  let configuracion_repo: any;
 
   beforeEach(async () => {
     evaluacion_repo = {
@@ -86,6 +90,16 @@ describe('EvaluacionesServicio', () => {
       update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
+    let registro_config_memoria: any = null;
+    configuracion_repo = {
+      findOne: jest.fn().mockImplementation(async () => registro_config_memoria),
+      create: jest.fn().mockImplementation((d) => ({ ...d, id: 1 })),
+      save: jest.fn().mockImplementation(async (d) => {
+        registro_config_memoria = { ...d };
+        return registro_config_memoria;
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EvaluacionesServicio,
@@ -98,6 +112,7 @@ describe('EvaluacionesServicio', () => {
         { provide: getRepositoryToken(Becario), useValue: becario_repo },
         { provide: getRepositoryToken(EntregaTareaLideres), useValue: entrega_tarea_repo },
         { provide: getRepositoryToken(DocumentoSemestralBecario), useValue: documento_semestral_repo },
+        { provide: getRepositoryToken(ConfiguracionInstitucional), useValue: configuracion_repo },
       ],
     }).compile();
 
@@ -689,6 +704,109 @@ describe('EvaluacionesServicio', () => {
           facilitador,
         ),
       ).rejects.toThrow('No se encontró ningún becario registrado en la base de datos.');
+    });
+
+    it('debe validar GuardarTareaCatalogoLideresDto con ValidationPipe estricto aceptando alias y conservando lecturas_pdf y enlaces_lectura', async () => {
+      const pipe = new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      });
+
+      const entrada = {
+        tarea_numero: 5,
+        titulo: 'Misión y Liderazgo Comunitario',
+        modulo_tematico: 'Módulo III: Servicio Social',
+        descripcion: 'Leer el documento adjunto y responder el cuestionario.',
+        fecha_limite: '2026-11-30',
+        ponderacion: 8.33,
+        publicar_apk: true,
+        lecturas_pdf: [
+          {
+            nombre: 'Guia_Liderazgo.pdf',
+            url: '/uploads/escuela-lideres/guia-liderazgo.pdf',
+            tamano: '1.4 MB',
+          },
+        ],
+        enlaces_lectura: [
+          {
+            titulo: 'Artículo CETI',
+            url: 'https://ceti.example.org/lectura-5',
+          },
+        ],
+        lectura_pdf_url: '/uploads/escuela-lideres/guia-liderazgo.pdf',
+        lectura_pdf_nombre: 'Guia_Liderazgo.pdf',
+        enlace_lectura: 'https://ceti.example.org/lectura-5',
+      };
+
+      const validado = (await pipe.transform(entrada, {
+        type: 'body',
+        metatype: GuardarTareaCatalogoLideresDto,
+      })) as GuardarTareaCatalogoLideresDto;
+
+      expect(validado.tarea_numero).toBe(5);
+      expect(validado.modulo_tematico).toBe('Módulo III: Servicio Social');
+      expect(validado.publicar_apk).toBe(true);
+      expect(validado.lecturas_pdf).toEqual(entrada.lecturas_pdf);
+      expect(validado.enlaces_lectura).toEqual(entrada.enlaces_lectura);
+    });
+
+    it('debe persistir lecturas_pdf y enlaces_lectura en configuraciones_institucionales usando alias y devolverlos en obtenerTareasEscuelaLideres', async () => {
+      const becario_user: Usuario = { id: 10, nombre: 'Becario Prueba', rol: Rol.BECARIO } as any;
+      becario_repo.findOne.mockResolvedValue({ id: 7, usuario_id: 10 });
+      becario_repo.find.mockResolvedValue([{ id: 7, usuario_id: 10 }]);
+      periodo_repo.findOne.mockResolvedValue({ id: 2, estado: EstadoPeriodo.ABIERTO });
+      entrega_tarea_repo.findOne.mockResolvedValue(null);
+      entrega_tarea_repo.find.mockResolvedValue([]);
+
+      const guardado = await servicio.guardarTareaCatalogoEscuelaLideres({
+        tarea_numero: 4,
+        titulo: 'Taller de Liderazgo Cristiano',
+        modulo_tematico: 'Módulo II: Mayordomía',
+        descripcion: 'Analizar las lecturas obligatorias.',
+        publicar_apk: true,
+        lecturas_pdf: [
+          {
+            nombre: 'Lectura_04.pdf',
+            url: '/uploads/escuela-lideres/lectura-04.pdf',
+            tamano: '820 KB',
+          },
+        ],
+        enlaces_lectura: [
+          {
+            titulo: 'Video de apoyo',
+            url: 'https://ejemplo.org/video-04',
+          },
+        ],
+      });
+
+      expect(guardado.exito).toBe(true);
+      expect(guardado.tarea.numero).toBe(4);
+      expect(guardado.tarea.modulo).toBe('Módulo II: Mayordomía');
+      expect(guardado.tarea.publicada_apk).toBe(true);
+      expect(guardado.tarea.lecturas_pdf).toHaveLength(1);
+      expect(guardado.tarea.enlaces_lectura).toHaveLength(1);
+      expect(configuracion_repo.save).toHaveBeenCalled();
+
+      const listado = await servicio.obtenerTareasEscuelaLideres(becario_user, 7, 2);
+      const tarea_4 = listado.tareas.find((t: any) => t.numero === 4);
+      expect(tarea_4).toBeDefined();
+      expect(tarea_4!.modulo).toBe('Módulo II: Mayordomía');
+      expect(tarea_4!.lecturas_pdf).toEqual([
+        {
+          nombre: 'Lectura_04.pdf',
+          url: '/uploads/escuela-lideres/lectura-04.pdf',
+          tamano: '820 KB',
+        },
+      ]);
+      expect(tarea_4!.enlaces_lectura).toEqual([
+        {
+          titulo: 'Video de apoyo',
+          url: 'https://ejemplo.org/video-04',
+        },
+      ]);
+      expect(tarea_4!.lectura_pdf_url).toBe('/uploads/escuela-lideres/lectura-04.pdf');
+      expect(tarea_4!.enlace_lectura).toBe('https://ejemplo.org/video-04');
     });
   });
 });

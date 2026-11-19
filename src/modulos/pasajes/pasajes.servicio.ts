@@ -30,6 +30,20 @@ export interface CalculoReembolsoPasajes {
   devolucion_centavos: number;
 }
 
+export function esActividadReembolsablePasaje(tipo?: string | null): boolean {
+  if (!tipo) {
+    return true;
+  }
+  const normalizado = tipo
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return normalizado !== 'escuela lideres' && normalizado !== 'escuela de lideres';
+}
+
 @Injectable()
 export class PasajesServicio {
   constructor(
@@ -239,18 +253,21 @@ export class PasajesServicio {
   }
 
   async agregarRecorrido(dto: AgregarRecorridoDto): Promise<Recorrido> {
+    const tipo_actividad_crudo = dto.tipo_actividad || dto.tipoActividad || 'practicas';
+    if (!esActividadReembolsablePasaje(tipo_actividad_crudo)) {
+      throw new BadRequestException(
+        'Los pasajes de Escuela de Líderes no son reembolsables. Solo se reconocen Prácticas Pre Profesionales o Acciones de Servicio.',
+      );
+    }
+
     const becario_id_real = await this.resolverBecarioId(dto.becario_id || 0);
 
-    // Validación TAREA-14: Configuración administrativa de modalidad de pasajes (Solo Ida vs Ida y Vuelta)
     if (this.becarioRepositorio) {
       const becario = await this.becarioRepositorio.findOne({
         where: [{ id: becario_id_real }, ...(dto.becario_id ? [{ usuario_id: dto.becario_id }] : [])],
       });
       if (becario) {
-        const actividad = (dto.tipo_actividad || dto.tipoActividad || 'practicas') as
-          | 'practicas'
-          | 'escuela_lideres'
-          | 'acciones_servicio';
+        const actividad = tipo_actividad_crudo as 'practicas' | 'acciones_servicio';
         let modalidad: 'ida_y_vuelta' | 'solo_ida' = becario.modalidad_pasajes || 'ida_y_vuelta';
         if (becario.configuracion_pasajes_actividades && becario.configuracion_pasajes_actividades[actividad]) {
           modalidad = becario.configuracion_pasajes_actividades[actividad]!;
@@ -290,7 +307,7 @@ export class PasajesServicio {
       origen: dto.origen,
       destino: dto.destino,
       tarifa: Number(dto.tarifa),
-      tipo_actividad: dto.tipo_actividad || dto.tipoActividad || 'practicas',
+      tipo_actividad: tipo_actividad_crudo,
       apoyo_realizado: dto.apoyo_realizado || dto.apoyoRealizado,
       lat_origen: dto.lat_origen ?? dto.latOrigen,
       lng_origen: dto.lng_origen ?? dto.lngOrigen,
@@ -304,7 +321,12 @@ export class PasajesServicio {
     await this.recorridoRepositorio.save(nuevo_recorrido);
 
     const recorridos = await this.recorridoRepositorio.find({ where: { solicitud_id: solicitud.id } });
-    const calculo = this.calcularReembolsoCentavos(recorridos.map((r) => Number(r.tarifa)));
+    const recorridos_reembolsables = recorridos.filter((r) =>
+      esActividadReembolsablePasaje(r.tipo_actividad),
+    );
+    const calculo = this.calcularReembolsoCentavos(
+      recorridos_reembolsables.map((r) => Number(r.tarifa)),
+    );
 
     solicitud.monto_total = calculo.monto_total;
     solicitud.monto_devolucion = calculo.monto_devolucion;
@@ -391,7 +413,12 @@ export class PasajesServicio {
     await this.recorridoRepositorio.remove(recorrido);
 
     const recorridos_actuales = await this.recorridoRepositorio.find({ where: { solicitud_id: solicitud.id } });
-    const calculo = this.calcularReembolsoCentavos(recorridos_actuales.map((r) => Number(r.tarifa)));
+    const recorridos_reembolsables = recorridos_actuales.filter((r) =>
+      esActividadReembolsablePasaje(r.tipo_actividad),
+    );
+    const calculo = this.calcularReembolsoCentavos(
+      recorridos_reembolsables.map((r) => Number(r.tarifa)),
+    );
     solicitud.monto_total = calculo.monto_total;
     solicitud.monto_devolucion = calculo.monto_devolucion;
     await this.solicitudRepositorio.save(solicitud);
@@ -448,8 +475,23 @@ export class PasajesServicio {
   }
 
   private mapearSolicitudConMultas(s: SolicitudPasajes, multas_bs: number): SolicitudPasajes {
-    const monto_total = Number(s.monto_total) || 0;
-    const monto_devolucion = Number(s.monto_devolucion) || 0;
+    const recorridos_crudos = s.recorridos || [];
+    const recorridos_reembolsables = recorridos_crudos.filter((r) =>
+      esActividadReembolsablePasaje(r.tipo_actividad),
+    );
+    const tiene_excluidos = recorridos_reembolsables.length !== recorridos_crudos.length;
+    const calculo_reembolsable = tiene_excluidos
+      ? this.calcularReembolsoCentavos(
+          recorridos_reembolsables.map((r) => Number(r.tarifa) || 0),
+        )
+      : null;
+
+    const monto_total = calculo_reembolsable
+      ? calculo_reembolsable.monto_total
+      : Number(s.monto_total) || 0;
+    const monto_devolucion = calculo_reembolsable
+      ? calculo_reembolsable.monto_devolucion
+      : Number(s.monto_devolucion) || 0;
     const multas_asistencia_bs = Number((Number(multas_bs) || 0).toFixed(2));
     const multas_asistencia_centavos = Math.round(multas_asistencia_bs * 100);
     const devolucion_centavos = Math.round(monto_devolucion * 100);
@@ -467,7 +509,7 @@ export class PasajesServicio {
       multas_asistencia_centavos,
       monto_liquido_pagable,
       monto_liquido_pagable_centavos,
-      recorridos: (s.recorridos || []).map((r) => ({
+      recorridos: recorridos_reembolsables.map((r) => ({
         ...r,
         tarifa: Number(r.tarifa) || 0,
         calles_declaradas: r.calles_declaradas ?? null,
@@ -776,6 +818,11 @@ export class PasajesServicio {
           return b_id ? ids_mentor_permitidos!.has(b_id) : false;
         });
       }
+      recorridos_db = recorridos_db.filter((r) =>
+        esActividadReembolsablePasaje(
+          r.tipo_actividad || (r as { tipoActividad?: string }).tipoActividad,
+        ),
+      );
     }
 
     const nombres_dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -952,7 +999,12 @@ export class PasajesServicio {
       }
 
       qb.orderBy('recorrido.fecha', 'DESC').addOrderBy('recorrido.id', 'DESC');
-      recorridos_db = await qb.getMany();
+      const recorridos_crudos = await qb.getMany();
+      recorridos_db = recorridos_crudos.filter((r) =>
+        esActividadReembolsablePasaje(
+          r.tipo_actividad || (r as { tipoActividad?: string }).tipoActividad,
+        ),
+      );
     }
 
     const nombres_dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -1096,8 +1148,8 @@ export class PasajesServicio {
           calles_declaradas: 'Estación Obelisco → Línea Morada → Estación San Jorge',
           paradas_secuencia: ['Obelisco - Mariscal Santa Cruz', 'Red Mi Teleférico Línea Morada', 'San Jorge - Av. Arce'],
           medio_transporte: 'Mi Teleférico',
-          tipo_actividad: 'Escuela de Líderes',
-          apoyo_realizado: 'Asistencia y apoyo logístico en Escuela de Líderes',
+          tipo_actividad: 'Prácticas',
+          apoyo_realizado: 'Apoyo operativo en ventanilla de servicios institucionales',
           tarifa: 3.00,
           periodo: `Octubre ${anio_def}`,
         },
@@ -1112,8 +1164,8 @@ export class PasajesServicio {
           calles_declaradas: 'Estación San Jorge → Línea Morada → Estación Obelisco',
           paradas_secuencia: ['San Jorge - Av. Arce', 'Red Mi Teleférico Línea Morada', 'Obelisco - Mariscal Santa Cruz'],
           medio_transporte: 'Mi Teleférico',
-          tipo_actividad: 'Escuela de Líderes',
-          apoyo_realizado: 'Retorno de taller de liderazgo eclesial',
+          tipo_actividad: 'Prácticas',
+          apoyo_realizado: 'Retorno de jornada de prácticas en sede San Jorge',
           tarifa: 3.00,
           periodo: `Octubre ${anio_def}`,
         },
@@ -1160,8 +1212,8 @@ export class PasajesServicio {
           calles_declaradas: 'Ciudad Satélite → Autopista LP-EA → Calle Yanacocha → Plaza Murillo',
           paradas_secuencia: ['Ciudad Satélite', 'Autopista LP-EA', 'Plaza Murillo'],
           medio_transporte: 'Minibús Tramo Directo',
-          tipo_actividad: 'Escuela de Líderes',
-          apoyo_realizado: 'Coordinación devocional y estudio teológico CETI',
+          tipo_actividad: 'Prácticas',
+          apoyo_realizado: 'Revisión y clasificación documental de cartera institucional',
           tarifa: 2.60,
           periodo: `Octubre ${anio_def}`,
         },
@@ -1176,7 +1228,7 @@ export class PasajesServicio {
           calles_declaradas: 'Plaza Murillo → Calle Ingavi → Autopista → Ciudad Satélite',
           paradas_secuencia: ['Plaza Murillo', 'Calle Ingavi', 'Ciudad Satélite'],
           medio_transporte: 'Minibús Tramo Directo',
-          tipo_actividad: 'Escuela de Líderes',
+          tipo_actividad: 'Prácticas',
           apoyo_realizado: 'Retorno a residencia',
           tarifa: 2.60,
           periodo: `Octubre ${anio_def}`,
