@@ -32,22 +32,35 @@ export class DevocionalesServicio {
     private readonly tiempo_real_gateway?: TiempoRealGateway,
   ) {}
 
-  async crear(dto: CrearDevocionalDto, usuario_id?: number): Promise<Devocional> {
+  async crear(dto: CrearDevocionalDto, usuario_id?: number, rol_emisor?: string): Promise<Devocional> {
     let becario_id = dto.becario_id;
+    let becario_destino: Becario | null = null;
 
-    if (!becario_id && usuario_id) {
-      const becario = await this.repositorio_becario.findOne({
-        where: [{ usuario_id }, { id: usuario_id }],
+    if (becario_id) {
+      becario_destino = await this.repositorio_becario.findOne({
+        where: [{ id: becario_id }, { usuario_id: becario_id }],
+        relations: { usuario: true },
       });
-      if (!becario) {
+      if (becario_destino) {
+        becario_id = becario_destino.id;
+      }
+    } else if (usuario_id) {
+      becario_destino = await this.repositorio_becario.findOne({
+        where: [{ usuario_id }, { id: usuario_id }],
+        relations: { usuario: true },
+      });
+      if (!becario_destino) {
         throw new BadRequestException('Perfil de becario no encontrado para este usuario.');
       }
-      becario_id = becario.id;
+      becario_id = becario_destino.id;
     }
 
     if (!becario_id) {
       throw new BadRequestException('El campo becario_id es obligatorio.');
     }
+
+    const enviado_por_mentor =
+      rol_emisor === Rol.SUPERVISOR || rol_emisor === Rol.ADMINISTRADOR;
 
     const nuevo_devocional = this.repositorio_devocional.create({
       becario_id,
@@ -56,10 +69,24 @@ export class DevocionalesServicio {
       titulo: dto.titulo,
       reflexion: dto.reflexion,
       oracion_peticion: dto.oracion_peticion,
-      revisado_por_pastor: false,
+      comentario_pastoral: enviado_por_mentor ? 'Compartido por tu Mentor pastoral.' : null,
+      revisado_por_pastor: enviado_por_mentor,
     });
 
     const guardado = await this.repositorio_devocional.save(nuevo_devocional);
+
+    if (enviado_por_mentor && becario_destino?.usuario_id) {
+      try {
+        await this.servicio_notificaciones.crear({
+          usuario_id: becario_destino.usuario_id,
+          tipo: 'devocional_mentor',
+          mensaje: `Tu mentor compartió un versículo/devocional contigo: ${dto.cita_biblica} — "${dto.titulo}".`,
+        });
+      } catch {
+        // Notificación opcional no bloqueante
+      }
+    }
+
     this.tiempo_real_gateway?.notificarDevocional({ accion: 'crear', devocional: guardado });
     return guardado;
   }
@@ -136,6 +163,17 @@ export class DevocionalesServicio {
     devocional.comentario_pastoral = dto.comentario_pastoral;
     devocional.revisado_por_pastor = true;
     const guardado = await this.repositorio_devocional.save(devocional);
+    if (devocional.becario?.usuario_id) {
+      try {
+        await this.servicio_notificaciones.crear({
+          usuario_id: devocional.becario.usuario_id,
+          tipo: 'retroalimentacion_devocional',
+          mensaje: `Tu mentor dejó acompañamiento pastoral en tu devocional "${devocional.titulo}" (${devocional.cita_biblica}).`,
+        });
+      } catch {
+        // Notificación opcional no bloqueante
+      }
+    }
     this.tiempo_real_gateway?.notificarDevocional({ accion: 'retroalimentar', devocional: guardado });
     return guardado;
   }
@@ -165,9 +203,13 @@ export class DevocionalesServicio {
     });
   }
 
-  async crearCitaSeguimiento(supervisor_id: number, dto: CrearCitaSeguimientoDto): Promise<CitaSeguimiento> {
+  async crearCitaSeguimiento(
+    supervisor_id: number,
+    dto: CrearCitaSeguimientoDto,
+    rol_emisor?: string,
+  ): Promise<CitaSeguimiento> {
     const becario = await this.repositorio_becario.findOne({
-      where: { id: dto.becario_id },
+      where: [{ id: dto.becario_id }, { usuario_id: dto.becario_id }],
       relations: { usuario: true },
     });
 
@@ -176,6 +218,7 @@ export class DevocionalesServicio {
     }
 
     if (
+      rol_emisor !== Rol.ADMINISTRADOR &&
       becario.supervisor_id !== null &&
       becario.supervisor_id !== undefined &&
       becario.supervisor_id !== supervisor_id
@@ -185,7 +228,7 @@ export class DevocionalesServicio {
 
     const nueva_cita = this.repositorio_cita.create({
       supervisor_id,
-      becario_id: dto.becario_id,
+      becario_id: becario.id,
       fecha_cita: dto.fecha_cita,
       hora_cita: dto.hora_cita,
       modalidad: dto.modalidad || ModalidadCita.PRESENCIAL,
@@ -199,10 +242,11 @@ export class DevocionalesServicio {
 
     if (becario.usuario_id) {
       try {
+        const texto_versiculo = dto.cita_biblica ? ` Pasaje bíblico: ${dto.cita_biblica}.` : '';
         await this.servicio_notificaciones.crear({
           usuario_id: becario.usuario_id,
           tipo: 'cita_seguimiento',
-          mensaje: `Tienes una nueva cita de seguimiento agendada para el ${dto.fecha_cita} a las ${dto.hora_cita}. Modalidad: ${dto.modalidad || ModalidadCita.PRESENCIAL}.`,
+          mensaje: `Tienes una nueva cita de seguimiento agendada para el ${dto.fecha_cita} a las ${dto.hora_cita} (${dto.modalidad || ModalidadCita.PRESENCIAL}).${texto_versiculo}`,
         });
       } catch {
         // Notificación opcional no bloqueante
@@ -212,6 +256,11 @@ export class DevocionalesServicio {
     const cita_completa = await this.repositorio_cita.findOne({
       where: { id: cita_guardada.id },
       relations: { becario: { usuario: true }, supervisor: true },
+    });
+
+    this.tiempo_real_gateway?.notificarDevocional({
+      accion: 'crear_cita',
+      cita: cita_completa || cita_guardada,
     });
 
     return cita_completa || cita_guardada;

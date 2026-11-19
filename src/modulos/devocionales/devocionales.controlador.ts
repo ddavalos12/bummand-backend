@@ -31,11 +31,11 @@ import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 export class DevocionalesControlador {
   constructor(private readonly devocionalesServicio: DevocionalesServicio) {}
 
-  @Roles(Rol.BECARIO)
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post()
   @ApiOperation({
     summary: 'Registrar devocional o meditación bíblica',
-    description: 'Permite al becario registrar su lectura bíblica, reflexión personal y motivo de oración como parte de su formación diaconal.',
+    description: 'Permite al becario registrar su lectura bíblica o al mentor compartir un versículo/devocional asignado a su becario supervisado.',
   })
   @ApiResponse({ status: 201, description: 'Devocional registrado exitosamente.', type: Devocional })
   @ApiResponse({ status: 400, description: 'Datos incompletos o inválidos.' })
@@ -43,7 +43,7 @@ export class DevocionalesControlador {
     @Body() crearDevocionalDto: CrearDevocionalDto,
     @UsuarioActual() usuario: Usuario,
   ): Promise<Devocional> {
-    return this.devocionalesServicio.crear(crearDevocionalDto, usuario.id);
+    return this.devocionalesServicio.crear(crearDevocionalDto, usuario.id, usuario.rol);
   }
 
   @Roles(Rol.SUPERVISOR, Rol.BECARIO)
@@ -71,7 +71,7 @@ export class DevocionalesControlador {
 
   // --- Citas de Seguimiento y Supervisión Pastoral ---
 
-  @Roles(Rol.SUPERVISOR)
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get('mis-supervisados')
   @ApiOperation({
     summary: 'Listar becarios asignados al supervisor',
@@ -82,7 +82,7 @@ export class DevocionalesControlador {
     return this.devocionalesServicio.obtenerMisSupervisados(req.user.id);
   }
 
-  @Roles(Rol.SUPERVISOR)
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('citas')
   @ApiOperation({
     summary: 'Agendar cita de seguimiento y retroalimentación',
@@ -92,10 +92,10 @@ export class DevocionalesControlador {
   @ApiResponse({ status: 400, description: 'Becario no pertenece a la supervisión.' })
   @ApiResponse({ status: 404, description: 'Becario no encontrado.' })
   crearCita(@Req() req: any, @Body() dto: CrearCitaSeguimientoDto): Promise<CitaSeguimiento> {
-    return this.devocionalesServicio.crearCitaSeguimiento(req.user.id, dto);
+    return this.devocionalesServicio.crearCitaSeguimiento(req.user.id, dto, req.user.rol);
   }
 
-  @Roles(Rol.SUPERVISOR, Rol.BECARIO)
+  @Roles(Rol.SUPERVISOR, Rol.BECARIO, Rol.ADMINISTRADOR)
   @Get('citas')
   @ApiOperation({
     summary: 'Listar citas de seguimiento',
@@ -106,7 +106,7 @@ export class DevocionalesControlador {
     return this.devocionalesServicio.obtenerCitasSeguimiento(req.user);
   }
 
-  @Roles(Rol.SUPERVISOR)
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Patch('citas/:id')
   @ApiOperation({
     summary: 'Actualizar cita de seguimiento o registrar acuerdos',

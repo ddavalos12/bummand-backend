@@ -1,16 +1,37 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModulo } from './app.modulo';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { FiltroExcepcionesGlobal } from './nucleo/errores';
+import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModulo);
-  
+  const app = await NestFactory.create<NestExpressApplication>(AppModulo);
+
   app.enableCors({
     origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
+  });
+
+  // Servir archivos subidos (lecturas PDF de Escuela de Líderes, evidencias y respaldos académicos)
+  const directorio_uploads = join(process.cwd(), 'uploads');
+  if (!existsSync(directorio_uploads)) {
+    mkdirSync(directorio_uploads, { recursive: true });
+  }
+  const configurarCabecerasUploads = (res: { setHeader: (k: string, v: string) => void }) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  };
+  app.useStaticAssets(directorio_uploads, {
+    prefix: '/uploads/',
+    setHeaders: configurarCabecerasUploads,
+  });
+  app.useStaticAssets(directorio_uploads, {
+    prefix: '/api/uploads/',
+    setHeaders: configurarCabecerasUploads,
   });
 
   app.useGlobalPipes(new ValidationPipe({

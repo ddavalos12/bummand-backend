@@ -558,4 +558,91 @@ describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transport
       expect(filas_tbody).toBe(4);
     });
   });
+
+  describe('Asistencia de Escuela de Líderes (enlazado con Multas y Permisos)', () => {
+    it('incluye a TODOS los becarios, fija entrada 14:30 y enlaza permisos y multas de Escuela de Líderes', async () => {
+      const becarios_mock = [
+        { id: 1, ci: '13696496 LP', usuario: { nombre: 'Adai Belen Huayta Cardozo' } },
+        { id: 2, ci: '9160054 LP', usuario: { nombre: 'Edgar Elias Alarcon Huanca' } },
+        { id: 3, ci: '9107373 LP', usuario: { nombre: 'Daniel Davalos Quiñoñez' } },
+      ];
+      const registros_mock = [
+        {
+          id: 10,
+          becario_id: 1,
+          tipo: 'escuela_lideres',
+          fecha: new Date('2026-10-09T00:00:00Z'),
+          hora_prevista: '14:30',
+          hora_ingreso: '14:48',
+          minutos_retraso: 18,
+          becario: becarios_mock[0],
+        },
+        {
+          id: 11,
+          becario_id: 2,
+          tipo: 'escuela_lideres',
+          fecha: new Date('2026-10-09T00:00:00Z'),
+          hora_prevista: '14:30',
+          hora_ingreso: '14:25',
+          minutos_retraso: 0,
+          becario: becarios_mock[1],
+        },
+      ];
+      const justificaciones_mock = [
+        {
+          id: 20,
+          becario_id: 3,
+          tipo_incidencia: 'escuela_lideres',
+          referencia_id: null,
+          fecha_incidencia: new Date('2026-10-09T00:00:00Z'),
+          motivo: 'Examen parcial universitario',
+          estado: 'aprobada',
+          becario: becarios_mock[2],
+        },
+      ];
+      const multas_mock = [
+        {
+          id: 30,
+          becario_id: 1,
+          asistencia_id: 10,
+          minutos_retraso: 18,
+          monto_bs: 20,
+          motivo: 'Retraso de 18 min en Escuela de Líderes (11 a 30 min)',
+          fecha_aplicacion: new Date('2026-10-09T14:48:00Z'),
+          becario: becarios_mock[0],
+        },
+      ];
+
+      const servicio_pdf = new PdfServicio(
+        undefined,
+        undefined,
+        { createQueryBuilder: jest.fn().mockReturnValue(crearConstructorConsultaMock(registros_mock)) } as never,
+        { find: jest.fn().mockResolvedValue(becarios_mock) } as never,
+        undefined,
+        undefined,
+        undefined,
+        { createQueryBuilder: jest.fn().mockReturnValue(crearConstructorConsultaMock(justificaciones_mock)) } as never,
+        { createQueryBuilder: jest.fn().mockReturnValue(crearConstructorConsultaMock(multas_mock)) } as never,
+      );
+
+      const espia_pdf = jest
+        .spyOn(servicio_pdf, 'generarPdf')
+        .mockResolvedValue(Buffer.from('PDF_LIDERES_OK'));
+
+      const res = await servicio_pdf.generarAsistenciaEscuelaLideresPdf({
+        fecha_inicio: '2026-10-01',
+        fecha_fin: '2026-10-31',
+      });
+
+      expect(res.bufer.toString()).toBe('PDF_LIDERES_OK');
+      expect(res.nombre_archivo).toContain('Asistencia_Escuela_Lideres_Multas_Permisos');
+      const html = espia_pdf.mock.calls[0][0];
+      expect(html).toContain('14:30');
+      expect(html).toContain('Alarcon Huanca, Edgar Elias');
+      expect(html).toContain('Davalos Quiñoñez, Daniel');
+      expect(html).toContain('Huayta Cardozo, Adai Belen');
+      expect(html).toContain('Examen parcial universitario');
+      expect(html).toContain('Bs 20,00');
+    });
+  });
 });

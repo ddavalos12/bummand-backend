@@ -874,7 +874,10 @@ export class PdfServicio {
           : r.tipo === TipoAsistencia.ESCUELA_LIDERES
           ? 'Escuela de Líderes'
           : 'Acciones de Servicio';
-      const previsto = r.hora_prevista || '08:00';
+      const previsto =
+        r.tipo === TipoAsistencia.ESCUELA_LIDERES
+          ? '14:30'
+          : r.hora_prevista || '08:00';
       const real = r.hora_ingreso || '08:00';
       const retraso_m = r.minutos_retraso || 0;
       const horas = r.tipo === TipoAsistencia.ESCUELA_LIDERES ? 0 : Number(r.horas_trabajadas || 4.0);
@@ -1727,7 +1730,7 @@ export class PdfServicio {
           <table class="header-table">
             <tr>
               <td>
-                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y SRD · PROGRAMA BUMAND</div>
+                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y RSD · PROGRAMA BUMAND</div>
                 <div class="header-subtitle">Fundación Diaconía FRIF-IFD · Expediente Mensual de Recorridos y Liquidación de Pasajes (80%)</div>
               </td>
               <td style="text-align: right;">
@@ -2665,7 +2668,7 @@ export class PdfServicio {
           <table class="header-table">
             <tr>
               <td>
-                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y SRD · REFRIGERIOS BUMAND</div>
+                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y RSD · REFRIGERIOS BUMAND</div>
                 <div class="header-subtitle">Fundación Diaconía FRIF-IFD · Planilla Oficial de Rendición de Refrigerios y Solicitud de Devolución (100%)</div>
               </td>
               <td style="text-align: right;">
@@ -2675,7 +2678,7 @@ export class PdfServicio {
           </table>
 
           <div class="auditoria-bar">
-            <span><strong>CONTABILIDAD Y SRD:</strong> ${codigo_auditoria}</span>
+            <span><strong>CONTABILIDAD Y RSD:</strong> ${codigo_auditoria}</span>
             <span><strong>JORNADA DE VIERNES:</strong> ${fecha_formato.toUpperCase()}</span>
             <span><strong>ESTADO:</strong> ${refrigerio.estado_reposicion ? refrigerio.estado_reposicion.toUpperCase() : 'PROGRAMADO'}</span>
           </div>
@@ -2906,12 +2909,12 @@ export class PdfServicio {
           <table class="header-table">
             <tr>
               <td>
-                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y SRD · REFRIGERIOS BUMAND</div>
+                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y RSD · REFRIGERIOS BUMAND</div>
                 <div style="font-size: 10px; color: #035683; font-weight: bold;">Fundación Diaconía FRIF-IFD · Consolidado de Refrigerios y Devoluciones al 100%</div>
               </td>
               <td style="text-align: right;">
                 <span style="background: #007BBE; color: #FFFFFF; font-size: 9px; font-weight: bold; padding: 4px 8px; border-radius: 4px;">
-                  CONTABILIDAD Y SRD: ${rango_texto.toUpperCase()}
+                  CONTABILIDAD Y RSD: ${rango_texto.toUpperCase()}
                 </span>
               </td>
             </tr>
@@ -2963,7 +2966,7 @@ export class PdfServicio {
             </tbody>
             <tfoot>
               <tr style="background: #F1F5F9; font-weight: bold;">
-                <td colspan="4" style="text-align: right; padding: 5px;">TOTALES PARA CONTABILIDAD Y SRD:</td>
+                <td colspan="4" style="text-align: right; padding: 5px;">TOTALES PARA CONTABILIDAD Y RSD:</td>
                 <td style="text-align: center; font-family: monospace;">${total_raciones}</td>
                 <td style="text-align: right; font-family: monospace;">Bs ${total_gastado.toFixed(2)}</td>
                 <td style="text-align: right; font-family: monospace; color: #007BBE;">Bs ${total_devolucion.toFixed(2)}</td>
@@ -2973,7 +2976,7 @@ export class PdfServicio {
           </table>
 
           <div class="footer-nota">
-            Formulario Institucional extraído para Contabilidad y SRD · Sistema BUMAND · Emisión: ${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO')}.
+            Formulario Institucional extraído para Contabilidad y RSD · Sistema BUMAND · Emisión: ${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO')}.
           </div>
         </body>
       </html>
@@ -3023,7 +3026,7 @@ export class PdfServicio {
   }
 
   /**
-   * Genera el HTML oficial de Formulario para Contabilidad y SRD BUMAND (TAREA-08)
+   * Genera el HTML oficial de Formulario para Contabilidad y RSD BUMAND (TAREA-08)
    */
   generarConsolidadoAuditoriaHtml(datos: {
     fecha_inicio?: string;
@@ -3042,7 +3045,7 @@ export class PdfServicio {
       ? `Desde: ${datos.fecha_inicio} · Hasta: ${datos.fecha_fin}`
       : 'Periodo de Evaluación Integral';
 
-    const codigo_auditoria = `CONT-SRD-${Date.now().toString().slice(-6)}`;
+    const codigo_auditoria = `CONT-RSD-${Date.now().toString().slice(-6)}`;
     const multas_bs = Number(datos.total_multas_bs || 0);
     const liquido_pagable = Number(
       datos.monto_liquido_pagable ?? Math.max(0, Number(datos.total_monto_pasajes || 0) - multas_bs),
@@ -3053,7 +3056,7 @@ export class PdfServicio {
       <html lang="es">
         <head>
           <meta charset="UTF-8">
-          <title>FORMULARIO PARA CONTABILIDAD Y SRD - LIQUIDACIÓN DE PASAJES</title>
+          <title>FORMULARIO PARA CONTABILIDAD Y RSD - LIQUIDACIÓN DE PASAJES</title>
           <style>
             @page { size: A4 portrait; margin: 12mm 15mm; }
             body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1E293B; font-size: 10px; margin: 0; padding: 0; }
@@ -3077,8 +3080,8 @@ export class PdfServicio {
           <table class="header-table">
             <tr>
               <td>
-                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y SRD - LIQUIDACIÓN DE PASAJES</div>
-                <div style="font-size: 11px; color: #035683; font-weight: 600;">Fundación Diaconía FRIF-IFD · Programa BUMAND · Consolidado para Contabilidad y SRD</div>
+                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y RSD - LIQUIDACIÓN DE PASAJES</div>
+                <div style="font-size: 11px; color: #035683; font-weight: 600;">Fundación Diaconía FRIF-IFD · Programa BUMAND · Consolidado para Contabilidad y RSD</div>
               </td>
               <td style="text-align: right;">
                 <span class="auditoria-badge">${codigo_auditoria}</span>
@@ -3087,7 +3090,7 @@ export class PdfServicio {
           </table>
 
           <div class="rango-banner">
-            <strong>INTERVALO DE CONTABILIDAD Y SRD:</strong> ${rango_texto.toUpperCase()} &nbsp;|&nbsp;
+            <strong>INTERVALO DE CONTABILIDAD Y RSD:</strong> ${rango_texto.toUpperCase()} &nbsp;|&nbsp;
             <strong>FECHA Y HORA DE EXTRACCIÓN:</strong> ${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO')}
           </div>
 
@@ -3106,7 +3109,7 @@ export class PdfServicio {
           </div>
 
           <div class="card-resumen">
-            <div class="card-titulo">2. Formulario para Contabilidad y SRD — Liquidación de Pasajes (80%)</div>
+            <div class="card-titulo">2. Formulario para Contabilidad y RSD — Liquidación de Pasajes (80%)</div>
             <table class="metric-table">
               <tr>
                 <td class="metric-lbl">Total solicitudes de transporte procesadas:</td>
@@ -3121,7 +3124,7 @@ export class PdfServicio {
                 <td class="metric-val" style="color: #B45309;">- Bs ${multas_bs.toFixed(2)}</td>
               </tr>
               <tr>
-                <td class="metric-lbl"><strong>Líquido Pagable Neto (Contabilidad y SRD):</strong></td>
+                <td class="metric-lbl"><strong>Líquido Pagable Neto (Contabilidad y RSD):</strong></td>
                 <td class="metric-val" style="color: #065F46;">Bs ${liquido_pagable.toFixed(2)}</td>
               </tr>
             </table>
@@ -3151,13 +3154,13 @@ export class PdfServicio {
               <div style="font-size: 7.5px; color: #64748B;">Programa de Becas BUMAND</div>
             </div>
             <div class="firma-col">
-              <div class="firma-linea">Dirección y Finanzas (Contabilidad y SRD)</div>
+              <div class="firma-linea">Dirección y Finanzas (Contabilidad y RSD)</div>
               <div style="font-size: 7.5px; color: #64748B;">Fundación Diaconía FRIF - IFD</div>
             </div>
           </div>
 
           <div class="footer-nota">
-            Formulario Oficial para Contabilidad y SRD emitido mediante Puppeteer por el Sistema BUMAND (v2.0) · Rango: ${rango_texto}.
+            Formulario Oficial para Contabilidad y RSD emitido mediante Puppeteer por el Sistema BUMAND (v2.0) · Rango: ${rango_texto}.
           </div>
         </body>
       </html>
@@ -3250,7 +3253,7 @@ export class PdfServicio {
     });
 
     const bufer = await this.generarPdf(html);
-    const nombre_archivo = `Formulario_Contabilidad_SRD_BUMAND_${(filtros.fecha_inicio || 'inicio').replace(/-/g, '_')}_a_${(filtros.fecha_fin || 'fin').replace(/-/g, '_')}.pdf`;
+    const nombre_archivo = `Formulario_Contabilidad_RSD_BUMAND_${(filtros.fecha_inicio || 'inicio').replace(/-/g, '_')}_a_${(filtros.fecha_fin || 'fin').replace(/-/g, '_')}.pdf`;
 
     return { bufer, nombre_archivo };
   }
@@ -3546,7 +3549,7 @@ export class PdfServicio {
       <html lang="es">
         <head>
           <meta charset="UTF-8" />
-          <title>FORMULARIO PARA CONTABILIDAD Y SRD - LIQUIDACIÓN DE PASAJES</title>
+          <title>FORMULARIO PARA CONTABILIDAD Y RSD - LIQUIDACIÓN DE PASAJES</title>
           <style>
             @page { size: A4 landscape; margin: 8mm 10mm; }
             body { font-family: Helvetica, Arial, sans-serif; color: #1E293B; margin: 0; padding: 0; font-size: 9px; }
@@ -3589,12 +3592,12 @@ export class PdfServicio {
           <table class="header-table">
             <tr>
               <td>
-                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y SRD - LIQUIDACIÓN DE PASAJES</div>
+                <div class="header-title">FORMULARIO PARA CONTABILIDAD Y RSD - LIQUIDACIÓN DE PASAJES</div>
                 <div class="header-subtitle">Fundación Diaconía FRIF-IFD · Programa BUMAND · Consolidado de Recorridos (80%) y Descuento de Multas</div>
               </td>
               <td style="text-align: right;">
                 <span style="background: #007BBE; color: #FFFFFF; font-size: 8.5px; font-weight: bold; padding: 4px 8px; font-family: monospace;">
-                  CONTABILIDAD Y SRD
+                  CONTABILIDAD Y RSD
                 </span>
               </td>
             </tr>
@@ -3603,7 +3606,7 @@ export class PdfServicio {
           <table class="meta-table">
             <tr>
               <td>
-                <span class="meta-label">Periodo de Contabilidad y SRD:</span> <span class="meta-val">${rango_texto}</span> &nbsp;|&nbsp;
+                <span class="meta-label">Periodo de Contabilidad y RSD:</span> <span class="meta-val">${rango_texto}</span> &nbsp;|&nbsp;
                 <span class="meta-label">Estudiantes Evaluados:</span> <span class="meta-val">${becarios_unicos} becarios</span>
               </td>
               <td class="tr">
@@ -3658,7 +3661,7 @@ export class PdfServicio {
               <div style="font-size: 7.5px; color: #64748B;">Programa de Becas BUMAND</div>
             </div>
             <div class="firma-col">
-              <div class="firma-linea">Dirección y Finanzas (Contabilidad y SRD)</div>
+              <div class="firma-linea">Dirección y Finanzas (Contabilidad y RSD)</div>
               <div style="font-size: 7.5px; color: #64748B;">Fundación Diaconía FRIF - IFD</div>
             </div>
           </div>
@@ -5056,6 +5059,715 @@ export class PdfServicio {
       String(opciones.con_firma).toLowerCase() === 'true';
     const sufijo_firma = incluir_firma ? 'ConFirma' : 'SinFirma';
     const nombre_archivo = `Donacion_Transporte_BUMAND_${mes_limpio}_${sufijo_firma}.pdf`;
+
+    return { bufer, nombre_archivo };
+  }
+
+  /**
+   * Genera el HTML del Reporte de Asistencia de Escuela de Líderes para TODOS los becarios,
+   * enlazado con Multas y Permisos (hora oficial de entrada: 14:30 en todo campo)
+   */
+  generarAsistenciaEscuelaLideresHtml(datos: {
+    fecha_inicio?: string;
+    fecha_fin?: string;
+    becarios?: Becario[];
+    registros: RegistroAsistencia[];
+    multas: Multa[];
+    justificaciones: Justificacion[];
+  }): string {
+    const fecha_actual = new Date();
+    const HORA_OFICIAL_LIDERES = '14:30';
+    const rango_texto =
+      datos.fecha_inicio && datos.fecha_fin
+        ? `${datos.fecha_inicio} al ${datos.fecha_fin}`
+        : datos.fecha_inicio
+          ? `Desde ${datos.fecha_inicio}`
+          : datos.fecha_fin
+            ? `Hasta ${datos.fecha_fin}`
+            : 'Historial Semestral Vigente';
+
+    const escapar = (v: unknown) =>
+      String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    const normalizarFecha = (f: Date | string | null | undefined): string => {
+      if (!f) return '';
+      if (f instanceof Date) return f.toISOString().split('T')[0];
+      return String(f).split('T')[0];
+    };
+
+    const formatearBs = (valor: number): string =>
+      Number(valor || 0).toLocaleString('es-BO', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+    // Indexar multas por asistencia_id y por (becario_id + fecha)
+    const multas_por_asistencia = new Map<number, Multa[]>();
+    const multas_por_becario_fecha = new Map<string, Multa[]>();
+    const multas_usadas = new Set<number>();
+
+    for (const m of datos.multas || []) {
+      if (m.asistencia_id) {
+        const lista = multas_por_asistencia.get(m.asistencia_id) || [];
+        lista.push(m);
+        multas_por_asistencia.set(m.asistencia_id, lista);
+      }
+      const clave_bf = `${m.becario_id}|${normalizarFecha(m.fecha_aplicacion)}`;
+      const lista_bf = multas_por_becario_fecha.get(clave_bf) || [];
+      lista_bf.push(m);
+      multas_por_becario_fecha.set(clave_bf, lista_bf);
+    }
+
+    // Indexar justificaciones (permisos) por referencia_id y por (becario_id + fecha_incidencia)
+    const just_por_ref = new Map<number, Justificacion>();
+    const just_por_becario_fecha = new Map<string, Justificacion>();
+    const just_usadas = new Set<number>();
+
+    for (const j of datos.justificaciones || []) {
+      if (j.referencia_id) {
+        just_por_ref.set(j.referencia_id, j);
+      }
+      const clave_jf = `${j.becario_id}|${normalizarFecha(j.fecha_incidencia)}`;
+      just_por_becario_fecha.set(clave_jf, j);
+    }
+
+    interface FilaAsistenciaLideres {
+      numero: number;
+      becario_id: number;
+      becario_nombre: string;
+      ci: string;
+      fecha: string;
+      hora_prevista: string;
+      hora_gps: string;
+      retraso_m: number;
+      permiso_estado: string;
+      permiso_motivo: string;
+      multa_bs: number;
+      multa_motivo: string;
+      estado_final: string;
+      clase_estado: string;
+    }
+
+    const filas: FilaAsistenciaLideres[] = [];
+
+    for (const r of datos.registros || []) {
+      const fecha_str = normalizarFecha(r.fecha) || datos.fecha_inicio || '2026-10-01';
+      const nombre = r.becario?.usuario?.nombre || `Becario #${r.becario_id}`;
+      const ci = r.becario?.ci || 'S/C';
+      const clave_bf = `${r.becario_id}|${fecha_str}`;
+
+      const permiso = just_por_ref.get(r.id) || just_por_becario_fecha.get(clave_bf);
+      if (permiso?.id) just_usadas.add(permiso.id);
+
+      const multas_asoc = [
+        ...(multas_por_asistencia.get(r.id) || []),
+        ...(multas_por_becario_fecha.get(clave_bf) || []),
+      ].filter((m, idx, arr) => arr.findIndex((x) => x.id === m.id) === idx);
+      for (const m of multas_asoc) {
+        if (m.id) multas_usadas.add(m.id);
+      }
+
+      const multa_total = multas_asoc.reduce((acc, m) => acc + (Number(m.monto_bs) || 0), 0);
+      const multa_motivo = multas_asoc.map((m) => m.motivo).filter(Boolean).join('; ');
+      const retraso_m = Number(r.minutos_retraso) || 0;
+      const permiso_estado_raw = permiso?.estado ? String(permiso.estado).toLowerCase() : '';
+      const permiso_aprobado =
+        permiso_estado_raw === 'aprobada' ||
+        permiso_estado_raw === 'aprobado_administracion';
+
+      let estado_final = 'Puntual Conforme';
+      let clase_estado = 'badge-exito';
+      if (permiso_aprobado) {
+        estado_final = retraso_m > 0 ? 'Tardanza Justificada' : 'Con Permiso Aprobado';
+        clase_estado = 'badge-info';
+      } else if (multa_total > 0) {
+        estado_final = `Multa Aplicada (Bs ${formatearBs(multa_total)})`;
+        clase_estado = 'badge-error';
+      } else if (retraso_m > 0) {
+        estado_final = `Tardanza (+${retraso_m}m)`;
+        clase_estado = 'badge-alerta';
+      }
+
+      filas.push({
+        numero: filas.length + 1,
+        becario_id: r.becario_id,
+        becario_nombre: nombre,
+        ci,
+        fecha: fecha_str,
+        hora_prevista: HORA_OFICIAL_LIDERES,
+        hora_gps: r.hora_ingreso || '—',
+        retraso_m,
+        permiso_estado: permiso ? String(permiso.estado).toUpperCase() : 'SIN PERMISO',
+        permiso_motivo: permiso?.motivo || '—',
+        multa_bs: Number(multa_total.toFixed(2)),
+        multa_motivo: multa_motivo || '—',
+        estado_final,
+        clase_estado,
+      });
+    }
+
+    // Incluir permisos de Escuela de Líderes sin marcación de asistencia en esa fecha
+    for (const j of datos.justificaciones || []) {
+      if (j.id && just_usadas.has(j.id)) continue;
+      const fecha_str = normalizarFecha(j.fecha_incidencia);
+      const nombre = j.becario?.usuario?.nombre || `Becario #${j.becario_id}`;
+      const ci = j.becario?.ci || 'S/C';
+      const clave_bf = `${j.becario_id}|${fecha_str}`;
+      const multas_asoc = (multas_por_becario_fecha.get(clave_bf) || []).filter(
+        (m) => !m.id || !multas_usadas.has(m.id),
+      );
+      for (const m of multas_asoc) {
+        if (m.id) multas_usadas.add(m.id);
+      }
+      const multa_total = multas_asoc.reduce((acc, m) => acc + (Number(m.monto_bs) || 0), 0);
+      const estado_raw = String(j.estado || '').toLowerCase();
+      const aprobada = estado_raw === 'aprobada' || estado_raw === 'aprobado_administracion';
+      const rechazada = estado_raw === 'rechazada';
+
+      filas.push({
+        numero: filas.length + 1,
+        becario_id: j.becario_id,
+        becario_nombre: nombre,
+        ci,
+        fecha: fecha_str || '—',
+        hora_prevista: HORA_OFICIAL_LIDERES,
+        hora_gps: 'Sin marcación',
+        retraso_m: 0,
+        permiso_estado: String(j.estado || 'PENDIENTE').toUpperCase(),
+        permiso_motivo: j.motivo || 'Permiso solicitado',
+        multa_bs: Number(multa_total.toFixed(2)),
+        multa_motivo: multas_asoc.map((m) => m.motivo).filter(Boolean).join('; ') || '—',
+        estado_final: aprobada
+          ? 'Permiso Aprobado'
+          : rechazada
+            ? 'Permiso Rechazado'
+            : 'Permiso En Revisión',
+        clase_estado: aprobada ? 'badge-info' : rechazada ? 'badge-error' : 'badge-alerta',
+      });
+    }
+
+    // Incluir multas de Escuela de Líderes sin marcación asociada (ej. inasistencia)
+    for (const m of datos.multas || []) {
+      if (m.id && multas_usadas.has(m.id)) continue;
+      const fecha_str = normalizarFecha(m.fecha_aplicacion);
+      const nombre = m.becario?.usuario?.nombre || `Becario #${m.becario_id}`;
+      const ci = m.becario?.ci || 'S/C';
+      const monto = Number(m.monto_bs) || 0;
+      if (monto <= 0) continue;
+
+      filas.push({
+        numero: filas.length + 1,
+        becario_id: m.becario_id,
+        becario_nombre: nombre,
+        ci,
+        fecha: fecha_str || '—',
+        hora_prevista: HORA_OFICIAL_LIDERES,
+        hora_gps: 'Inasistencia / Sanción',
+        retraso_m: Number(m.minutos_retraso) || 0,
+        permiso_estado: 'SIN PERMISO',
+        permiso_motivo: '—',
+        multa_bs: Number(monto.toFixed(2)),
+        multa_motivo: m.motivo || 'Multa de asistencia',
+        estado_final: `Multa Aplicada (Bs ${formatearBs(monto)})`,
+        clase_estado: 'badge-error',
+      });
+    }
+
+    filas.sort((a, b) => a.fecha.localeCompare(b.fecha) || a.becario_nombre.localeCompare(b.becario_nombre, 'es'));
+    filas.forEach((f, idx) => {
+      f.numero = idx + 1;
+    });
+
+    // Construir nómina consolidada de TODOS los becarios (incluyendo quienes tienen 0 marcaciones)
+    interface ResumenBecarioLideres {
+      becario_id: number;
+      nombres: string;
+      apellidos: string;
+      nombre_completo: string;
+      ci: string;
+      sesiones: number;
+      puntuales: number;
+      tardanzas: number;
+      permisos_total: number;
+      permisos_aprobados: number;
+      detalle_permisos: string[];
+      multas_cantidad: number;
+      multas_bs: number;
+      detalle_multas: string[];
+    }
+
+    const mapa_resumen = new Map<number, ResumenBecarioLideres>();
+
+    const registrarBecarioEnMapa = (
+      id: number,
+      nombre_completo: string,
+      ci: string,
+    ): ResumenBecarioLideres => {
+      const existente = mapa_resumen.get(id);
+      if (existente) return existente;
+      const partes = this.separarNombresYApellidos(nombre_completo);
+      const nuevo: ResumenBecarioLideres = {
+        becario_id: id,
+        nombres: partes.nombres,
+        apellidos: partes.apellidos,
+        nombre_completo,
+        ci: ci || 'S/C',
+        sesiones: 0,
+        puntuales: 0,
+        tardanzas: 0,
+        permisos_total: 0,
+        permisos_aprobados: 0,
+        detalle_permisos: [],
+        multas_cantidad: 0,
+        multas_bs: 0,
+        detalle_multas: [],
+      };
+      mapa_resumen.set(id, nuevo);
+      return nuevo;
+    };
+
+    for (const b of datos.becarios || []) {
+      const nombre = b.usuario?.nombre?.trim();
+      if (!nombre) continue;
+      registrarBecarioEnMapa(b.id, nombre, b.ci || 'S/C');
+    }
+
+    for (const f of filas) {
+      const actual = registrarBecarioEnMapa(f.becario_id, f.becario_nombre, f.ci);
+      const hubo_marcacion =
+        f.hora_gps !== 'Sin marcación' && f.hora_gps !== 'Inasistencia / Sanción';
+      if (hubo_marcacion) {
+        actual.sesiones += 1;
+        if (f.retraso_m === 0 && f.multa_bs === 0) {
+          actual.puntuales += 1;
+        }
+      }
+      if (f.retraso_m > 0) actual.tardanzas += 1;
+      if (f.permiso_estado !== 'SIN PERMISO') {
+        actual.permisos_total += 1;
+        if (
+          f.permiso_estado === 'APROBADA' ||
+          f.permiso_estado === 'APROBADO_ADMINISTRACION'
+        ) {
+          actual.permisos_aprobados += 1;
+        }
+        actual.detalle_permisos.push(`${f.fecha}: ${f.permiso_estado} (${f.permiso_motivo})`);
+      }
+      if (f.multa_bs > 0) {
+        actual.multas_cantidad += 1;
+        actual.multas_bs = Number((actual.multas_bs + f.multa_bs).toFixed(2));
+        actual.detalle_multas.push(`${f.fecha}: Bs ${formatearBs(f.multa_bs)}`);
+      }
+    }
+
+    const resumen_becarios = Array.from(mapa_resumen.values()).sort(
+      (a, b) =>
+        a.apellidos.localeCompare(b.apellidos, 'es', { sensitivity: 'base' }) ||
+        a.nombres.localeCompare(b.nombres, 'es', { sensitivity: 'base' }),
+    );
+
+    const total_becarios = resumen_becarios.length;
+    const total_sesiones = resumen_becarios.reduce((acc, r) => acc + r.sesiones, 0);
+    const total_puntuales = resumen_becarios.reduce((acc, r) => acc + r.puntuales, 0);
+    const pct_puntualidad =
+      total_sesiones > 0 ? Math.round((total_puntuales / total_sesiones) * 100) : 100;
+    const total_permisos = resumen_becarios.reduce((acc, r) => acc + r.permisos_total, 0);
+    const total_permisos_aprobados = resumen_becarios.reduce(
+      (acc, r) => acc + r.permisos_aprobados,
+      0,
+    );
+    const total_multas_bs = Number(
+      resumen_becarios.reduce((acc, r) => acc + r.multas_bs, 0).toFixed(2),
+    );
+    const total_multas_cant = resumen_becarios.reduce(
+      (acc, r) => acc + r.multas_cantidad,
+      0,
+    );
+
+    const filas_nomina_html =
+      resumen_becarios.length === 0
+        ? `<tr><td colspan="8" style="text-align: center; padding: 14px; color: #64748B;">No se encontraron becarios registrados en la base de datos.</td></tr>`
+        : resumen_becarios
+            .map((r, i) => {
+              let estado_nomina = 'Sin registros en periodo';
+              let clase_nomina = 'badge-neutro';
+              if (r.multas_bs > 0) {
+                estado_nomina = `Con Multa (Bs ${formatearBs(r.multas_bs)})`;
+                clase_nomina = 'badge-error';
+              } else if (r.permisos_total > 0) {
+                estado_nomina = `Con Permiso (${r.permisos_aprobados}/${r.permisos_total} aprob.)`;
+                clase_nomina = 'badge-info';
+              } else if (r.tardanzas > 0) {
+                estado_nomina = `Tardanza (${r.tardanzas})`;
+                clase_nomina = 'badge-alerta';
+              } else if (r.sesiones > 0) {
+                estado_nomina = 'Asistencia Puntual';
+                clase_nomina = 'badge-exito';
+              }
+
+              const texto_permisos =
+                r.detalle_permisos.length > 0
+                  ? r.detalle_permisos.slice(0, 2).map((p) => escapar(p)).join('<br/>') +
+                    (r.detalle_permisos.length > 2
+                      ? `<br/><small style="color:#64748B;">+${r.detalle_permisos.length - 2} permiso(s) más</small>`
+                      : '')
+                  : `<span style="color: #94A3B8;">Sin permisos</span>`;
+
+              const texto_multas =
+                r.multas_bs > 0
+                  ? `<strong style="color:#DC2626;">Bs ${formatearBs(r.multas_bs)}</strong><br/><small style="color:#7F1D1D;">${r.multas_cantidad} multa(s)</small>`
+                  : `<span style="color: #64748B;">Bs 0,00</span>`;
+
+              return `
+                <tr style="background-color: ${r.multas_bs > 0 ? '#FEF2F2' : r.permisos_total > 0 ? '#EFF6FF' : i % 2 === 1 ? '#F8FAFC' : '#FFFFFF'};">
+                  <td style="text-align: center; font-family: monospace; font-weight: bold;">${i + 1}</td>
+                  <td>
+                    <strong>${escapar(r.apellidos)}, ${escapar(r.nombres)}</strong><br/>
+                    <small style="color: #64748B; font-family: monospace;">CI: ${escapar(r.ci)}</small>
+                  </td>
+                  <td style="text-align: center; font-family: monospace; font-weight: bold; color: #035683;">${HORA_OFICIAL_LIDERES}</td>
+                  <td style="text-align: center; font-family: monospace; font-weight: bold;">${r.sesiones}</td>
+                  <td style="text-align: center; font-family: monospace; color: ${r.tardanzas > 0 ? '#B45309' : '#059669'};">${r.tardanzas}</td>
+                  <td style="font-size: 7.5px;">${texto_permisos}</td>
+                  <td style="text-align: right; font-family: monospace;">${texto_multas}</td>
+                  <td style="text-align: center;"><span class="badge ${clase_nomina}">${escapar(estado_nomina)}</span></td>
+                </tr>`;
+            })
+            .join('');
+
+    const filas_detalle_mostrar =
+      filas.length > 150
+        ? filas.filter(
+            (f) =>
+              f.multa_bs > 0 ||
+              f.permiso_estado !== 'SIN PERMISO' ||
+              f.retraso_m > 0 ||
+              f.hora_gps === 'Sin marcación' ||
+              f.hora_gps === 'Inasistencia / Sanción',
+          )
+        : filas;
+    const nota_resumen_detalle =
+      filas.length > 150
+        ? `<div style="background:#EFF6FF;border:1px solid #93C5FD;color:#1E3A8A;padding:5px 9px;margin-bottom:6px;font-size:7.8px;border-radius:4px;"><strong>Vista consolidada de incidencias:</strong> Se muestran los ${filas_detalle_mostrar.length} registros con tardanzas, permisos o multas (de ${filas.length} eventos totales en el rango). La Tabla 1 incluye el 100% de las sesiones de todos los becarios.</div>`
+        : '';
+
+    const filas_detalle_html =
+      filas_detalle_mostrar.length === 0
+        ? `<tr><td colspan="9" style="text-align: center; padding: 12px; color: #64748B;">No existen marcaciones individuales, permisos ni multas de Escuela de Líderes registrados en el rango (${escapar(rango_texto)}).</td></tr>`
+        : filas_detalle_mostrar
+            .map(
+              (f, idx_det) => `
+          <tr style="background-color: ${f.multa_bs > 0 ? '#FEF2F2' : f.permiso_estado !== 'SIN PERMISO' ? '#EFF6FF' : f.retraso_m > 0 ? '#FFFBEB' : '#FFFFFF'};">
+            <td style="text-align: center; font-weight: bold; font-family: monospace;">${idx_det + 1}</td>
+            <td>
+              <strong>${escapar(f.becario_nombre)}</strong><br/>
+              <small style="color: #64748B; font-family: monospace;">CI: ${escapar(f.ci)}</small>
+            </td>
+            <td style="text-align: center; font-family: monospace;">${escapar(f.fecha)}</td>
+            <td style="text-align: center; font-family: monospace; color: #035683; font-weight: bold;">${HORA_OFICIAL_LIDERES}</td>
+            <td style="text-align: center; font-family: monospace;"><strong>${escapar(f.hora_gps)}</strong></td>
+            <td style="text-align: center; font-family: monospace; font-weight: bold; color: ${f.retraso_m > 0 ? '#B45309' : '#059669'};">
+              ${f.retraso_m > 0 ? `+${f.retraso_m} min` : '0 min'}
+            </td>
+            <td>
+              ${
+                f.permiso_estado !== 'SIN PERMISO'
+                  ? `<span class="badge badge-info">${escapar(f.permiso_estado)}</span><br/><small style="color: #334155;">${escapar(f.permiso_motivo)}</small>`
+                  : `<span style="color: #94A3B8; font-size: 7.5px;">Sin permiso</span>`
+              }
+            </td>
+            <td style="text-align: right; font-family: monospace; font-weight: bold; color: ${f.multa_bs > 0 ? '#DC2626' : '#64748B'};">
+              ${f.multa_bs > 0 ? `Bs ${formatearBs(f.multa_bs)}` : 'Bs 0,00'}
+              ${f.multa_bs > 0 && f.multa_motivo !== '—' ? `<br/><small style="font-family: Helvetica, Arial, sans-serif; font-weight: normal; color: #7F1D1D;">${escapar(f.multa_motivo)}</small>` : ''}
+            </td>
+            <td style="text-align: center;">
+              <span class="badge ${f.clase_estado}">${escapar(f.estado_final)}</span>
+            </td>
+          </tr>`,
+            )
+            .join('');
+
+    return `
+      <!DOCTYPE html>
+      <html lang="es">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Asistencia de Escuela de Líderes (Enlazado con Multas y Permisos) - BUMAND</title>
+          <style>
+            @page { size: A4 landscape; margin: 8mm 10mm; }
+            body { font-family: Helvetica, Arial, sans-serif; color: #1E293B; margin: 0; padding: 0; font-size: 8.5px; }
+            .header-table { width: 100%; border-collapse: collapse; border-bottom: 2px solid #035683; padding-bottom: 6px; margin-bottom: 8px; }
+            .header-title { font-size: 14px; font-weight: 800; color: #035683; text-transform: uppercase; }
+            .header-subtitle { font-size: 9.5px; color: #475569; font-weight: 600; }
+            .meta-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 6px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; font-size: 8.5px; }
+            .meta-label { color: #64748B; font-weight: bold; text-transform: uppercase; }
+            .meta-val { color: #035683; font-weight: 800; }
+            .kpi-row { width: 100%; display: table; table-layout: fixed; margin-bottom: 10px; }
+            .kpi-col { display: table-cell; padding: 0 3px; }
+            .kpi-card { border: 1px solid #CBD5E1; border-radius: 6px; padding: 6px 8px; background: #FFFFFF; text-align: center; }
+            .kpi-title { font-size: 7px; font-weight: bold; text-transform: uppercase; color: #64748B; margin-bottom: 2px; }
+            .kpi-value { font-size: 12px; font-weight: 900; color: #035683; }
+            .sec-titulo { font-size: 9.5px; font-weight: 800; color: #035683; text-transform: uppercase; margin: 10px 0 5px 0; border-bottom: 1px solid #CBD5E1; padding-bottom: 3px; }
+            .tabla-datos { width: 100%; border-collapse: collapse; font-size: 7.8px; }
+            .tabla-datos tfoot { display: table-row-group; }
+            .tabla-datos th { background-color: #035683; color: #FFFFFF; padding: 4px; text-transform: uppercase; font-size: 7.2px; border: 1px solid #035683; }
+            .tabla-datos td { padding: 3.5px 4px; border: 1px solid #CBD5E1; vertical-align: middle; }
+            .badge { display: inline-block; padding: 2px 5px; border-radius: 4px; font-size: 6.8px; font-weight: bold; }
+            .badge-exito { background: #D1FAE5; color: #065F46; }
+            .badge-alerta { background: #FEF3C7; color: #92400E; }
+            .badge-error { background: #FEE2E2; color: #991B1B; }
+            .badge-info { background: #DBEAFE; color: #1E40AF; }
+            .badge-neutro { background: #F1F5F9; color: #475569; }
+            .firmas-row { width: 100%; display: table; table-layout: fixed; margin-top: 22px; page-break-inside: avoid; }
+            .firma-col { display: table-cell; text-align: center; padding: 0 15px; }
+            .firma-linea { border-top: 1px solid #475569; padding-top: 4px; font-weight: bold; font-size: 8px; color: #1E293B; }
+            .footer-nota { font-size: 7.5px; color: #94A3B8; text-align: right; margin-top: 10px; border-top: 1px solid #E2E8F0; padding-top: 4px; }
+          </style>
+        </head>
+        <body>
+          <table class="header-table">
+            <tr>
+              <td>
+                <div class="header-title">ASISTENCIA DE ESCUELA DE LÍDERES · ENLAZADO CON MULTAS Y PERMISOS</div>
+                <div class="header-subtitle">Fundación Diaconía FRIF-IFD · Programa BUMAND · Nómina Completa de Becarios (Hora Oficial de Entrada: 14:30)</div>
+              </td>
+              <td style="text-align: right;">
+                <span style="background: #035683; color: #FFB600; font-size: 8.5px; font-weight: bold; padding: 4px 8px; border-radius: 4px; font-family: monospace;">
+                  ESCUELA DE LÍDERES · 14:30
+                </span>
+              </td>
+            </tr>
+          </table>
+
+          <div class="meta-box">
+            <div>
+              <span class="meta-label">Periodo Consultado:</span> <span class="meta-val">${escapar(rango_texto)}</span> &nbsp;|&nbsp;
+              <span class="meta-label">Hora de Entrada Oficial:</span> <span class="meta-val">${HORA_OFICIAL_LIDERES}</span> &nbsp;|&nbsp;
+              <span class="meta-label">Becarios en Nómina:</span> <span class="meta-val">${total_becarios}</span>
+            </div>
+            <div>
+              <span class="meta-label">Emisión:</span> <span class="meta-val">${fecha_actual.toLocaleDateString('es-BO')} ${fecha_actual.toLocaleTimeString('es-BO')}</span>
+            </div>
+          </div>
+
+          <div class="kpi-row">
+            <div class="kpi-col">
+              <div class="kpi-card">
+                <div class="kpi-title">Becarios en Nómina</div>
+                <div class="kpi-value">${total_becarios}</div>
+              </div>
+            </div>
+            <div class="kpi-col">
+              <div class="kpi-card">
+                <div class="kpi-title">Sesiones Marcadas</div>
+                <div class="kpi-value">${total_sesiones}</div>
+              </div>
+            </div>
+            <div class="kpi-col">
+              <div class="kpi-card" style="border-color: #A7F3D0; background: #ECFDF5;">
+                <div class="kpi-title" style="color: #065F46;">Puntualidad (14:30)</div>
+                <div class="kpi-value" style="color: #065F46;">${pct_puntualidad}%</div>
+              </div>
+            </div>
+            <div class="kpi-col">
+              <div class="kpi-card" style="border-color: #BFDBFE; background: #EFF6FF;">
+                <div class="kpi-title" style="color: #1E40AF;">Permisos Enlazados</div>
+                <div class="kpi-value" style="color: #1E40AF;">${total_permisos} (${total_permisos_aprobados} aprob.)</div>
+              </div>
+            </div>
+            <div class="kpi-col">
+              <div class="kpi-card" style="border-color: #FECACA; background: #FEF2F2;">
+                <div class="kpi-title" style="color: #991B1B;">Multas Vinculadas (${total_multas_cant})</div>
+                <div class="kpi-value" style="color: #DC2626;">Bs ${formatearBs(total_multas_bs)}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sec-titulo">1. Nómina Completa de Todos los Becarios · Asistencia Escuela de Líderes, Permisos y Multas</div>
+          <table class="tabla-datos">
+            <thead>
+              <tr>
+                <th style="width: 24px;">N°</th>
+                <th>Apellidos y Nombres / C.I.</th>
+                <th style="width: 58px;">Hora Prog.</th>
+                <th style="width: 56px;">Sesiones</th>
+                <th style="width: 56px;">Tardanzas</th>
+                <th style="width: 200px;">Permisos / Justificaciones Enlazados</th>
+                <th style="width: 82px; text-align: right;">Multas (Bs)</th>
+                <th style="width: 112px;">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filas_nomina_html}
+            </tbody>
+            <tfoot>
+              <tr style="background: #F1F5F9; font-weight: bold;">
+                <td colspan="3" style="text-align: right; padding: 5px;">TOTALES GENERALES (${total_becarios} BECARIOS):</td>
+                <td style="text-align: center; font-family: monospace;">${total_sesiones}</td>
+                <td style="text-align: center; font-family: monospace;">${resumen_becarios.reduce((a, r) => a + r.tardanzas, 0)}</td>
+                <td style="font-family: monospace; color: #1E40AF;">${total_permisos} permiso(s) · ${total_permisos_aprobados} aprobado(s)</td>
+                <td style="text-align: right; font-family: monospace; color: #DC2626;">Bs ${formatearBs(total_multas_bs)}</td>
+                <td style="text-align: center; font-size: 7px; color: #035683;">HORA OFICIAL 14:30</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="sec-titulo" style="margin-top: 14px;">2. Detalle Cronológico de Asistencias, Permisos y Multas en Escuela de Líderes</div>
+          ${nota_resumen_detalle}
+          <table class="tabla-datos">
+            <thead>
+              <tr>
+                <th style="width: 24px;">#</th>
+                <th>Becario / C.I.</th>
+                <th style="width: 64px;">Fecha</th>
+                <th style="width: 50px;">Prog.</th>
+                <th style="width: 68px;">Ingreso GPS</th>
+                <th style="width: 52px;">Retraso</th>
+                <th style="width: 155px;">Permiso / Justificación</th>
+                <th style="width: 110px; text-align: right;">Multa (Bs)</th>
+                <th style="width: 105px;">Estado Final</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filas_detalle_html}
+            </tbody>
+          </table>
+
+          <div class="firmas-row">
+            <div class="firma-col">
+              <div class="firma-linea">Pamela Sanchez Cachi</div>
+              <div style="font-size: 7.5px; color: #64748B;">Encargado de Responsabilidad Social Diaconal</div>
+            </div>
+            <div class="firma-col">
+              <div class="firma-linea">Samuel Martín Durán Baspineiro</div>
+              <div style="font-size: 7.5px; color: #64748B;">Subgerente Nacional de Sostenibilidad y Responsabilidad Diaconal</div>
+            </div>
+          </div>
+
+          <div class="footer-nota">
+            Reporte oficial de Asistencia de Escuela de Líderes (todos los becarios, entrada 14:30, enlazado con permisos y multas) · Sistema BUMAND (v2.0).
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Genera el PDF del Reporte de Asistencia de Escuela de Líderes para TODOS los becarios enlazado con Multas y Permisos
+   */
+  async generarAsistenciaEscuelaLideresPdf(opciones: {
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): Promise<{ bufer: Buffer; nombre_archivo: string }> {
+    let becarios: Becario[] = [];
+    let registros: RegistroAsistencia[] = [];
+    let justificaciones: Justificacion[] = [];
+    let multas: Multa[] = [];
+
+    if (this.becario_repo && typeof this.becario_repo.find === 'function') {
+      becarios = await this.becario_repo.find({ relations: { usuario: true } });
+    }
+
+    if (
+      this.registro_asistencia_repo &&
+      typeof this.registro_asistencia_repo.createQueryBuilder === 'function'
+    ) {
+      const qb = this.registro_asistencia_repo
+        .createQueryBuilder('a')
+        .leftJoinAndSelect('a.becario', 'bec')
+        .leftJoinAndSelect('bec.usuario', 'usu')
+        .where('a.tipo = :tipo', { tipo: TipoAsistencia.ESCUELA_LIDERES });
+
+      if (opciones.fecha_inicio && opciones.fecha_fin) {
+        qb.andWhere('a.fecha >= :inicio AND a.fecha <= :fin', {
+          inicio: opciones.fecha_inicio,
+          fin: opciones.fecha_fin,
+        });
+      } else if (opciones.fecha_inicio) {
+        qb.andWhere('a.fecha >= :inicio', { inicio: opciones.fecha_inicio });
+      } else if (opciones.fecha_fin) {
+        qb.andWhere('a.fecha <= :fin', { fin: opciones.fecha_fin });
+      }
+
+      qb.orderBy('a.fecha', 'ASC').addOrderBy('a.id', 'ASC');
+      registros = await qb.getMany();
+    }
+
+    if (
+      this.justificacion_repo &&
+      typeof this.justificacion_repo.createQueryBuilder === 'function'
+    ) {
+      const qb_j = this.justificacion_repo
+        .createQueryBuilder('j')
+        .leftJoinAndSelect('j.becario', 'bec')
+        .leftJoinAndSelect('bec.usuario', 'usu')
+        .where('j.tipo_incidencia = :tipo', { tipo: 'escuela_lideres' });
+
+      if (opciones.fecha_inicio && opciones.fecha_fin) {
+        qb_j.andWhere('j.fecha_incidencia >= :inicio AND j.fecha_incidencia <= :fin', {
+          inicio: opciones.fecha_inicio,
+          fin: opciones.fecha_fin,
+        });
+      } else if (opciones.fecha_inicio) {
+        qb_j.andWhere('j.fecha_incidencia >= :inicio', { inicio: opciones.fecha_inicio });
+      } else if (opciones.fecha_fin) {
+        qb_j.andWhere('j.fecha_incidencia <= :fin', { fin: opciones.fecha_fin });
+      }
+
+      qb_j.orderBy('j.fecha_incidencia', 'ASC').addOrderBy('j.id', 'ASC');
+      justificaciones = await qb_j.getMany();
+    }
+
+    if (
+      this.multa_repo &&
+      typeof this.multa_repo.createQueryBuilder === 'function'
+    ) {
+      const qb_m = this.multa_repo
+        .createQueryBuilder('m')
+        .leftJoinAndSelect('m.becario', 'bec')
+        .leftJoinAndSelect('bec.usuario', 'usu')
+        .leftJoinAndSelect('m.asistencia', 'asis');
+
+      if (opciones.fecha_inicio && opciones.fecha_fin) {
+        qb_m.where(
+          'm.fecha_aplicacion >= :inicio AND m.fecha_aplicacion <= :fin',
+          {
+            inicio: `${opciones.fecha_inicio} 00:00:00`,
+            fin: `${opciones.fecha_fin} 23:59:59`,
+          },
+        );
+      }
+
+      const todas_multas = await qb_m.orderBy('m.fecha_aplicacion', 'ASC').getMany();
+      const ids_asistencia = new Set(registros.map((r) => r.id));
+      multas = todas_multas.filter((m) => {
+        if (m.asistencia_id && ids_asistencia.has(m.asistencia_id)) return true;
+        if (m.asistencia?.tipo === TipoAsistencia.ESCUELA_LIDERES) return true;
+        const motivo = String(m.motivo || '').toLowerCase();
+        return (
+          motivo.includes('escuela') ||
+          motivo.includes('lider') ||
+          motivo.includes('líder') ||
+          motivo.includes('viernes')
+        );
+      });
+    }
+
+    const html = this.generarAsistenciaEscuelaLideresHtml({
+      fecha_inicio: opciones.fecha_inicio,
+      fecha_fin: opciones.fecha_fin,
+      becarios,
+      registros,
+      multas,
+      justificaciones,
+    });
+
+    const bufer = await this.generarPdf(html);
+    const sufijo = `${(opciones.fecha_inicio || 'general').replace(/-/g, '_')}_a_${(opciones.fecha_fin || 'actual').replace(/-/g, '_')}`;
+    const nombre_archivo = `Asistencia_Escuela_Lideres_Multas_Permisos_${sufijo}.pdf`;
 
     return { bufer, nombre_archivo };
   }

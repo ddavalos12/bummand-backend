@@ -251,8 +251,8 @@ export class PdfControlador {
 
   @Get('refrigerios/consolidado')
   @ApiOperation({
-    summary: 'Generar y descargar formulario consolidado de refrigerios en PDF para Contabilidad y SRD',
-    description: 'Genera el PDF con el resumen institucional para Contabilidad y SRD de los refrigerios del intervalo con desglose de duplas, montos y becarios receptores.',
+    summary: 'Generar y descargar formulario consolidado de refrigerios en PDF para Contabilidad y RSD',
+    description: 'Genera el PDF con el resumen institucional para Contabilidad y RSD de los refrigerios del intervalo con desglose de duplas, montos y becarios receptores.',
   })
   @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
   @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
@@ -279,7 +279,7 @@ export class PdfControlador {
 
   @Get('refrigerios/:id')
   @ApiOperation({
-    summary: 'Generar y descargar planilla oficial de refrigerio en PDF para Contabilidad y SRD (TAREA-07, TAREA-15)',
+    summary: 'Generar y descargar planilla oficial de refrigerio en PDF para Contabilidad y RSD (TAREA-07, TAREA-15)',
     description: 'Renderiza mediante Puppeteer la planilla oficial con membrete Diaconía, los 2 becarios de la dupla, ingredientes, devolución al 100% y becario receptor único.',
   })
   @ApiParam({ name: 'id', description: 'ID del refrigerio', type: String, example: '1' })
@@ -303,8 +303,8 @@ export class PdfControlador {
 
   @Get('refrigerios')
   @ApiOperation({
-    summary: 'Generar formulario de refrigerios en PDF para Contabilidad y SRD con intervalo de fechas (TAREA-07, TAREA-08)',
-    description: 'Genera el formulario consolidado de refrigerios para Contabilidad y SRD.',
+    summary: 'Generar formulario de refrigerios en PDF para Contabilidad y RSD con intervalo de fechas (TAREA-07, TAREA-08)',
+    description: 'Genera el formulario consolidado de refrigerios para Contabilidad y RSD.',
   })
   @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
   @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
@@ -331,13 +331,13 @@ export class PdfControlador {
 
   @Get(['consolidado-auditoria', 'consolidado-contabilidad', 'formulario-contabilidad'])
   @ApiOperation({
-    summary: 'Generar Formulario para Contabilidad y SRD consolidado en PDF (TAREA-08)',
-    description: 'Consolida horas de asistencia, liquidación de pasajes (80%) descontando multas y reembolsos de refrigerio (100%) para Contabilidad y SRD por intervalo de fechas.',
+    summary: 'Generar Formulario para Contabilidad y RSD consolidado en PDF (TAREA-08)',
+    description: 'Consolida horas de asistencia, liquidación de pasajes (80%) descontando multas y reembolsos de refrigerio (100%) para Contabilidad y RSD por intervalo de fechas.',
   })
   @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
   @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
   @ApiProduces('application/pdf')
-  @ApiResponse({ status: 200, description: 'Archivo binario del Formulario para Contabilidad y SRD en PDF descargado.' })
+  @ApiResponse({ status: 200, description: 'Archivo binario del Formulario para Contabilidad y RSD en PDF descargado.' })
   async generarConsolidadoAuditoria(
     @Query('fecha_inicio') fecha_inicio: string | undefined,
     @Query('fecha_fin') fecha_fin: string | undefined,
@@ -359,8 +359,8 @@ export class PdfControlador {
 
   @Get('pasajes-general')
   @ApiOperation({
-    summary: 'Generar y descargar Formulario para Contabilidad y SRD de pasajes en PDF (TAREA-07, TAREA-01)',
-    description: 'Genera el Formulario para Contabilidad y SRD de recorridos y solicitud de pasajes con detalle de tramos, calles declaradas (origen -> calles -> destino), liquidación del 80% y descuento de multas.',
+    summary: 'Generar y descargar Formulario para Contabilidad y RSD de pasajes en PDF (TAREA-07, TAREA-01)',
+    description: 'Genera el Formulario para Contabilidad y RSD de recorridos y solicitud de pasajes con detalle de tramos, calles declaradas (origen -> calles -> destino), liquidación del 80% y descuento de multas.',
   })
   @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
   @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
@@ -512,6 +512,38 @@ export class PdfControlador {
       con_firma,
       firmante_1,
       firmante_2,
+    });
+
+    respuesta.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=${resultado.nombre_archivo}`,
+      'Content-Length': resultado.bufer.length,
+    });
+
+    respuesta.end(resultado.bufer);
+  }
+
+  @Get('asistencia-escuela-lideres')
+  @ApiOperation({
+    summary: 'Generar y descargar Reporte de Asistencia de Escuela de Líderes (enlazado con Multas y Permisos)',
+    description:
+      'Consolida las asistencias de Escuela de Líderes vinculándolas en vivo con permisos/justificaciones y multas aplicadas en el intervalo.',
+  })
+  @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({
+    status: 200,
+    description: 'Archivo binario del Reporte de Asistencia de Escuela de Líderes con Multas y Permisos en PDF.',
+  })
+  async generarAsistenciaEscuelaLideres(
+    @Query('fecha_inicio') fecha_inicio: string | undefined,
+    @Query('fecha_fin') fecha_fin: string | undefined,
+    @Res() respuesta: Response,
+  ) {
+    const resultado = await this.pdf_servicio.generarAsistenciaEscuelaLideresPdf({
+      fecha_inicio,
+      fecha_fin,
     });
 
     respuesta.set({
