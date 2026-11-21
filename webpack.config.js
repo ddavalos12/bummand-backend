@@ -1,5 +1,17 @@
 const nodeExternals = require('webpack-node-externals');
 
+const MODULOS_ESM_EMPAQUETAR = [
+  /^@nestjs\/config(\/.*)?$/,
+  /^@nestjs\/typeorm(\/.*)?$/,
+  /^@nestjs\/jwt(\/.*)?$/,
+  /^@nestjs\/passport(\/.*)?$/,
+  /^@nestjs\/mapped-types(\/.*)?$/,
+  /^@nestjs\/schedule(\/.*)?$/,
+  /^@standard-schema\/spec(\/.*)?$/,
+  /^es-toolkit(\/.*)?$/,
+  /^marked(\/.*)?$/,
+];
+
 module.exports = function (options) {
   return {
     ...options,
@@ -7,7 +19,11 @@ module.exports = function (options) {
       main: './src/main.ts',
       vercel: './src/vercel.ts',
     },
-    externals: [nodeExternals()],
+    externals: [
+      nodeExternals({
+        allowlist: MODULOS_ESM_EMPAQUETAR,
+      }),
+    ],
     output: {
       ...(options.output || {}),
       filename: '[name].js',

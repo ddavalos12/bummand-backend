@@ -208,12 +208,17 @@ export class NavegadorPdfServicio {
     return this.cliente_puppeteer_cache;
   }
 
-  private obtenerClienteChromium(): ModuloSparticuzChromium {
+  private async obtenerClienteChromium(): Promise<ModuloSparticuzChromium> {
     if (!this.cliente_chromium_cache) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const modulo = require('@sparticuz/chromium') as {
-        default?: ModuloSparticuzChromium;
-      } & ModuloSparticuzChromium;
+      const importar_esm = new Function(
+        'especificador',
+        'return import(especificador);',
+      ) as (
+        especificador: string,
+      ) => Promise<
+        { default?: ModuloSparticuzChromium } & ModuloSparticuzChromium
+      >;
+      const modulo = await importar_esm('@sparticuz/chromium');
       this.cliente_chromium_cache = modulo.default || modulo;
     }
     return this.cliente_chromium_cache;
@@ -221,7 +226,7 @@ export class NavegadorPdfServicio {
 
   private async lanzarNavegadorCloud(): Promise<Browser> {
     const cliente_puppeteer = this.obtenerClientePuppeteerCore();
-    const cliente_chromium = this.obtenerClienteChromium();
+    const cliente_chromium = await this.obtenerClienteChromium();
 
     const ruta_override = (process.env.PUPPETEER_EXECUTABLE_PATH || '').trim();
     let ruta_ejecutable: string;
