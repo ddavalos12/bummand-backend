@@ -58,6 +58,36 @@ export async function configurarAplicacion(
     process.env.SWAGGER_ENABLED === 'true' ||
     (process.env.SWAGGER_ENABLED !== 'false' && process.env.VERCEL !== '1');
 
+  const instancia_http = app.getHttpAdapter().getInstance();
+  instancia_http.get(
+    '/favicon.ico',
+    (_req: unknown, res: { status: (c: number) => { end: () => void } }) => {
+      res.status(204).end();
+    },
+  );
+  instancia_http.get(
+    '/documentacion',
+    (
+      _req: unknown,
+      res: {
+        redirect: (url: string) => void;
+        status: (c: number) => { json: (cuerpo: unknown) => void };
+      },
+    ) => {
+      if (habilitar_swagger) {
+        res.redirect('/api/docs');
+        return;
+      }
+      res.status(200).json({
+        estado: 'ok',
+        servicio: 'bumand-backend',
+        mensaje:
+          'API BUMAND operativa. La documentación interactiva Swagger (/api/docs) está deshabilitada en producción (SWAGGER_ENABLED=false); defina SWAGGER_ENABLED=true para activarla.',
+        salud: '/health',
+      });
+    },
+  );
+
   if (habilitar_swagger) {
     const configuracion_swagger = new DocumentBuilder()
       .setTitle('API BUMAND — Sistema de Prácticas y Viáticos')

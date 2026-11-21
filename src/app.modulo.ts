@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import * as pg from 'pg';
 import { AppControlador } from './app.controlador';
 import { AppServicio } from './app.servicio';
 
@@ -128,19 +129,26 @@ const ENTIDADES_BUMAND = [
           idleTimeoutMillis: 15000,
         };
 
+        const reintentos_conexion = process.env.VERCEL === '1' ? 1 : 5;
+        const espera_reintento_ms = process.env.VERCEL === '1' ? 1000 : 3000;
+
         if (url_base_datos) {
           return {
             type: 'postgres' as const,
+            driver: pg,
             url: url_base_datos,
             ssl: configuracion_ssl,
             entities: ENTIDADES_BUMAND,
             synchronize: sincronizar_esquema,
+            retryAttempts: reintentos_conexion,
+            retryDelay: espera_reintento_ms,
             extra: configuracion_extra,
           };
         }
 
         return {
           type: 'postgres' as const,
+          driver: pg,
           host: host_bd,
           port: puerto_bd,
           username: usuario_bd,
@@ -149,6 +157,8 @@ const ENTIDADES_BUMAND = [
           ssl: configuracion_ssl,
           entities: ENTIDADES_BUMAND,
           synchronize: sincronizar_esquema,
+          retryAttempts: reintentos_conexion,
+          retryDelay: espera_reintento_ms,
           extra: configuracion_extra,
         };
       },
