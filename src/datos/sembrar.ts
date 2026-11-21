@@ -3,6 +3,9 @@ import { AppModulo } from '../app.modulo';
 import { SemillaServicio } from './semilla.servicio';
 
 async function bootstrap() {
+  if (!process.env.OMITIR_SEMILLA_INICIO) {
+    process.env.OMITIR_SEMILLA_INICIO = 'true';
+  }
   const args = process.argv.slice(2);
   const app = await NestFactory.createApplicationContext(AppModulo, {
     logger: ['log', 'warn', 'error'],
@@ -37,6 +40,13 @@ async function bootstrap() {
     console.log('>>> Sembrando únicamente cuestionarios y preguntas dinámicas...');
     await semilla.sembrarCuestionarios();
     console.log('>>> Cuestionarios sembrados con éxito.');
+  } else if (args.includes('--solo-usuarios-becarios')) {
+    console.log('>>> Sembrando exclusivamente administradores, mentores/supervisores, catálogos base y nómina de becarios...');
+    await semilla.asegurarEsquemaBase();
+    await semilla.sembrarUsuarios();
+    await semilla.sembrarCatalogos();
+    await semilla.sembrarBecarios();
+    console.log('>>> Usuarios (admins y mentores) y nómina de becarios (sin usuarios becarios ni datos operativos) sembrados con éxito.');
   } else {
     console.log('>>> Ejecutando siembra completa institucional de BUMAND...');
     await semilla.ejecutarSemilla();

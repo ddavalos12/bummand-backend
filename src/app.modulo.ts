@@ -121,7 +121,15 @@ const ENTIDADES_BUMAND = [
           ? { rejectUnauthorized: false }
           : false;
 
-        const sincronizar_esquema = process.env.SINCRONIZAR_DB === 'true';
+        const valor_sincronizar = (
+          process.env.SINCRONIZAR_DB ||
+          process.env.DB_SYNCHRONIZE ||
+          process.env.SYNCHRONIZE ||
+          ''
+        )
+          .trim()
+          .toLowerCase();
+        const sincronizar_esquema = valor_sincronizar === 'true';
 
         const configuracion_extra = {
           max: process.env.VERCEL === '1' ? 5 : 20,

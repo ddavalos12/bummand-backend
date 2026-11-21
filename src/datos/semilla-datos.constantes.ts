@@ -65,6 +65,12 @@ export const ADMINISTRADORES_SEMILLA: AdministradorSemilla[] = [
     "correo": "coordinacion@bumand.bo",
     "clave": "Bumand2026!",
     "cargo": "Coordinación Institucional y Dirección del Programa BUMAND"
+  },
+  {
+    "nombre": "Daniel Davalos Quiñonez",
+    "correo": "daniel.davalos@bumand.bo",
+    "clave": "Bumand2026!",
+    "cargo": "Administrador del Sistema BUMAND"
   }
 ];
 

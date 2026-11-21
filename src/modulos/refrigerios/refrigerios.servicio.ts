@@ -102,6 +102,13 @@ export class RefrigeriosServicio implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
+    const omitir_semilla =
+      process.env.OMITIR_SEMILLA_INICIO === 'true' ||
+      (process.env.VERCEL === '1' &&
+        process.env.EJECUTAR_SEMILLA_EN_VERCEL !== 'true');
+    if (omitir_semilla) {
+      return;
+    }
     try {
       await this.sembrarRefrigeriosInicialesSiEstaVacio();
     } catch {
@@ -325,11 +332,6 @@ export class RefrigeriosServicio implements OnModuleInit {
   }
 
   async listar(filtros?: { fecha_inicio?: string; fecha_fin?: string }): Promise<Refrigerio[]> {
-    const conteo = await this.refrigerio_repo.count();
-    if (conteo === 0) {
-      await this.sembrarRefrigeriosInicialesSiEstaVacio();
-    }
-
     const where: Record<string, unknown> = {};
 
     if (filtros?.fecha_inicio && filtros?.fecha_fin) {
