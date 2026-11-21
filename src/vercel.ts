@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import * as pg from 'pg';
+import * as plataforma_socketio from '@nestjs/platform-socket.io';
 import express, { Express } from 'express';
 import type { IncomingMessage, ServerResponse } from 'http';
 import { NestFactory } from '@nestjs/core';
@@ -11,6 +12,7 @@ import { AppModulo } from './app.modulo';
 import { configurarAplicacion } from './bootstrap-app';
 
 void pg;
+void plataforma_socketio;
 
 let promesa_servidor_express: Promise<Express> | null = null;
 

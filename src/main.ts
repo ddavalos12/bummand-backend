@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModulo } from './app.modulo';
 import { configurarAplicacion } from './bootstrap-app';
+import manejadorVercel from './vercel';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModulo);
@@ -15,4 +16,8 @@ async function bootstrap() {
   );
 }
 
-void bootstrap();
+if (process.env.VERCEL !== '1') {
+  void bootstrap();
+}
+
+export default manejadorVercel;
