@@ -332,20 +332,23 @@ export class PdfControlador {
   @Get(['consolidado-auditoria', 'consolidado-contabilidad', 'formulario-contabilidad'])
   @ApiOperation({
     summary: 'Generar Formulario para Contabilidad y RSD consolidado en PDF (TAREA-08)',
-    description: 'Consolida horas de asistencia, liquidación de pasajes (80%) descontando multas y reembolsos de refrigerio (100%) para Contabilidad y RSD por intervalo de fechas.',
+    description: 'Consolida horas de asistencia, liquidación de pasajes (80%) con opción de descuento de multas y reembolsos de refrigerio (100%) para Contabilidad y RSD por intervalo de fechas.',
   })
   @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
   @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'descontar_multas', required: false, description: 'Descontar multas de asistencia en la liquidación de pasajes (true | false, por defecto true)' })
   @ApiProduces('application/pdf')
   @ApiResponse({ status: 200, description: 'Archivo binario del Formulario para Contabilidad y RSD en PDF descargado.' })
   async generarConsolidadoAuditoria(
     @Query('fecha_inicio') fecha_inicio: string | undefined,
     @Query('fecha_fin') fecha_fin: string | undefined,
     @Res() respuesta: Response,
+    @Query('descontar_multas') descontar_multas?: string,
   ) {
     const resultado = await this.pdf_servicio.generarConsolidadoAuditoriaPdf({
       fecha_inicio,
       fecha_fin,
+      descontar_multas,
     });
 
     respuesta.set({
@@ -360,20 +363,23 @@ export class PdfControlador {
   @Get('pasajes-general')
   @ApiOperation({
     summary: 'Generar y descargar Formulario para Contabilidad y RSD de pasajes en PDF (TAREA-07, TAREA-01)',
-    description: 'Genera el Formulario para Contabilidad y RSD de recorridos y solicitud de pasajes con detalle de tramos, calles declaradas (origen -> calles -> destino), liquidación del 80% y descuento de multas.',
+    description: 'Genera el Formulario para Contabilidad y RSD de recorridos y solicitud de pasajes con detalle de tramos, calles declaradas (origen -> calles -> destino), liquidación del 80% y opción de descuento de multas.',
   })
   @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
   @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'descontar_multas', required: false, description: 'Descontar multas de asistencia en la liquidación de pasajes (true | false, por defecto true)' })
   @ApiProduces('application/pdf')
   @ApiResponse({ status: 200, description: 'Archivo binario del consolidado general de pasajes en PDF.' })
   async generarPasajesGeneral(
     @Query('fecha_inicio') fecha_inicio: string | undefined,
     @Query('fecha_fin') fecha_fin: string | undefined,
     @Res() respuesta: Response,
+    @Query('descontar_multas') descontar_multas?: string,
   ) {
     const resultado = await this.pdf_servicio.generarPasajesGeneralPdf({
       fecha_inicio,
       fecha_fin,
+      descontar_multas,
     });
 
     respuesta.set({
@@ -486,7 +492,7 @@ export class PdfControlador {
   @ApiOperation({
     summary: 'Generar planilla oficial PDF de Donación para Transporte BUMAN-D',
     description:
-      'Renderiza con Puppeteer la planilla oficial consolidada de Donación para Transporte BUMAN-D (todos los becarios ordenados por apellido, 80% neto sin descontar multas, con o sin columna firma) y 2 firmas institucionales seleccionables.',
+      'Renderiza con Puppeteer la planilla oficial consolidada de Donación para Transporte BUMAN-D (todos los becarios ordenados por apellido, 80% neto con opción de descontar multas, con o sin columna firma) y 2 firmas institucionales seleccionables.',
   })
   @ApiQuery({ name: 'fecha_inicio', required: false, description: 'Fecha de inicio (YYYY-MM-DD)' })
   @ApiQuery({ name: 'fecha_fin', required: false, description: 'Fecha de fin (YYYY-MM-DD)' })
@@ -494,6 +500,7 @@ export class PdfControlador {
   @ApiQuery({ name: 'con_firma', required: false, description: 'Incluir columna FIRMA para archivo del área (true | false)' })
   @ApiQuery({ name: 'firmante_1', required: false, description: 'Primer firmante institucional (ruth | pamela | samuel)' })
   @ApiQuery({ name: 'firmante_2', required: false, description: 'Segundo firmante institucional (ruth | pamela | samuel)' })
+  @ApiQuery({ name: 'descontar_multas', required: false, description: 'Descontar multas de asistencia del 80% reconocido (true | false, por defecto false)' })
   @ApiProduces('application/pdf')
   @ApiResponse({ status: 200, description: 'Archivo binario de la planilla de donación de transporte en PDF.' })
   async generarDonacionTransporte(
@@ -504,6 +511,7 @@ export class PdfControlador {
     @Query('firmante_1') firmante_1: string | undefined,
     @Query('firmante_2') firmante_2: string | undefined,
     @Res() respuesta: Response,
+    @Query('descontar_multas') descontar_multas?: string,
   ) {
     const resultado = await this.pdf_servicio.generarDonacionTransportePdf({
       fecha_inicio,
@@ -512,6 +520,7 @@ export class PdfControlador {
       con_firma,
       firmante_1,
       firmante_2,
+      descontar_multas,
     });
 
     respuesta.set({

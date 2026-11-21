@@ -8,6 +8,9 @@
   "scripts": {
     "build": "nest build",
     "compilar": "nest build",
+    "compilar:vercel": "nest build",
+    "env:desktop": "node -e \"require('fs').copyFileSync('.env.desktop', '.env')\"",
+    "env:vercel": "node -e \"require('fs').copyFileSync('.env.vercel', '.env')\"",
     "sembrar": "ts-node -r tsconfig-paths/register src/datos/sembrar.ts",
     "sembrar:limpiar-todo": "ts-node -r tsconfig-paths/register src/datos/sembrar.ts --limpiar-todo",
     "sembrar:limpiar-datos": "ts-node -r tsconfig-paths/register src/datos/sembrar.ts --limpiar-datos",
@@ -34,6 +37,7 @@
     "pruebas:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1175.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^12.0.1",
     "@nestjs/core": "^11.0.1",
@@ -46,6 +50,7 @@
     "@nestjs/swagger": "^11.4.7",
     "@nestjs/typeorm": "^12.0.2",
     "@nestjs/websockets": "^11.2.7",
+    "@sparticuz/chromium": "^153.0.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
@@ -53,12 +58,15 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.23.0",
-    "puppeteer": "^25.12.0",
+    "puppeteer-core": "^25.18.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.4",
     "swagger-ui-express": "^5.0.1",
     "typeorm": "^1.1.1"
+  },
+  "optionalDependencies": {
+    "puppeteer": "^25.12.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -86,7 +94,8 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.20.0"
+    "typescript-eslint": "^8.20.0",
+    "webpack-node-externals": "^3.0.0"
   },
   "jest": {
     "moduleFileExtensions": [
@@ -107,7 +116,9 @@
     "moduleNameMapper": {
       "^@nestjs/typeorm$": "<rootDir>/../test/mocks/nestjs-typeorm.ts",
       "^@nestjs/passport$": "<rootDir>/../test/mocks/nestjs-passport.ts",
-      "^puppeteer$": "<rootDir>/../test/mocks/puppeteer.ts"
+      "^puppeteer$": "<rootDir>/../test/mocks/puppeteer.ts",
+      "^puppeteer-core$": "<rootDir>/../test/mocks/puppeteer-core.ts",
+      "^@sparticuz/chromium$": "<rootDir>/../test/mocks/sparticuz-chromium.ts"
     }
   }
 }

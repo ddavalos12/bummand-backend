@@ -4,7 +4,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppControlador } from './app.controlador';
 import { AppServicio } from './app.servicio';
 
-// 15 Entidades Relacionales Oficiales (BUMAND)
 import { Usuario } from './modulos/usuarios/entidades/usuario.entidad';
 import { CorreoUsuario } from './modulos/usuarios/entidades/correo-usuario.entidad';
 import { Iglesia } from './modulos/iglesias/entidades/iglesia.entidad';
@@ -40,7 +39,7 @@ import { Justificacion } from './modulos/justificaciones/entidades/justificacion
 import { Multa } from './modulos/asistencia/entidades/multa.entidad';
 import { Refrigerio } from './modulos/refrigerios/entidades/refrigerio.entidad';
 
-// Módulos Funcionales
+import { AlmacenamientoModulo } from './modulos/almacenamiento/almacenamiento.modulo';
 import { UsuariosModulo } from './modulos/usuarios/usuarios.modulo';
 import { BecariosModulo } from './modulos/becarios/becarios.modulo';
 import { IglesiasModulo } from './modulos/iglesias/iglesias.modulo';
@@ -61,56 +60,100 @@ import { TiempoRealModulo } from './modulos/tiempo-real/tiempo-real.modulo';
 import { BibliaModulo } from './modulos/biblia/biblia.modulo';
 import { RefrigeriosModulo } from './modulos/refrigerios/refrigerios.modulo';
 
+const ENTIDADES_BUMAND = [
+  Usuario,
+  CorreoUsuario,
+  Iglesia,
+  LugarPractica,
+  Becario,
+  DocumentoSemestralBecario,
+  HorarioApoyo,
+  AsignacionPractica,
+  ConfiguracionInstitucional,
+  RegistroAsistencia,
+  SolicitudPasajes,
+  Recorrido,
+  ModuloEvaluacion,
+  PeriodoEvaluacion,
+  Evaluador,
+  Evaluacion,
+  EvaluacionPastor,
+  PreguntaBienestar,
+  Cuestionario,
+  PreguntaCuestionario,
+  EntregaTareaLideres,
+  CasoSeguimientoPastoral,
+  AprobacionPracticas,
+  Notificacion,
+  ReporteGenerado,
+  TarifaTransporte,
+  ParadaTransporte,
+  Devocional,
+  CitaSeguimiento,
+  Evento,
+  AsistenciaEvento,
+  Justificacion,
+  Multa,
+  Refrigerio,
+];
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST,
-      port: parseInt(process.env.DB_PORT as string, 10),
-      username: process.env.DB_USERNAME,
-      password: process.env.DB_CONTRASENA,
-      database: process.env.DB_DATABASE,
-      entities: [
-        Usuario,
-        CorreoUsuario,
-        Iglesia,
-        LugarPractica,
-        Becario,
-        DocumentoSemestralBecario,
-        HorarioApoyo,
-        AsignacionPractica,
-        ConfiguracionInstitucional,
-        RegistroAsistencia,
-        SolicitudPasajes,
-        Recorrido,
-        ModuloEvaluacion,
-        PeriodoEvaluacion,
-        Evaluador,
-        Evaluacion,
-        EvaluacionPastor,
-        PreguntaBienestar,
-        Cuestionario,
-        PreguntaCuestionario,
-        EntregaTareaLideres,
-        CasoSeguimientoPastoral,
-        AprobacionPracticas,
-        Notificacion,
-        ReporteGenerado,
-        TarifaTransporte,
-        ParadaTransporte,
-        Devocional,
-        CitaSeguimiento,
-        Evento,
-        AsistenciaEvento,
-        Justificacion,
-        Multa,
-        Refrigerio,
-      ],
-      synchronize: process.env.SINCRONIZAR_DB === 'true',
+    TypeOrmModule.forRootAsync({
+      useFactory: () => {
+        const url_base_datos = (process.env.DATABASE_URL || '').trim();
+        const host_bd = (process.env.DB_HOST || 'localhost').trim();
+        const puerto_bd = parseInt(process.env.DB_PORT || '5432', 10) || 5432;
+        const usuario_bd = (process.env.DB_USERNAME || 'postgres').trim();
+        const contrasena_bd = process.env.DB_CONTRASENA || '';
+        const nombre_bd = (process.env.DB_DATABASE || 'bumand-db').trim();
+
+        const requiere_ssl =
+          process.env.SSL_ENABLED === 'true' ||
+          url_base_datos.toLowerCase().includes('supabase') ||
+          host_bd.toLowerCase().includes('supabase');
+
+        const configuracion_ssl = requiere_ssl
+          ? { rejectUnauthorized: false }
+          : false;
+
+        const sincronizar_esquema = process.env.SINCRONIZAR_DB === 'true';
+
+        const configuracion_extra = {
+          max: process.env.VERCEL === '1' ? 5 : 20,
+          connectionTimeoutMillis: 10000,
+          idleTimeoutMillis: 15000,
+        };
+
+        if (url_base_datos) {
+          return {
+            type: 'postgres' as const,
+            url: url_base_datos,
+            ssl: configuracion_ssl,
+            entities: ENTIDADES_BUMAND,
+            synchronize: sincronizar_esquema,
+            extra: configuracion_extra,
+          };
+        }
+
+        return {
+          type: 'postgres' as const,
+          host: host_bd,
+          port: puerto_bd,
+          username: usuario_bd,
+          password: contrasena_bd,
+          database: nombre_bd,
+          ssl: configuracion_ssl,
+          entities: ENTIDADES_BUMAND,
+          synchronize: sincronizar_esquema,
+          extra: configuracion_extra,
+        };
+      },
     }),
+    AlmacenamientoModulo,
     UsuariosModulo,
     BecariosModulo,
     IglesiasModulo,

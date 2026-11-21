@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PdfServicio } from './pdf.servicio';
+import { NavegadorPdfServicio } from './navegador-pdf.servicio';
 import { PdfControlador } from './pdf.controlador';
 import { EvaluacionesModulo } from '../evaluaciones/evaluaciones.modulo';
 import { ReporteGenerado } from './entidades/reporte-generado.entidad';
@@ -31,7 +32,7 @@ import { Justificacion } from '../justificaciones/entidades/justificacion.entida
     EvaluacionesModulo,
   ],
   controllers: [PdfControlador],
-  providers: [PdfServicio],
-  exports: [TypeOrmModule, PdfServicio],
+  providers: [PdfServicio, NavegadorPdfServicio],
+  exports: [TypeOrmModule, PdfServicio, NavegadorPdfServicio],
 })
 export class PdfModulo {}

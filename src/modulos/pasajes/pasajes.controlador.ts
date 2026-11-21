@@ -348,6 +348,37 @@ export class PasajesControlador {
     });
   }
 
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @Get('calculo-pago')
+  @ApiOperation({
+    summary: 'Calcular liquidación de pago de pasajes (80%) con opción de descuento de multas',
+    description:
+      'Calcula en aritmética exacta de centavos el monto total declarado (100%), el 80% reconocido, las multas de asistencia vigentes en el periodo o rango de fechas y el líquido pagable neto, activando o desactivando el descuento de multas.',
+  })
+  @ApiQuery({ name: 'periodo', required: false, type: String, example: '2026-10', description: 'Periodo mensual (YYYY-MM o texto)' })
+  @ApiQuery({ name: 'fecha_inicio', required: false, type: String, example: '2026-10-01', description: 'Fecha de inicio (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'fecha_fin', required: false, type: String, example: '2026-10-31', description: 'Fecha de fin (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'becario_id', required: false, type: Number, description: 'ID opcional del becario' })
+  @ApiQuery({ name: 'descontar_multas', required: false, type: String, example: 'true', description: 'Descontar multas de asistencia (true | false, por defecto true)' })
+  @ApiResponse({ status: 200, description: 'Cálculo detallado y resumen financiero de pago de pasajes.' })
+  calcularPagoPasajes(
+    @Query('periodo') periodo?: string,
+    @Query('fecha_inicio') fecha_inicio?: string,
+    @Query('fecha_fin') fecha_fin?: string,
+    @Query('becario_id') becario_id?: number,
+    @Query('descontar_multas') descontar_multas?: string,
+    @UsuarioActual() usuario?: Usuario,
+  ) {
+    return this.pasajesServicio.calcularPagoPasajesConMultas({
+      periodo,
+      fecha_inicio,
+      fecha_fin,
+      becario_id: becario_id ? Number(becario_id) : undefined,
+      descontar_multas,
+      usuario_autenticado: usuario,
+    });
+  }
+
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get(':id')
   @ApiOperation({

@@ -1,99 +1,18 @@
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModulo } from './app.modulo';
-import { ValidationPipe } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { FiltroExcepcionesGlobal } from './nucleo/errores';
-import { join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { configurarAplicacion } from './bootstrap-app';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModulo);
-
-  app.enableCors({
-    origin: true,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: true,
-  });
-
-  // Servir archivos subidos (lecturas PDF de Escuela de Líderes, evidencias y respaldos académicos)
-  const directorio_uploads = join(process.cwd(), 'uploads');
-  if (!existsSync(directorio_uploads)) {
-    mkdirSync(directorio_uploads, { recursive: true });
-  }
-  const configurarCabecerasUploads = (res: { setHeader: (k: string, v: string) => void }) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  };
-  app.useStaticAssets(directorio_uploads, {
-    prefix: '/uploads/',
-    setHeaders: configurarCabecerasUploads,
-  });
-  app.useStaticAssets(directorio_uploads, {
-    prefix: '/api/uploads/',
-    setHeaders: configurarCabecerasUploads,
-  });
-
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-  }));
-
-  app.useGlobalFilters(new FiltroExcepcionesGlobal());
-
-  // Configuración de Swagger para documentación interactiva de la API
-  const configuracion = new DocumentBuilder()
-    .setTitle('API BUMAND — Sistema de Prácticas y Viáticos')
-    .setDescription(
-      'Documentación interactiva y especificación OpenAPI de los endpoints del backend BUMAND ' +
-      '(Fundación Diaconía FRIF-IFD). Monolito modular en NestJS con PostgreSQL/TypeORM que ' +
-      'administra autenticación JWT, usuarios, becarios, iglesias, lugares de práctica con geocercas, ' +
-      'asistencia satelital Haversine, declaración y reembolso de pasajes en centavos enteros con regla del día 24, ' +
-      'evaluaciones 360° en 5 ejes formativos, formulario pastoral F-03, convalidación de prácticas, ' +
-      'notificaciones push y emisión de reportes PDF oficiales.',
-    )
-    .setVersion('1.0.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        name: 'Autorización JWT',
-        description: 'Ingrese el token JWT institucional en el formato: Bearer <token>',
-        in: 'header',
-      },
-      'JWT-auth',
-    )
-    .addTag('Sistema', 'Comprobación de conectividad y estado operativo del servicio')
-    .addTag('Autenticación', 'Inicio de sesión, emisión y verificación de credenciales JWT')
-    .addTag('Usuarios', 'Gestión de cuentas institucionales, estados y roles RBAC')
-    .addTag('Becarios', 'Perfiles académicos, carreras, asignaciones institucionales y directorio')
-    .addTag('Iglesias', 'Directorio de congregaciones cristianas vinculadas')
-    .addTag('Lugares de Práctica', 'Sedes institucionales, coordenadas WGS84 y calibración métrica de geocercas')
-    .addTag('Asistencia', 'Marcación de ingreso/salida con geolocalización Haversine y control anti-spoofing')
-    .addTag('Pasajes', 'Declaración mensual de viáticos, liquidación del 80% en centavos y regla del día 24')
-    .addTag('Evaluaciones', 'Matriz de evaluación 360° en 5 ejes, catálogo de módulos y formulario F-03')
-    .addTag('Prácticas', 'Aprobación y convalidación institucional de horas de práctica en sistema')
-    .addTag('Notificaciones', 'Bandeja de alertas reactivas, contador de no leídas y push')
-    .addTag('Dashboard', 'Consolidado analítico de horas, presupuesto del 80% y rankings')
-    .addTag('PDF', 'Generación headless de reportes oficiales certificados en PDF')
-    .build();
-
-  const documento = SwaggerModule.createDocument(app, configuracion);
-  SwaggerModule.setup('api/docs', app, documento, {
-    swaggerOptions: {
-      persistAuthorization: true,
-      filter: true,
-      displayRequestDuration: true,
-    },
-    customSiteTitle: 'Documentación API BUMAND — Swagger UI',
-  });
+  await configurarAplicacion(app);
 
   const puerto = process.env.PORT ?? 3000;
   await app.listen(puerto);
   console.log(`[BUMAND] Servidor iniciado en http://localhost:${puerto}`);
-  console.log(`[BUMAND] Documentación Swagger UI disponible en http://localhost:${puerto}/api/docs`);
+  console.log(
+    `[BUMAND] Documentación Swagger UI disponible en http://localhost:${puerto}/api/docs`,
+  );
 }
-bootstrap();
 
+void bootstrap();

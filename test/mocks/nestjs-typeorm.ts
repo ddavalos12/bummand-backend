@@ -13,6 +13,9 @@ export class TypeOrmModule {
   static forRoot(options?: any) {
     return { module: TypeOrmModule, providers: [], exports: [] };
   }
+  static forRootAsync(options?: any) {
+    return { module: TypeOrmModule, providers: [], exports: [] };
+  }
   static forFeature(entities?: any[], dataSourceName?: string) {
     return { module: TypeOrmModule, providers: [], exports: [] };
   }

@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -22,10 +23,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import * as fs from 'fs';
-import * as path from 'path';
+import { memoryStorage } from 'multer';
 import { JustificacionesServicio } from './justificaciones.servicio';
+import { AlmacenamientoServicio } from '../almacenamiento/almacenamiento.servicio';
 import { Justificacion } from './entidades/justificacion.entidad';
 import { CrearJustificacionDto } from './dtos/crear-justificacion.dto';
 import { ResolverJustificacionDto } from './dtos/resolver-justificacion.dto';
@@ -39,34 +39,30 @@ import { Roles } from '../autenticacion/roles.decorador';
 import { UsuarioActual } from '../autenticacion/usuario-actual.decorador';
 import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 
-const almacenamientoComprobantes = diskStorage({
-  destination: (req, file, cb) => {
-    const carpeta = './uploads/justificaciones';
-    if (!fs.existsSync(carpeta)) {
-      fs.mkdirSync(carpeta, { recursive: true });
-    }
-    cb(null, carpeta);
-  },
-  filename: (req, file, cb) => {
-    const sufijoUnico = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const extension = path.extname(file.originalname);
-    cb(null, `comprobante-${sufijoUnico}${extension}`);
-  },
-});
+const LIMITE_TAMANO_COMPROBANTE_BYTES = 15 * 1024 * 1024;
+
+const opciones_subida_comprobantes = {
+  storage: memoryStorage(),
+  limits: { fileSize: LIMITE_TAMANO_COMPROBANTE_BYTES },
+};
 
 @ApiTags('Justificaciones')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtGuardia, RolesGuardia)
 @Controller(['justificaciones', 'api/justificaciones'])
 export class JustificacionesControlador {
-  constructor(private readonly justificaciones_servicio: JustificacionesServicio) {}
+  constructor(
+    private readonly justificaciones_servicio: JustificacionesServicio,
+    @Optional()
+    private readonly almacenamiento_servicio: AlmacenamientoServicio = new AlmacenamientoServicio(),
+  ) {}
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('subir-comprobante')
-  @UseInterceptors(FileInterceptor('archivo', { storage: almacenamientoComprobantes }))
+  @UseInterceptors(FileInterceptor('archivo', opciones_subida_comprobantes))
   @ApiOperation({
     summary: 'Subir archivo o comprobante probatorio de justificación',
-    description: 'Permite adjuntar certificados médicos, bajas o documentos respaldatorios en ./uploads/justificaciones.',
+    description: 'Permite adjuntar certificados médicos, bajas o documentos respaldatorios en almacenamiento institucional (R2 o local).',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -84,13 +80,17 @@ export class JustificacionesControlador {
   })
   @ApiResponse({ status: 201, description: 'Archivo cargado con éxito en el servidor.' })
   @ApiResponse({ status: 400, description: 'No se adjuntó archivo válido.' })
-  subirComprobante(@UploadedFile() archivo?: any) {
+  async subirComprobante(@UploadedFile() archivo?: any) {
     if (!archivo) {
       throw new BadRequestException('No se ha proporcionado ningún archivo en el campo "archivo"');
     }
-    const archivo_prueba_url = `/uploads/justificaciones/${archivo.filename}`;
+    const resultado = await this.almacenamiento_servicio.guardarArchivo(
+      archivo,
+      'justificaciones',
+      'comprobante',
+    );
     return {
-      archivo_prueba_url,
+      archivo_prueba_url: resultado.url,
       nombre_archivo_prueba: archivo.originalname,
       tamano: archivo.size,
     };

@@ -14,13 +14,13 @@ import {
   UploadedFile,
   UploadedFiles,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import * as path from 'path';
-import * as fs from 'fs';
+import { memoryStorage } from 'multer';
 import { EvaluacionesServicio } from './evaluaciones.servicio';
+import { AlmacenamientoServicio } from '../almacenamiento/almacenamiento.servicio';
 import { CrearEvaluacionDto } from './dtos/crear-evaluacion.dto';
 import { GuardarFormularioF03Dto } from './dtos/guardar-formulario-f03.dto';
 import { CrearPeriodoEvaluacionDto } from './dtos/crear-periodo-evaluacion.dto';
@@ -57,42 +57,23 @@ import { Roles } from '../autenticacion/roles.decorador';
 import { UsuarioActual } from '../autenticacion/usuario-actual.decorador';
 import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 
-const almacenamiento_academicos = diskStorage({
-  destination: (req, file, cb) => {
-    const destino = path.join(process.cwd(), 'uploads', 'academicos');
-    if (!fs.existsSync(destino)) {
-      fs.mkdirSync(destino, { recursive: true });
-    }
-    cb(null, destino);
-  },
-  filename: (req, file, cb) => {
-    const unico = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname);
-    cb(null, `academico-${unico}${ext}`);
-  },
-});
+const LIMITE_TAMANO_ARCHIVO_EVALUACION_BYTES = 15 * 1024 * 1024;
 
-const almacenamiento_lideres = diskStorage({
-  destination: (req, file, cb) => {
-    const destino = path.join(process.cwd(), 'uploads', 'escuela-lideres');
-    if (!fs.existsSync(destino)) {
-      fs.mkdirSync(destino, { recursive: true });
-    }
-    cb(null, destino);
-  },
-  filename: (req, file, cb) => {
-    const unico = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname);
-    cb(null, `ceti-${unico}${ext}`);
-  },
-});
+const opciones_subida_evaluaciones = {
+  storage: memoryStorage(),
+  limits: { fileSize: LIMITE_TAMANO_ARCHIVO_EVALUACION_BYTES },
+};
 
 @ApiTags('Evaluaciones')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtGuardia, RolesGuardia)
 @Controller(['evaluaciones', 'api/evaluaciones'])
 export class EvaluacionesControlador {
-  constructor(private readonly evaluaciones_servicio: EvaluacionesServicio) {}
+  constructor(
+    private readonly evaluaciones_servicio: EvaluacionesServicio,
+    @Optional()
+    private readonly almacenamiento_servicio: AlmacenamientoServicio = new AlmacenamientoServicio(),
+  ) {}
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('tutor/solicitar-codigo')
@@ -219,19 +200,42 @@ export class EvaluacionesControlador {
 
   @Roles(Rol.BECARIO, Rol.ADMINISTRADOR)
   @Post('academica/subir-documento')
-  @UseInterceptors(FileInterceptor('archivo', { storage: almacenamiento_academicos }))
+  @UseInterceptors(FileInterceptor('archivo', opciones_subida_evaluaciones))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Subir Récord Académico o Historial Académico por semestre',
-    description: 'Permite al estudiante o administración subir el archivo probatorio a ./uploads/academicos y pasa directamente a revisión de Administración.',
+    description: 'Permite al estudiante o administración subir el archivo probatorio y pasa directamente a revisión de Administración.',
   })
   @ApiResponse({ status: 201, description: 'Documento académico subido y remitido a revisión directa de Administración.', type: Evaluacion })
-  subirDocumentoAcademico(
+  async subirDocumentoAcademico(
     @Body() dto: SubirDocumentoAcademicoDto,
     @UploadedFile() archivo: any,
     @UsuarioActual() usuario: Usuario,
   ): Promise<Evaluacion> {
-    return this.evaluaciones_servicio.subirDocumentoAcademico(dto, archivo, usuario);
+    if (!archivo) {
+      throw new BadRequestException('Se requiere adjuntar el documento académico');
+    }
+    if (archivo.filename && !archivo.buffer && !archivo.path) {
+      return this.evaluaciones_servicio.subirDocumentoAcademico(
+        dto,
+        archivo,
+        usuario,
+      );
+    }
+    const resultado = await this.almacenamiento_servicio.guardarArchivo(
+      archivo,
+      'academicos',
+      'academico',
+    );
+    return this.evaluaciones_servicio.subirDocumentoAcademico(
+      dto,
+      {
+        ...archivo,
+        filename: resultado.nombre_archivo,
+        url: resultado.url,
+      },
+      usuario,
+    );
   }
 
   @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
@@ -982,19 +986,23 @@ export class EvaluacionesControlador {
 
   @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('escuela-lideres/catalogo-tareas/subir-lectura')
-  @UseInterceptors(FileInterceptor('archivo', { storage: almacenamiento_lideres }))
+  @UseInterceptors(FileInterceptor('archivo', opciones_subida_evaluaciones))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Subir PDF o material de lectura para una tarea del catálogo de Escuela de Líderes',
   })
-  subirLecturaCatalogoLideres(@UploadedFile() archivo: any) {
+  async subirLecturaCatalogoLideres(@UploadedFile() archivo: any) {
     if (!archivo) {
       throw new BadRequestException('Se requiere adjuntar un archivo PDF de lectura');
     }
-    const url = `/uploads/escuela-lideres/${archivo.filename}`;
+    const resultado = await this.almacenamiento_servicio.guardarArchivo(
+      archivo,
+      'escuela-lideres',
+      'ceti',
+    );
     return {
       exito: true,
-      url,
+      url: resultado.url,
       nombre: archivo.originalname,
       tamano: archivo.size,
       tamano_legible: `${(archivo.size / 1024).toFixed(1)} KB`,
@@ -1056,21 +1064,25 @@ export class EvaluacionesControlador {
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('escuela-lideres/tareas/subir-evidencia')
-  @UseInterceptors(AnyFilesInterceptor({ storage: almacenamiento_lideres }))
+  @UseInterceptors(AnyFilesInterceptor(opciones_subida_evaluaciones))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Subir evidencia documental de tarea de Escuela de Líderes',
-    description: 'Almacena el archivo en ./uploads/escuela-lideres y retorna la URL.',
+    description: 'Almacena el archivo en almacenamiento institucional (R2 o local) y retorna la URL.',
   })
-  subirEvidenciaLideres(@UploadedFiles() archivos: any[]) {
+  async subirEvidenciaLideres(@UploadedFiles() archivos: any[]) {
     const archivo = Array.isArray(archivos) && archivos.length > 0 ? archivos[0] : null;
     if (!archivo) {
       throw new BadRequestException('Se requiere adjuntar un archivo de evidencia');
     }
-    const url = `/uploads/escuela-lideres/${archivo.filename}`;
+    const resultado = await this.almacenamiento_servicio.guardarArchivo(
+      archivo,
+      'escuela-lideres',
+      'ceti',
+    );
     return {
-      url,
-      archivo_evidencia_url: url,
+      url: resultado.url,
+      archivo_evidencia_url: resultado.url,
       nombre_archivo: archivo.originalname,
       tamano_archivo: `${(archivo.size / 1024).toFixed(1)} KB`,
     };
@@ -1078,7 +1090,7 @@ export class EvaluacionesControlador {
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('escuela-lideres/tarea/:numero/evidencia')
-  @UseInterceptors(AnyFilesInterceptor({ storage: almacenamiento_lideres }))
+  @UseInterceptors(AnyFilesInterceptor(opciones_subida_evaluaciones))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Alias APK: Subir evidencia documental de una tarea específica de Escuela de Líderes',
@@ -1093,7 +1105,12 @@ export class EvaluacionesControlador {
     if (!archivo) {
       throw new BadRequestException('Se requiere adjuntar un archivo de evidencia');
     }
-    const url = `/uploads/escuela-lideres/${archivo.filename}`;
+    const resultado = await this.almacenamiento_servicio.guardarArchivo(
+      archivo,
+      'escuela-lideres',
+      'ceti',
+    );
+    const url = resultado.url;
     const tamano_archivo = `${(archivo.size / 1024).toFixed(1)} KB`;
     const entrega = await this.evaluaciones_servicio.entregarTareaEscuelaLideres(
       {

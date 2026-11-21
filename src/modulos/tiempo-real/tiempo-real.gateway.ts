@@ -11,57 +11,51 @@ import { Server, Socket } from 'socket.io';
     origin: '*',
   },
 })
-export class TiempoRealGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class TiempoRealGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   servidor: Server;
 
-  handleConnection(cliente: Socket) {
-    // Registro de conexión activa
-  }
+  handleConnection(_cliente: Socket) {}
 
-  handleDisconnect(cliente: Socket) {
-    // Registro de desconexión
+  handleDisconnect(_cliente: Socket) {}
+
+  private emitirSeguro(evento: string, datos: unknown): void {
+    try {
+      if (this.servidor && typeof this.servidor.emit === 'function') {
+        this.servidor.emit(evento, datos);
+      }
+    } catch {
+      // En entornos serverless sin servidor WebSocket persistente se ignora el fallo de emisión
+    }
   }
 
   notificarAsistencia(datos_asistencia: unknown) {
-    if (this.servidor) {
-      this.servidor.emit('asistencia_actualizada', datos_asistencia);
-    }
+    this.emitirSeguro('asistencia_actualizada', datos_asistencia);
   }
 
   notificarPasajes(datos_pasajes: unknown) {
-    if (this.servidor) {
-      this.servidor.emit('pasajes_actualizados', datos_pasajes);
-    }
+    this.emitirSeguro('pasajes_actualizados', datos_pasajes);
   }
 
   notificarJustificacion(datos_justificacion: unknown) {
-    if (this.servidor) {
-      this.servidor.emit('justificacion_actualizada', datos_justificacion);
-    }
+    this.emitirSeguro('justificacion_actualizada', datos_justificacion);
   }
 
   notificarDevocional(datos_devocional: unknown) {
-    if (this.servidor) {
-      this.servidor.emit('devocional_actualizado', datos_devocional);
-    }
+    this.emitirSeguro('devocional_actualizado', datos_devocional);
   }
 
   notificarEvento(datos_evento: unknown) {
-    if (this.servidor) {
-      this.servidor.emit('evento_actualizado', datos_evento);
-    }
+    this.emitirSeguro('evento_actualizado', datos_evento);
   }
 
   notificarCodigoTutor(datos_codigo: unknown) {
-    if (this.servidor) {
-      this.servidor.emit('codigo_verificacion_tutor', datos_codigo);
-    }
+    this.emitirSeguro('codigo_verificacion_tutor', datos_codigo);
   }
 
   notificarEvaluacion(datos_evaluacion: unknown) {
-    if (this.servidor) {
-      this.servidor.emit('evaluacion_actualizada', datos_evaluacion);
-    }
+    this.emitirSeguro('evaluacion_actualizada', datos_evaluacion);
   }
 }

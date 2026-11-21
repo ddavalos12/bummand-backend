@@ -3928,7 +3928,13 @@ export class EvaluacionesServicio {
 
   async subirDocumentoAcademico(
     dto: SubirDocumentoAcademicoDto,
-    archivo: { filename?: string; originalname?: string; size?: number; path?: string },
+    archivo: {
+      filename?: string;
+      originalname?: string;
+      size?: number;
+      path?: string;
+      url?: string;
+    },
     usuario: Usuario,
   ): Promise<Evaluacion> {
     if (!archivo) {
@@ -3951,7 +3957,11 @@ export class EvaluacionesServicio {
     }
 
     const archivo_nombre = archivo.originalname || archivo.filename || 'documento.pdf';
-    const archivo_url = archivo.filename ? `/uploads/academicos/${archivo.filename}` : (archivo.path || `/uploads/academicos/${archivo_nombre}`);
+    const archivo_url =
+      archivo.url ||
+      (archivo.filename
+        ? `/uploads/academicos/${archivo.filename}`
+        : archivo.path || `/uploads/academicos/${archivo_nombre}`);
     const tamano_formateado = archivo.size ? `${(archivo.size / 1024).toFixed(1)} KB` : '1.0 MB';
 
     let evaluador_id = 1;

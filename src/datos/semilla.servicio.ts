@@ -72,6 +72,18 @@ export class SemillaServicio implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    const omitir_semilla =
+      process.env.OMITIR_SEMILLA_INICIO === 'true' ||
+      (process.env.VERCEL === '1' &&
+        process.env.EJECUTAR_SEMILLA_EN_VERCEL !== 'true');
+
+    if (omitir_semilla) {
+      this.logger.log(
+        'Semilla automática de inicio omitida por configuración de entorno (Serverless/Vercel).',
+      );
+      return;
+    }
+
     try {
       await this.asegurarEsquemaBase();
       const cantidad_usuarios = await this.usuario_repo.count();

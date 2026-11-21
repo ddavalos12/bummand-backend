@@ -4,6 +4,9 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PasajesServicio, esActividadReembolsablePasaje } from './pasajes.servicio';
 import { SolicitudPasajes, EstadoSolicitud } from './entidades/solicitud-pasaje.entidad';
 import { Recorrido, Tramo } from './entidades/recorrido.entidad';
+import { Becario } from '../becarios/entidades/becario.entidad';
+import { Multa } from '../asistencia/entidades/multa.entidad';
+import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 
 describe('PasajesServicio', () => {
   let servicio: PasajesServicio;
@@ -525,6 +528,203 @@ describe('PasajesServicio', () => {
       expect(solicitudes[0].monto_total).toBe(10.0);
       expect(solicitudes[0].monto_devolucion).toBe(8.0);
       expect(solicitudes[0].recorridos).toHaveLength(1);
+    });
+  });
+
+  describe('Cálculo de pago de pasajes descontando multas (calcularPagoPasajesConMultas)', () => {
+    let servicio_con_multas: PasajesServicio;
+    let solicitud_repo_m: any;
+    let recorrido_repo_m: any;
+    let becario_repo_m: any;
+    let multa_repo_m: any;
+
+    beforeEach(async () => {
+      solicitud_repo_m = {
+        find: jest.fn(),
+      };
+      recorrido_repo_m = {
+        find: jest.fn(),
+      };
+      becario_repo_m = {
+        find: jest.fn().mockResolvedValue([]),
+        findOne: jest.fn(),
+      };
+      multa_repo_m = {
+        find: jest.fn(),
+      };
+
+      const modulo: TestingModule = await Test.createTestingModule({
+        providers: [
+          PasajesServicio,
+          { provide: getRepositoryToken(SolicitudPasajes), useValue: solicitud_repo_m },
+          { provide: getRepositoryToken(Recorrido), useValue: recorrido_repo_m },
+          { provide: getRepositoryToken(Becario), useValue: becario_repo_m },
+          { provide: getRepositoryToken(Multa), useValue: multa_repo_m },
+        ],
+      }).compile();
+
+      servicio_con_multas = modulo.get<PasajesServicio>(PasajesServicio);
+    });
+
+    it('calcula en centavos exactos con descontar_multas=true y descontar_multas=false filtrando por periodo YYYY-MM', async () => {
+      solicitud_repo_m.find.mockResolvedValue([
+        {
+          id: 1,
+          becario_id: 10,
+          periodo: 'Octubre 2026',
+          estado: EstadoSolicitud.APROBADO,
+          becario: {
+            id: 10,
+            ci: '9123841 LP',
+            carrera: 'Contabilidad',
+            usuario: { nombre: 'Aruquipa Mamani Juan Carlos' },
+            lugar_practica: { nombre: 'Oficina Central' },
+          },
+          recorridos: [
+            { id: 1, fecha: '2026-10-05', tarifa: 50, tipo_actividad: 'practicas' },
+            { id: 2, fecha: '2026-10-12', tarifa: 50, tipo_actividad: 'acciones_servicio' },
+            { id: 3, fecha: '2026-10-16', tarifa: 30, tipo_actividad: 'escuela_lideres' },
+          ],
+        },
+        {
+          id: 2,
+          becario_id: 20,
+          periodo: 'Octubre 2026',
+          estado: EstadoSolicitud.APROBADO,
+          becario: {
+            id: 20,
+            ci: '8492018 LP',
+            carrera: 'Economía',
+            usuario: { nombre: 'Condori Quispe Maria Belen' },
+            lugar_practica: { nombre: 'Agencia El Alto' },
+          },
+          recorridos: [
+            { id: 4, fecha: '2026-10-08', tarifa: 20, tipo_actividad: 'practicas' },
+          ],
+        },
+      ]);
+
+      multa_repo_m.find.mockResolvedValue([
+        {
+          id: 101,
+          becario_id: 10,
+          fecha_aplicacion: new Date('2026-10-09T14:50:00Z'),
+          minutos_retraso: 20,
+          monto_bs: 20,
+          motivo: 'Retraso 20 min Escuela de Líderes',
+        },
+        {
+          id: 102,
+          becario_id: 10,
+          fecha_aplicacion: new Date('2026-09-15T14:50:00Z'),
+          minutos_retraso: 15,
+          monto_bs: 15,
+          motivo: 'Multa de mes anterior (fuera de periodo)',
+        },
+        {
+          id: 103,
+          becario_id: 20,
+          fecha_aplicacion: new Date('2026-10-16T15:15:00Z'),
+          minutos_retraso: 45,
+          monto_bs: 30,
+          motivo: 'Retraso mayor a 30 min',
+        },
+      ]);
+
+      const con_descuento = await servicio_con_multas.calcularPagoPasajesConMultas({
+        periodo: '2026-10',
+        descontar_multas: 'true',
+      });
+
+      expect(con_descuento.resumen).toEqual({
+        descontar_multas: true,
+        total_becarios: 2,
+        total_100_bs: 120,
+        total_80_bs: 96,
+        total_multas_bs: 50,
+        total_descuento_aplicado_bs: 50,
+        total_liquido_pagable_bs: 60,
+      });
+
+      const bec1 = con_descuento.becarios.find((b) => b.becario_id === 10)!;
+      expect(bec1.monto_total_100_bs).toBe(100);
+      expect(bec1.monto_reconocido_80_bs).toBe(80);
+      expect(bec1.multas_asistencia_bs).toBe(20);
+      expect(bec1.descuento_multas_aplicado_bs).toBe(20);
+      expect(bec1.monto_liquido_pagable_bs).toBe(60);
+      expect(bec1.cantidad_multas).toBe(1);
+      expect(bec1.detalle_multas[0]).toEqual(
+        expect.objectContaining({
+          id: 101,
+          fecha_aplicacion: '2026-10-09',
+          minutos_retraso: 20,
+          monto_bs: 20,
+        }),
+      );
+
+      const bec2 = con_descuento.becarios.find((b) => b.becario_id === 20)!;
+      expect(bec2.monto_reconocido_80_bs).toBe(16);
+      expect(bec2.multas_asistencia_bs).toBe(30);
+      expect(bec2.descuento_multas_aplicado_bs).toBe(30);
+      expect(bec2.monto_liquido_pagable_bs).toBe(0);
+
+      const sin_descuento = await servicio_con_multas.calcularPagoPasajesConMultas({
+        periodo: '2026-10',
+        descontar_multas: 'false',
+      });
+
+      expect(sin_descuento.resumen).toEqual({
+        descontar_multas: false,
+        total_becarios: 2,
+        total_100_bs: 120,
+        total_80_bs: 96,
+        total_multas_bs: 50,
+        total_descuento_aplicado_bs: 0,
+        total_liquido_pagable_bs: 96,
+      });
+      expect(sin_descuento.becarios[0].descuento_multas_aplicado_bs).toBe(0);
+      expect(sin_descuento.becarios[0].monto_liquido_pagable_bs).toBe(80);
+      expect(sin_descuento.becarios[1].descuento_multas_aplicado_bs).toBe(0);
+      expect(sin_descuento.becarios[1].monto_liquido_pagable_bs).toBe(16);
+    });
+
+    it('restringe los resultados al propio becario cuando el rol es BECARIO y a los designados cuando es SUPERVISOR', async () => {
+      becario_repo_m.findOne.mockResolvedValue({ id: 10, usuario_id: 500 });
+      becario_repo_m.find.mockResolvedValue([{ id: 10, supervisor_id: 77 }]);
+      solicitud_repo_m.find.mockResolvedValue([
+        {
+          id: 1,
+          becario_id: 10,
+          estado: EstadoSolicitud.APROBADO,
+          monto_total: 100,
+          monto_devolucion: 80,
+          becario: { id: 10, usuario_id: 500, supervisor_id: 77, usuario: { nombre: 'Becario Propio' } },
+          recorridos: [],
+        },
+        {
+          id: 2,
+          becario_id: 20,
+          estado: EstadoSolicitud.APROBADO,
+          monto_total: 100,
+          monto_devolucion: 80,
+          becario: { id: 20, usuario_id: 600, supervisor_id: 88, usuario: { nombre: 'Becario Ajeno' } },
+          recorridos: [],
+        },
+      ]);
+      multa_repo_m.find.mockResolvedValue([]);
+
+      const resultado_becario = await servicio_con_multas.calcularPagoPasajesConMultas({
+        becario_id: 20,
+        usuario_autenticado: { id: 500, rol: Rol.BECARIO } as Usuario,
+      });
+      expect(resultado_becario.becarios).toHaveLength(1);
+      expect(resultado_becario.becarios[0].becario_id).toBe(10);
+
+      const resultado_mentor = await servicio_con_multas.calcularPagoPasajesConMultas({
+        usuario_autenticado: { id: 77, rol: Rol.SUPERVISOR } as Usuario,
+      });
+      expect(resultado_mentor.becarios).toHaveLength(1);
+      expect(resultado_mentor.becarios[0].becario_id).toBe(10);
     });
   });
 });

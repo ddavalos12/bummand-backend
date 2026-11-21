@@ -13,6 +13,8 @@ dist/
 .env.test
 .env.production
 .env.local
+.env.desktop
+.env.vercel
 
 # TypeScript
 *.tsbuildinfo

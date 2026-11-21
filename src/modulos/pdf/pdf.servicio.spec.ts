@@ -3,6 +3,7 @@ import {
   separarNombresYApellidos,
   CATALOGO_FIRMANTES_INSTITUCIONALES,
 } from './pdf.servicio';
+import { NavegadorPdfServicio } from './navegador-pdf.servicio';
 import { EstadoSolicitud } from '../pasajes/entidades/solicitud-pasaje.entidad';
 
 describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transporte)', () => {
@@ -643,6 +644,209 @@ describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transport
       expect(html).toContain('Huayta Cardozo, Adai Belen');
       expect(html).toContain('Examen parcial universitario');
       expect(html).toContain('Bs 20,00');
+    });
+  });
+
+  describe('Integración NavegadorPdfServicio y opción descontar_multas en PDFs de pasajes', () => {
+    it('delega generarPdf y métodos landscape a NavegadorPdfServicio.generarPdfDesdeHtml', async () => {
+      const navegador_mock = {
+        generarPdfDesdeHtml: jest.fn().mockResolvedValue(Buffer.from('PDF_NAVEGADOR')),
+      } as unknown as NavegadorPdfServicio;
+
+      const servicio_pdf = new PdfServicio(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        navegador_mock,
+      );
+
+      const res_normal = await servicio_pdf.generarPdf('<html><body>Prueba</body></html>');
+      expect(res_normal.toString()).toBe('PDF_NAVEGADOR');
+      expect(navegador_mock.generarPdfDesdeHtml).toHaveBeenCalledWith(
+        '<html><body>Prueba</body></html>',
+        undefined,
+      );
+
+      const res_semestral = await servicio_pdf.generarReporteEvaluacionSemestralPdf();
+      expect(res_semestral.toString()).toBe('PDF_NAVEGADOR');
+      expect(navegador_mock.generarPdfDesdeHtml).toHaveBeenLastCalledWith(
+        expect.any(String),
+        {
+          landscape: true,
+          margin: { top: '8mm', right: '10mm', bottom: '8mm', left: '10mm' },
+        },
+      );
+    });
+
+    it('generarDonacionTransporteHtml y generarDonacionTransportePdf descuentan multas cuando descontar_multas=true y preservan BKL-23 cuando es false', async () => {
+      const becarios_mock = [
+        { id: 1, nombre: 'Juan Carlos Aruquipa Mamani' },
+        { id: 2, nombre: 'Maria Belen Condori Quispe' },
+      ];
+      const recorridos_mock = [
+        {
+          id: 1,
+          tarifa: 100,
+          tipo_actividad: 'practicas',
+          solicitud: { becario_id: 1, estado: EstadoSolicitud.APROBADO },
+        },
+        {
+          id: 2,
+          tarifa: 20,
+          tipo_actividad: 'practicas',
+          solicitud: { becario_id: 2, estado: EstadoSolicitud.APROBADO },
+        },
+      ];
+      const multas_mock = [
+        {
+          id: 10,
+          becario_id: 1,
+          monto_bs: 20,
+          fecha_aplicacion: new Date('2026-11-12T14:50:00Z'),
+        },
+        {
+          id: 11,
+          becario_id: 2,
+          monto_bs: 30,
+          fecha_aplicacion: new Date('2026-11-19T15:10:00Z'),
+        },
+      ];
+
+      const html_con_descuento = servicio.generarDonacionTransporteHtml({
+        mes: '2026-11',
+        con_firma: 'false',
+        descontar_multas: true,
+        becarios: becarios_mock as never,
+        recorridos: recorridos_mock as never,
+        multas: multas_mock as never,
+      });
+
+      expect(html_con_descuento).toContain('80% Reconocido Bs.');
+      expect(html_con_descuento).toContain('(-) Multas Bs.');
+      expect(html_con_descuento).toContain('Líquido Pagable Bs.');
+      expect(html_con_descuento).toContain('80,00');
+      expect(html_con_descuento).toContain('20,00');
+      expect(html_con_descuento).toContain('60,00');
+      expect(html_con_descuento).toContain('16,00');
+      expect(html_con_descuento).toContain('30,00');
+      expect(html_con_descuento).toContain('0,00');
+      expect(html_con_descuento).toContain('96,00');
+      expect(html_con_descuento).toContain('50,00');
+      expect(html_con_descuento).toContain('descuento reglamentario por multas de asistencia');
+
+      const qb_recorridos = crearConstructorConsultaMock(recorridos_mock);
+      const qb_multas = crearConstructorConsultaMock(multas_mock);
+      const multa_repo_mock = {
+        createQueryBuilder: jest.fn().mockReturnValue(qb_multas),
+      };
+
+      const servicio_pdf = new PdfServicio(
+        undefined,
+        undefined,
+        undefined,
+        { find: jest.fn().mockResolvedValue(becarios_mock) } as never,
+        undefined,
+        { createQueryBuilder: jest.fn().mockReturnValue(qb_recorridos) } as never,
+        undefined,
+        undefined,
+        multa_repo_mock as never,
+      );
+
+      const espia_pdf = jest
+        .spyOn(servicio_pdf, 'generarPdf')
+        .mockResolvedValue(Buffer.from('PDF_TRANSPORTE_MULTAS'));
+
+      const resultado_con = await servicio_pdf.generarDonacionTransportePdf({
+        mes: '2026-11',
+        con_firma: 'false',
+        descontar_multas: 'true',
+      });
+
+      expect(multa_repo_mock.createQueryBuilder).toHaveBeenCalledTimes(1);
+      expect(resultado_con.nombre_archivo).toBe(
+        'Donacion_Transporte_BUMAND_Noviembre_SinFirma_ConDescuentoMultas.pdf',
+      );
+      expect(espia_pdf.mock.calls[0][0]).toContain('Líquido Pagable Bs.');
+
+      multa_repo_mock.createQueryBuilder.mockClear();
+      const resultado_sin = await servicio_pdf.generarDonacionTransportePdf({
+        mes: '2026-11',
+        con_firma: 'false',
+        descontar_multas: 'false',
+      });
+      expect(multa_repo_mock.createQueryBuilder).not.toHaveBeenCalled();
+      expect(resultado_sin.nombre_archivo).toBe(
+        'Donacion_Transporte_BUMAND_Noviembre_SinFirma.pdf',
+      );
+      expect(espia_pdf.mock.calls[1][0]).toContain('Total Gral por c/u Bs.');
+      expect(espia_pdf.mock.calls[1][0]).not.toContain('(-) Multas Bs.');
+    });
+
+    it('generarPasajesGeneralPdf y generarConsolidadoAuditoriaPdf excluyen descuento de multas cuando descontar_multas=false', async () => {
+      const recorridos_mock = [
+        {
+          id: 1,
+          fecha: new Date('2026-10-05T10:00:00Z'),
+          tramo: 'ida',
+          origen: 'Ceja',
+          destino: 'Centro',
+          tarifa: 100,
+          tipo_actividad: 'practicas',
+          solicitud: {
+            becario_id: 1,
+            estado: EstadoSolicitud.APROBADO,
+            becario: { id: 1, ci: '111 LP', usuario: { nombre: 'Becario Uno' } },
+          },
+        },
+      ];
+      const solicitudes_mock = [
+        { id: 1, becario_id: 1, monto_total: 100, monto_devolucion: 80 },
+      ];
+      const multas_mock = [
+        { id: 1, becario_id: 1, monto_bs: 20, fecha_aplicacion: new Date('2026-10-10T10:00:00Z') },
+      ];
+
+      const servicio_pdf = new PdfServicio(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { createQueryBuilder: jest.fn().mockReturnValue(crearConstructorConsultaMock(solicitudes_mock)) } as never,
+        { createQueryBuilder: jest.fn().mockReturnValue(crearConstructorConsultaMock(recorridos_mock)) } as never,
+        undefined,
+        undefined,
+        { find: jest.fn().mockResolvedValue(multas_mock) } as never,
+      );
+
+      const espia_pdf = jest
+        .spyOn(servicio_pdf, 'generarPdf')
+        .mockResolvedValue(Buffer.from('PDF_OK'));
+
+      await servicio_pdf.generarPasajesGeneralPdf({
+        fecha_inicio: '2026-10-01',
+        fecha_fin: '2026-10-31',
+        descontar_multas: 'false',
+      });
+      const html_pasajes_sin = espia_pdf.mock.calls[0][0];
+      expect(html_pasajes_sin).toContain('Excluye descuento de multas');
+      expect(html_pasajes_sin).toContain('- Bs 0.00');
+      expect(html_pasajes_sin).toContain('Bs 80.00');
+
+      await servicio_pdf.generarConsolidadoAuditoriaPdf({
+        fecha_inicio: '2026-10-01',
+        fecha_fin: '2026-10-31',
+        descontar_multas: 'false',
+      });
+      const html_consolidado_sin = espia_pdf.mock.calls[1][0];
+      expect(html_consolidado_sin).toContain('Excluye descuento de multas de asistencia');
+      expect(html_consolidado_sin).toContain('- Bs 0.00');
+      expect(html_consolidado_sin).toContain('Bs 80.00');
     });
   });
 });

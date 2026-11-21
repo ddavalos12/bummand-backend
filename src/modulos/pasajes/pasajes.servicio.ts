@@ -30,6 +30,56 @@ export interface CalculoReembolsoPasajes {
   devolucion_centavos: number;
 }
 
+export interface DetalleMultaPagoPasaje {
+  id: number;
+  fecha_aplicacion: string | null;
+  minutos_retraso: number;
+  monto_bs: number;
+  motivo: string;
+}
+
+export interface ItemCalculoPagoPasaje {
+  becario_id: number;
+  becario_nombre: string;
+  ci: string;
+  carrera: string;
+  sede: string;
+  estado: string;
+  solicitud_ids: number[];
+  periodos: string[];
+  cantidad_solicitudes: number;
+  cantidad_recorridos: number;
+  monto_total_100_bs: number;
+  monto_reconocido_80_bs: number;
+  multas_asistencia_bs: number;
+  descuento_multas_aplicado_bs: number;
+  monto_liquido_pagable_bs: number;
+  cantidad_multas: number;
+  detalle_multas: DetalleMultaPagoPasaje[];
+}
+
+export interface ResumenCalculoPagoPasajes {
+  descontar_multas: boolean;
+  total_becarios: number;
+  total_100_bs: number;
+  total_80_bs: number;
+  total_multas_bs: number;
+  total_descuento_aplicado_bs: number;
+  total_liquido_pagable_bs: number;
+}
+
+export interface ResultadoCalculoPagoPasajes {
+  filtros: {
+    periodo: string | null;
+    fecha_inicio: string | null;
+    fecha_fin: string | null;
+    becario_id: number | null;
+    descontar_multas: boolean;
+  };
+  resumen: ResumenCalculoPagoPasajes;
+  becarios: ItemCalculoPagoPasaje[];
+}
+
 export function esActividadReembolsablePasaje(tipo?: string | null): boolean {
   if (!tipo) {
     return true;
@@ -1412,6 +1462,434 @@ export class PasajesServicio {
         paradas_unicas_frecuentes,
       },
       historial: items_render,
+    };
+  }
+
+  private resolverRangoFechasCalculoPago(
+    periodo?: string,
+    fecha_inicio?: string,
+    fecha_fin?: string,
+  ): { inicio?: string; fin?: string } {
+    if (fecha_inicio || fecha_fin) {
+      return {
+        inicio: fecha_inicio ? fecha_inicio.slice(0, 10) : undefined,
+        fin: fecha_fin ? fecha_fin.slice(0, 10) : undefined,
+      };
+    }
+
+    if (periodo) {
+      const limpio = periodo.trim();
+      const match_iso = limpio.match(/^(\d{4})-(\d{1,2})$/);
+      if (match_iso) {
+        const anio = Number(match_iso[1]);
+        const mes_num = Number(match_iso[2]);
+        if (mes_num >= 1 && mes_num <= 12) {
+          const ultimo_dia = new Date(anio, mes_num, 0).getDate();
+          const mes_pad = String(mes_num).padStart(2, '0');
+          return {
+            inicio: `${anio}-${mes_pad}-01`,
+            fin: `${anio}-${mes_pad}-${String(ultimo_dia).padStart(2, '0')}`,
+          };
+        }
+      }
+
+      const meses_mapa: Record<string, number> = {
+        enero: 1,
+        febrero: 2,
+        marzo: 3,
+        abril: 4,
+        mayo: 5,
+        junio: 6,
+        julio: 7,
+        agosto: 8,
+        septiembre: 9,
+        setiembre: 9,
+        octubre: 10,
+        noviembre: 11,
+        diciembre: 12,
+      };
+      const normalizado = limpio
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      const match_anio = normalizado.match(/\b(20\d{2})\b/);
+      const mes_encontrado = Object.entries(meses_mapa).find(([nombre]) =>
+        normalizado.includes(nombre),
+      );
+      if (match_anio && mes_encontrado) {
+        const anio = Number(match_anio[1]);
+        const mes_num = mes_encontrado[1];
+        const ultimo_dia = new Date(anio, mes_num, 0).getDate();
+        const mes_pad = String(mes_num).padStart(2, '0');
+        return {
+          inicio: `${anio}-${mes_pad}-01`,
+          fin: `${anio}-${mes_pad}-${String(ultimo_dia).padStart(2, '0')}`,
+        };
+      }
+    }
+
+    return {};
+  }
+
+  private extraerFechaIso(valor?: Date | string | null): string | null {
+    if (!valor) return null;
+    if (typeof valor === 'string') {
+      const match_ymd = valor.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (match_ymd) return match_ymd[1];
+    }
+    const fecha = new Date(valor);
+    if (isNaN(fecha.getTime())) return null;
+    return fecha.toISOString().slice(0, 10);
+  }
+
+  async calcularPagoPasajesConMultas(parametros: {
+    periodo?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+    becario_id?: number;
+    descontar_multas?: boolean | string;
+    usuario_autenticado?: Usuario;
+  }): Promise<ResultadoCalculoPagoPasajes> {
+    const descontar_multas =
+      parametros.descontar_multas === undefined
+        ? true
+        : String(parametros.descontar_multas).toLowerCase() !== 'false';
+
+    const rango = this.resolverRangoFechasCalculoPago(
+      parametros.periodo,
+      parametros.fecha_inicio,
+      parametros.fecha_fin,
+    );
+
+    let becario_id_filtro = parametros.becario_id
+      ? Number(parametros.becario_id)
+      : undefined;
+    let ids_mentor_permitidos: Set<number> | null = null;
+    const usuario = parametros.usuario_autenticado;
+
+    const construirVacio = (): ResultadoCalculoPagoPasajes => ({
+      filtros: {
+        periodo: parametros.periodo || null,
+        fecha_inicio: rango.inicio || null,
+        fecha_fin: rango.fin || null,
+        becario_id: becario_id_filtro ?? null,
+        descontar_multas,
+      },
+      resumen: {
+        descontar_multas,
+        total_becarios: 0,
+        total_100_bs: 0,
+        total_80_bs: 0,
+        total_multas_bs: 0,
+        total_descuento_aplicado_bs: 0,
+        total_liquido_pagable_bs: 0,
+      },
+      becarios: [],
+    });
+
+    if (usuario && usuario.rol === Rol.BECARIO) {
+      becario_id_filtro = await this.resolverBecarioId(usuario.id);
+    } else if (esRolMentor(usuario?.rol)) {
+      ids_mentor_permitidos = await obtenerIdsBecariosDesignadosMentor(
+        this.becarioRepositorio,
+        usuario,
+        usuario?.id,
+      );
+      if (
+        becario_id_filtro &&
+        ids_mentor_permitidos.size > 0 &&
+        !ids_mentor_permitidos.has(becario_id_filtro)
+      ) {
+        return construirVacio();
+      }
+    }
+
+    let solicitudes = await this.solicitudRepositorio.find({
+      relations: {
+        recorridos: true,
+        becario: { usuario: true, supervisor: true, lugar_practica: true },
+      },
+      order: { id: 'DESC' },
+    });
+
+    if (becario_id_filtro) {
+      solicitudes = solicitudes.filter(
+        (s) =>
+          Number(s.becario_id) === becario_id_filtro ||
+          Number(s.becario?.id) === becario_id_filtro ||
+          (usuario?.rol === Rol.BECARIO &&
+            Number(s.becario?.usuario_id) === Number(usuario.id)),
+      );
+    } else if (esRolMentor(usuario?.rol)) {
+      if (ids_mentor_permitidos && ids_mentor_permitidos.size > 0) {
+        solicitudes = solicitudes.filter((s) =>
+          ids_mentor_permitidos!.has(Number(s.becario_id)),
+        );
+      } else {
+        solicitudes = solicitudes.filter(
+          (s) => (s.becario?.supervisor_id ?? s.supervisor_id) === usuario?.id,
+        );
+      }
+    }
+
+    const grupos_becarios = new Map<
+      number,
+      {
+        becario_id: number;
+        becario_nombre: string;
+        ci: string;
+        carrera: string;
+        sede: string;
+        estado: string;
+        solicitud_ids: number[];
+        periodos: Set<string>;
+        cantidad_recorridos: number;
+        total_100_centavos: number;
+        reconocido_80_centavos: number;
+      }
+    >();
+
+    const periodo_texto_filtro =
+      parametros.periodo && !rango.inicio && !rango.fin
+        ? parametros.periodo.trim().toLowerCase()
+        : null;
+
+    for (const sol of solicitudes || []) {
+      if (sol.estado === EstadoSolicitud.RECHAZADO) {
+        continue;
+      }
+
+      if (periodo_texto_filtro) {
+        const periodo_sol = (sol.periodo || '').trim().toLowerCase();
+        if (!periodo_sol.includes(periodo_texto_filtro)) {
+          continue;
+        }
+      }
+
+      const recorridos_crudos = Array.isArray(sol.recorridos)
+        ? sol.recorridos
+        : [];
+      const recorridos_reembolsables = recorridos_crudos.filter((r) =>
+        esActividadReembolsablePasaje(
+          r.tipo_actividad || (r as { tipoActividad?: string }).tipoActividad,
+        ),
+      );
+
+      let sol_100_centavos = 0;
+      let sol_80_centavos = 0;
+      let cantidad_recorridos_sol = 0;
+
+      if (recorridos_crudos.length > 0) {
+        const recorridos_filtrados =
+          rango.inicio || rango.fin
+            ? recorridos_reembolsables.filter((r) => {
+                const fecha_rec = this.extraerFechaIso(r.fecha);
+                if (!fecha_rec) return true;
+                if (rango.inicio && fecha_rec < rango.inicio) return false;
+                if (rango.fin && fecha_rec > rango.fin) return false;
+                return true;
+              })
+            : recorridos_reembolsables;
+
+        if (recorridos_filtrados.length === 0) {
+          continue;
+        }
+
+        const calculo = this.calcularReembolsoCentavos(
+          recorridos_filtrados.map((r) => Number(r.tarifa) || 0),
+        );
+        sol_100_centavos = calculo.total_centavos;
+        sol_80_centavos = calculo.devolucion_centavos;
+        cantidad_recorridos_sol = recorridos_filtrados.length;
+      } else {
+        if (rango.inicio || rango.fin) {
+          const fecha_sol = this.extraerFechaIso(
+            sol.fecha_envio || sol.created_at,
+          );
+          if (fecha_sol) {
+            if (rango.inicio && fecha_sol < rango.inicio) continue;
+            if (rango.fin && fecha_sol > rango.fin) continue;
+          } else if (parametros.periodo) {
+            const rango_sol = this.resolverRangoFechasCalculoPago(sol.periodo);
+            if (
+              rango_sol.inicio &&
+              rango.inicio &&
+              rango_sol.inicio !== rango.inicio
+            ) {
+              continue;
+            }
+          }
+        }
+        const monto_100 = Number(sol.monto_total) || 0;
+        const monto_80 = Number(sol.monto_devolucion);
+        sol_100_centavos = Math.round(monto_100 * 100);
+        sol_80_centavos =
+          Number.isFinite(monto_80) && monto_80 > 0
+            ? Math.round(monto_80 * 100)
+            : Math.round((sol_100_centavos * 80) / 100);
+      }
+
+      const id_bec = Number(sol.becario_id ?? sol.becario?.id ?? 0);
+      if (!id_bec) continue;
+
+      let grupo = grupos_becarios.get(id_bec);
+      if (!grupo) {
+        const nombre_bec =
+          sol.becario?.usuario?.nombre ||
+          sol.becario?.nombre ||
+          (sol.datos_becario as { nombre?: string } | undefined)?.nombre ||
+          `Becario #${id_bec}`;
+        grupo = {
+          becario_id: id_bec,
+          becario_nombre: nombre_bec,
+          ci: sol.becario?.ci || 'S/C',
+          carrera: sol.becario?.carrera || 'General',
+          sede: sol.becario?.lugar_practica?.nombre || 'Oficina Central',
+          estado: sol.estado || EstadoSolicitud.PENDIENTE,
+          solicitud_ids: [],
+          periodos: new Set<string>(),
+          cantidad_recorridos: 0,
+          total_100_centavos: 0,
+          reconocido_80_centavos: 0,
+        };
+        grupos_becarios.set(id_bec, grupo);
+      }
+
+      if (sol.id) {
+        grupo.solicitud_ids.push(Number(sol.id));
+      }
+      if (sol.periodo) {
+        grupo.periodos.add(sol.periodo);
+      }
+      grupo.cantidad_recorridos += cantidad_recorridos_sol;
+      grupo.total_100_centavos += sol_100_centavos;
+      grupo.reconocido_80_centavos += sol_80_centavos;
+    }
+
+    const multas_por_becario = new Map<
+      number,
+      { total_centavos: number; detalle: DetalleMultaPagoPasaje[] }
+    >();
+
+    if (
+      this.multa_repositorio &&
+      typeof this.multa_repositorio.find === 'function'
+    ) {
+      try {
+        const multas_db = await this.multa_repositorio.find();
+        for (const m of multas_db || []) {
+          const monto_num = Number(m.monto_bs || 0);
+          if (monto_num <= 0) continue;
+
+          const id_bec = Number(m.becario_id);
+          if (!id_bec) continue;
+
+          if (becario_id_filtro && id_bec !== becario_id_filtro) {
+            continue;
+          }
+          if (
+            ids_mentor_permitidos &&
+            ids_mentor_permitidos.size > 0 &&
+            !ids_mentor_permitidos.has(id_bec)
+          ) {
+            continue;
+          }
+
+          const fecha_multa = this.extraerFechaIso(
+            m.fecha_aplicacion || m.created_at,
+          );
+          if (rango.inicio || rango.fin) {
+            if (fecha_multa) {
+              if (rango.inicio && fecha_multa < rango.inicio) continue;
+              if (rango.fin && fecha_multa > rango.fin) continue;
+            }
+          }
+
+          const centavos_multa = Math.round(monto_num * 100);
+          let acum = multas_por_becario.get(id_bec);
+          if (!acum) {
+            acum = { total_centavos: 0, detalle: [] };
+            multas_por_becario.set(id_bec, acum);
+          }
+          acum.total_centavos += centavos_multa;
+          acum.detalle.push({
+            id: Number(m.id || 0),
+            fecha_aplicacion: fecha_multa,
+            minutos_retraso: Number(m.minutos_retraso || 0),
+            monto_bs: centavos_multa / 100,
+            motivo: m.motivo || 'Multa de asistencia',
+          });
+        }
+      } catch {}
+    }
+
+    let total_100_centavos = 0;
+    let total_80_centavos = 0;
+    let total_multas_centavos = 0;
+    let total_descuento_centavos = 0;
+    let total_liquido_centavos = 0;
+
+    const becarios: ItemCalculoPagoPasaje[] = Array.from(
+      grupos_becarios.values(),
+    )
+      .sort((a, b) => a.becario_nombre.localeCompare(b.becario_nombre, 'es'))
+      .map((g) => {
+        const info_multas = multas_por_becario.get(g.becario_id) || {
+          total_centavos: 0,
+          detalle: [],
+        };
+        const multas_centavos = info_multas.total_centavos;
+        const descuento_centavos = descontar_multas ? multas_centavos : 0;
+        const liquido_centavos = Math.max(
+          0,
+          g.reconocido_80_centavos - descuento_centavos,
+        );
+
+        total_100_centavos += g.total_100_centavos;
+        total_80_centavos += g.reconocido_80_centavos;
+        total_multas_centavos += multas_centavos;
+        total_descuento_centavos += descuento_centavos;
+        total_liquido_centavos += liquido_centavos;
+
+        return {
+          becario_id: g.becario_id,
+          becario_nombre: g.becario_nombre,
+          ci: g.ci,
+          carrera: g.carrera,
+          sede: g.sede,
+          estado: g.estado,
+          solicitud_ids: g.solicitud_ids,
+          periodos: Array.from(g.periodos),
+          cantidad_solicitudes: g.solicitud_ids.length,
+          cantidad_recorridos: g.cantidad_recorridos,
+          monto_total_100_bs: g.total_100_centavos / 100,
+          monto_reconocido_80_bs: g.reconocido_80_centavos / 100,
+          multas_asistencia_bs: multas_centavos / 100,
+          descuento_multas_aplicado_bs: descuento_centavos / 100,
+          monto_liquido_pagable_bs: liquido_centavos / 100,
+          cantidad_multas: info_multas.detalle.length,
+          detalle_multas: info_multas.detalle,
+        };
+      });
+
+    return {
+      filtros: {
+        periodo: parametros.periodo || null,
+        fecha_inicio: rango.inicio || null,
+        fecha_fin: rango.fin || null,
+        becario_id: becario_id_filtro ?? null,
+        descontar_multas,
+      },
+      resumen: {
+        descontar_multas,
+        total_becarios: becarios.length,
+        total_100_bs: total_100_centavos / 100,
+        total_80_bs: total_80_centavos / 100,
+        total_multas_bs: total_multas_centavos / 100,
+        total_descuento_aplicado_bs: total_descuento_centavos / 100,
+        total_liquido_pagable_bs: total_liquido_centavos / 100,
+      },
+      becarios,
     };
   }
 }

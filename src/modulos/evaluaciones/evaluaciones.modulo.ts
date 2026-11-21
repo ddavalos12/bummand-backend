@@ -19,6 +19,7 @@ import { Usuario } from '../usuarios/entidades/usuario.entidad';
 import { BibliaModulo } from '../biblia/biblia.modulo';
 import { NotificacionesModulo } from '../notificaciones/notificaciones.modulo';
 import { TiempoRealModulo } from '../tiempo-real/tiempo-real.modulo';
+import { AlmacenamientoModulo } from '../almacenamiento/almacenamiento.modulo';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { TiempoRealModulo } from '../tiempo-real/tiempo-real.modulo';
     BibliaModulo,
     NotificacionesModulo,
     TiempoRealModulo,
+    AlmacenamientoModulo,
   ],
   controllers: [EvaluacionesControlador],
   providers: [EvaluacionesServicio],

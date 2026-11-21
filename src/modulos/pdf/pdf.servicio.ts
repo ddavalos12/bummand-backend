@@ -1,8 +1,7 @@
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
-import * as puppeteer from 'puppeteer';
-import * as fs from 'fs';
+import { NavegadorPdfServicio, OpcionesGeneracionPdf } from './navegador-pdf.servicio';
 import { Evento } from '../eventos/entidades/evento.entidad';
 import { AsistenciaEvento } from '../eventos/entidades/asistencia-evento.entidad';
 import { RegistroAsistencia, TipoAsistencia } from '../asistencia/entidades/registro-asistencia.entidad';
@@ -86,6 +85,8 @@ export function separarNombresYApellidos(nombre_completo: string): {
 
 @Injectable()
 export class PdfServicio {
+  private navegador_pdf_respaldo?: NavegadorPdfServicio;
+
   constructor(
     @Optional()
     @InjectRepository(Evento)
@@ -114,77 +115,25 @@ export class PdfServicio {
     @Optional()
     @InjectRepository(Multa)
     private readonly multa_repo?: Repository<Multa>,
+    @Optional()
+    private readonly navegador_pdf_servicio?: NavegadorPdfServicio,
   ) {}
 
-  private async lanzarNavegador(): Promise<puppeteer.Browser> {
-    const rutas_candidatas: (string | undefined)[] = [
-      process.env.PUPPETEER_EXECUTABLE_PATH,
-      process.env.CHROME_BIN,
-      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-      'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-      'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-      '/usr/bin/google-chrome',
-      '/usr/bin/chromium',
-      '/usr/bin/chromium-browser',
-    ];
-
-    let ruta_ejecutable: string | undefined = undefined;
-
-    for (const ruta of rutas_candidatas) {
-      if (ruta && fs.existsSync(ruta)) {
-        ruta_ejecutable = ruta;
-        break;
-      }
+  private obtenerNavegadorPdfServicio(): NavegadorPdfServicio {
+    if (this.navegador_pdf_servicio) {
+      return this.navegador_pdf_servicio;
     }
-
-    if (!ruta_ejecutable) {
-      try {
-        const ruta_puppeteer = (puppeteer as any).executablePath ? (puppeteer as any).executablePath() : undefined;
-        if (ruta_puppeteer && fs.existsSync(ruta_puppeteer)) {
-          ruta_ejecutable = ruta_puppeteer;
-        }
-      } catch {
-        // Ignorar si puppeteer.executablePath() falla
-      }
+    if (!this.navegador_pdf_respaldo) {
+      this.navegador_pdf_respaldo = new NavegadorPdfServicio();
     }
-
-    const opciones: puppeteer.LaunchOptions = {
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    };
-
-    if (ruta_ejecutable) {
-      opciones.executablePath = ruta_ejecutable;
-    }
-
-    try {
-      return await puppeteer.launch(opciones);
-    } catch (error_lanzamiento) {
-      if (ruta_ejecutable) {
-        delete opciones.executablePath;
-        return await puppeteer.launch(opciones);
-      }
-      throw error_lanzamiento;
-    }
+    return this.navegador_pdf_respaldo;
   }
 
-  async generarPdf(html: string): Promise<Buffer> {
-    const navegador = await this.lanzarNavegador();
-    try {
-      const pagina = await navegador.newPage();
-      pagina.setDefaultTimeout(120000);
-      await pagina.setContent(html, { waitUntil: 'domcontentloaded', timeout: 120000 });
-      const bufer = await pagina.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '15mm', right: '15mm', bottom: '15mm', left: '15mm' },
-        timeout: 120000,
-      });
-      return Buffer.from(bufer);
-    } finally {
-      await navegador.close().catch(() => {});
-    }
+  async generarPdf(
+    html: string,
+    opciones?: OpcionesGeneracionPdf,
+  ): Promise<Buffer> {
+    return this.obtenerNavegadorPdfServicio().generarPdfDesdeHtml(html, opciones);
   }
 
   async generarPdfEvaluacionF03(evaluacion: any): Promise<Buffer> {
@@ -807,17 +756,10 @@ export class PdfServicio {
     registros?: RegistroConsolidadoSemestral[],
   ): Promise<Buffer> {
     const html = this.generarReporteEvaluacionSemestralHtml(registros);
-    const navegador = await this.lanzarNavegador();
-    const pagina = await navegador.newPage();
-    await pagina.setContent(html, { waitUntil: 'domcontentloaded' });
-    const bufer = await pagina.pdf({
-      format: 'A4',
+    return this.generarPdf(html, {
       landscape: true,
-      printBackground: true,
       margin: { top: '8mm', right: '10mm', bottom: '8mm', left: '10mm' },
     });
-    await navegador.close();
-    return Buffer.from(bufer);
   }
 
   async generarCorteAsistenciaPdf(opciones: {
@@ -1215,17 +1157,10 @@ export class PdfServicio {
       </html>
     `;
 
-    const navegador = await this.lanzarNavegador();
-    const pagina = await navegador.newPage();
-    await pagina.setContent(html, { waitUntil: 'domcontentloaded' });
-    const bufer = await pagina.pdf({
-      format: 'A4',
+    return this.generarPdf(html, {
       landscape: true,
-      printBackground: true,
       margin: { top: '8mm', right: '10mm', bottom: '8mm', left: '10mm' },
     });
-    await navegador.close();
-    return Buffer.from(bufer);
   }
 
   /**
@@ -1438,29 +1373,17 @@ export class PdfServicio {
       dias_unicos,
     });
 
-    const navegador = await this.lanzarNavegador();
-    let bufer: Uint8Array;
-    try {
-      const pagina = await navegador.newPage();
-      pagina.setDefaultTimeout(120000);
-      await pagina.setContent(html, { waitUntil: 'domcontentloaded', timeout: 120000 });
-      bufer = await pagina.pdf({
-        format: 'A4',
-        landscape: true,
-        printBackground: true,
-        margin: { top: '8mm', right: '10mm', bottom: '8mm', left: '10mm' },
-        timeout: 120000,
-      });
-    } finally {
-      await navegador.close().catch(() => {});
-    }
+    const bufer = await this.generarPdf(html, {
+      landscape: true,
+      margin: { top: '8mm', right: '10mm', bottom: '8mm', left: '10mm' },
+    });
 
     const nombre_estudiante_limpio = nombre_estudiante.replace(/[^a-zA-Z0-9_-]/g, '_');
     const mes_limpio = mes_nombre.replace(/[^a-zA-Z0-9_-]/g, '_');
     const nombre_archivo = `Formulario_Contabilidad_Recorridos_${nombre_estudiante_limpio}_${mes_limpio}.pdf`;
 
     return {
-      bufer: Buffer.from(bufer),
+      bufer,
       nombre_archivo,
       nombre_estudiante,
       mes_nombre,
@@ -2007,23 +1930,17 @@ export class PdfServicio {
       horas_servicio,
     });
 
-    const navegador = await this.lanzarNavegador();
-    const pagina = await navegador.newPage();
-    await pagina.setContent(html, { waitUntil: 'domcontentloaded' });
-    const bufer = await pagina.pdf({
-      format: 'A4',
+    const bufer = await this.generarPdf(html, {
       landscape: true,
-      printBackground: true,
       margin: { top: '8mm', right: '10mm', bottom: '8mm', left: '10mm' },
     });
-    await navegador.close();
 
     const nombre_estudiante_limpio = nombre_estudiante.replace(/[^a-zA-Z0-9_-]/g, '_');
     const mes_limpio = mes_nombre.replace(/[^a-zA-Z0-9_-]/g, '_');
     const nombre_archivo = `Asistencia_Mensual_${nombre_estudiante_limpio}_${mes_limpio}.pdf`;
 
     return {
-      bufer: Buffer.from(bufer),
+      bufer,
       nombre_archivo,
       nombre_estudiante,
       mes_nombre,
@@ -3037,6 +2954,7 @@ export class PdfServicio {
     total_monto_pasajes: number;
     total_multas_bs?: number;
     monto_liquido_pagable?: number;
+    descontar_multas?: boolean;
     total_refrigerios: number;
     total_monto_refrigerios: number;
   }): string {
@@ -3046,10 +2964,18 @@ export class PdfServicio {
       : 'Periodo de Evaluación Integral';
 
     const codigo_auditoria = `CONT-RSD-${Date.now().toString().slice(-6)}`;
-    const multas_bs = Number(datos.total_multas_bs || 0);
-    const liquido_pagable = Number(
-      datos.monto_liquido_pagable ?? Math.max(0, Number(datos.total_monto_pasajes || 0) - multas_bs),
-    );
+    const aplicar_descuento_multas = datos.descontar_multas !== false;
+    const multas_bs = aplicar_descuento_multas ? Number(datos.total_multas_bs || 0) : 0;
+    const total_pasajes_bruto_80 = Number(datos.total_monto_pasajes || 0);
+    const liquido_pagable = aplicar_descuento_multas
+      ? Number(
+          datos.monto_liquido_pagable ??
+            Math.max(0, total_pasajes_bruto_80 - multas_bs),
+        )
+      : total_pasajes_bruto_80;
+    const subtitulo_multas = aplicar_descuento_multas
+      ? 'Incluye descuento de multas de asistencia'
+      : 'Excluye descuento de multas de asistencia';
 
     return `
       <!DOCTYPE html>
@@ -3081,7 +3007,7 @@ export class PdfServicio {
             <tr>
               <td>
                 <div class="header-title">FORMULARIO PARA CONTABILIDAD Y RSD - LIQUIDACIÓN DE PASAJES</div>
-                <div style="font-size: 11px; color: #035683; font-weight: 600;">Fundación Diaconía FRIF-IFD · Programa BUMAND · Consolidado para Contabilidad y RSD</div>
+                <div style="font-size: 11px; color: #035683; font-weight: 600;">Fundación Diaconía FRIF-IFD · Programa BUMAND · Consolidado para Contabilidad y RSD · ${subtitulo_multas}</div>
               </td>
               <td style="text-align: right;">
                 <span class="auditoria-badge">${codigo_auditoria}</span>
@@ -3173,7 +3099,12 @@ export class PdfServicio {
   async generarConsolidadoAuditoriaPdf(filtros: {
     fecha_inicio?: string;
     fecha_fin?: string;
+    descontar_multas?: boolean | string;
   }): Promise<{ bufer: Buffer; nombre_archivo: string }> {
+    const aplicar_descuento_multas =
+      filtros.descontar_multas === undefined
+        ? true
+        : String(filtros.descontar_multas).toLowerCase() !== 'false';
     let total_asistencias = 0;
     let total_horas = 0;
     let total_solicitudes_pasajes = 0;
@@ -3211,17 +3142,30 @@ export class PdfServicio {
       );
     }
 
-    if (this.multa_repo && typeof this.multa_repo.find === 'function') {
+    if (aplicar_descuento_multas && this.multa_repo && typeof this.multa_repo.find === 'function') {
       try {
         const multas = await this.multa_repo.find();
-        total_multas_bs = (multas || []).reduce(
-          (acc, m) => acc + Math.max(0, Number(m.monto_bs || 0)),
-          0,
-        );
+        total_multas_bs = (multas || []).reduce((acc, m) => {
+          const monto = Math.max(0, Number(m.monto_bs || 0));
+          if (monto <= 0) return acc;
+          if (filtros.fecha_inicio || filtros.fecha_fin) {
+            const fecha_ref = m.fecha_aplicacion || m.created_at;
+            const fecha_valida = fecha_ref ? new Date(fecha_ref) : null;
+            if (fecha_valida && !isNaN(fecha_valida.getTime())) {
+              const fecha_str = fecha_valida.toISOString().slice(0, 10);
+              if (filtros.fecha_inicio && fecha_str < filtros.fecha_inicio) return acc;
+              if (filtros.fecha_fin && fecha_str > filtros.fecha_fin) return acc;
+            }
+          }
+          return acc + monto;
+        }, 0);
+        total_multas_bs = Number(total_multas_bs.toFixed(2));
       } catch {}
     }
 
-    const monto_liquido_pagable = Math.max(0, Number((total_monto_pasajes - total_multas_bs).toFixed(2)));
+    const monto_liquido_pagable = aplicar_descuento_multas
+      ? Math.max(0, Number((total_monto_pasajes - total_multas_bs).toFixed(2)))
+      : Number(total_monto_pasajes.toFixed(2));
 
     if (this.refrigerio_repo) {
       const qb = this.refrigerio_repo.createQueryBuilder('ref');
@@ -3248,6 +3192,7 @@ export class PdfServicio {
       total_monto_pasajes,
       total_multas_bs,
       monto_liquido_pagable,
+      descontar_multas: aplicar_descuento_multas,
       total_refrigerios,
       total_monto_refrigerios,
     });
@@ -3264,7 +3209,12 @@ export class PdfServicio {
   async generarPasajesGeneralPdf(opciones: {
     fecha_inicio?: string;
     fecha_fin?: string;
+    descontar_multas?: boolean | string;
   }): Promise<{ bufer: Buffer; nombre_archivo: string }> {
+    const aplicar_descuento_multas =
+      opciones.descontar_multas === undefined
+        ? true
+        : String(opciones.descontar_multas).toLowerCase() !== 'false';
     const UMBRAL_CONSOLIDADO_TRAMOS = 400;
     const fecha_actual = new Date();
     const rango_texto =
@@ -3361,17 +3311,22 @@ export class PdfServicio {
     let total_multas_bs = 0;
     const mapa_multas_becario_mes = new Map<string, number>();
     const mapa_multas_becario_sin_mes = new Map<number, number>();
-    if (this.multa_repo && typeof this.multa_repo.find === 'function') {
+    if (aplicar_descuento_multas && this.multa_repo && typeof this.multa_repo.find === 'function') {
       try {
         const multas = await this.multa_repo.find();
         for (const m of multas || []) {
           const monto = Math.max(0, Number(m.monto_bs || 0));
           if (monto <= 0) continue;
+          const fecha_ref = m.fecha_aplicacion || m.created_at;
+          const fecha_valida = fecha_ref ? new Date(fecha_ref) : null;
+          if ((opciones.fecha_inicio || opciones.fecha_fin) && fecha_valida && !isNaN(fecha_valida.getTime())) {
+            const fecha_str = fecha_valida.toISOString().slice(0, 10);
+            if (opciones.fecha_inicio && fecha_str < opciones.fecha_inicio) continue;
+            if (opciones.fecha_fin && fecha_str > opciones.fecha_fin) continue;
+          }
           total_multas_bs = Number((total_multas_bs + monto).toFixed(2));
           if (m.becario_id) {
             const id_bec = Number(m.becario_id);
-            const fecha_ref = m.fecha_aplicacion || m.created_at;
-            const fecha_valida = fecha_ref ? new Date(fecha_ref) : null;
             if (fecha_valida && !isNaN(fecha_valida.getTime())) {
               const clave_mes = `${id_bec}|${fecha_valida.toISOString().slice(0, 7)}`;
               mapa_multas_becario_mes.set(
@@ -3391,7 +3346,12 @@ export class PdfServicio {
 
     const total_bruto = Number(items_render.reduce((acc, r) => acc + r.tarifa, 0).toFixed(2));
     const total_devolucion = Number(items_render.reduce((acc, r) => acc + r.reembolso_80, 0).toFixed(2));
-    const monto_liquido_pagable = Math.max(0, Number((total_devolucion - total_multas_bs).toFixed(2)));
+    const monto_liquido_pagable = aplicar_descuento_multas
+      ? Math.max(0, Number((total_devolucion - total_multas_bs).toFixed(2)))
+      : total_devolucion;
+    const subtitulo_multas = aplicar_descuento_multas
+      ? 'Incluye descuento de multas'
+      : 'Excluye descuento de multas';
     const total_tramos = items_render.length;
     const becarios_unicos = new Set(items_render.map((r) => r.becario_nombre)).size;
     const es_consolidado = total_tramos > UMBRAL_CONSOLIDADO_TRAMOS;
@@ -3593,7 +3553,7 @@ export class PdfServicio {
             <tr>
               <td>
                 <div class="header-title">FORMULARIO PARA CONTABILIDAD Y RSD - LIQUIDACIÓN DE PASAJES</div>
-                <div class="header-subtitle">Fundación Diaconía FRIF-IFD · Programa BUMAND · Consolidado de Recorridos (80%) y Descuento de Multas</div>
+                <div class="header-subtitle">Fundación Diaconía FRIF-IFD · Programa BUMAND · Consolidado de Recorridos (80%) · ${subtitulo_multas}</div>
               </td>
               <td style="text-align: right;">
                 <span style="background: #007BBE; color: #FFFFFF; font-size: 8.5px; font-weight: bold; padding: 4px 8px; font-family: monospace;">
@@ -4626,16 +4586,21 @@ export class PdfServicio {
     becarios?: Partial<Becario>[];
     recorridos?: Partial<Recorrido>[];
     solicitudes?: Partial<SolicitudPasajes>[];
+    multas?: Partial<Multa>[];
     fecha_inicio?: string;
     fecha_fin?: string;
     mes?: string;
     con_firma?: boolean | string;
+    descontar_multas?: boolean | string;
     firmante_1?: string;
     firmante_2?: string;
   }): string {
     const incluir_firma =
       opciones.con_firma === true ||
       String(opciones.con_firma).toLowerCase() === 'true';
+    const aplicar_descuento_multas =
+      opciones.descontar_multas === true ||
+      String(opciones.descontar_multas).toLowerCase() === 'true';
     const [firma_1, firma_2] = this.resolverFirmantesInstitucionales(
       opciones.firmante_1,
       opciones.firmante_2,
@@ -4755,6 +4720,24 @@ export class PdfServicio {
       }
     }
 
+    const multas_centavos_por_id = new Map<number, number>();
+    if (aplicar_descuento_multas) {
+      for (const multa of opciones.multas || []) {
+        const monto_m = Math.max(0, Number(multa.monto_bs || 0));
+        if (monto_m <= 0) continue;
+        const id_bec =
+          multa.becario_id ??
+          (multa.becario as { id?: number } | undefined)?.id;
+        if (id_bec !== undefined && id_bec !== null) {
+          const id_num = Number(id_bec);
+          multas_centavos_por_id.set(
+            id_num,
+            (multas_centavos_por_id.get(id_num) || 0) + Math.round(monto_m * 100),
+          );
+        }
+      }
+    }
+
     const filas_becarios = (opciones.becarios || []).map((bec) => {
       const nombre_completo = (
         bec.nombre ||
@@ -4770,24 +4753,64 @@ export class PdfServicio {
       const monto_nombre = nombre_completo
         ? montos_por_nombre.get(nombre_completo.toLowerCase()) || 0
         : 0;
-      const total_bs = Number((monto_id + monto_nombre).toFixed(2));
+      const monto_80_centavos = Math.round((monto_id + monto_nombre) * 100);
+      const monto_80_bs = monto_80_centavos / 100;
+      const multas_centavos =
+        aplicar_descuento_multas && bec.id !== undefined && bec.id !== null
+          ? multas_centavos_por_id.get(Number(bec.id)) || 0
+          : 0;
+      const multas_bs = multas_centavos / 100;
+      const liquido_pagable_centavos = aplicar_descuento_multas
+        ? Math.max(0, monto_80_centavos - multas_centavos)
+        : monto_80_centavos;
+      const liquido_pagable_bs = liquido_pagable_centavos / 100;
 
       return {
         id: bec.id,
         nombres,
         apellidos,
-        total_bs,
+        total_bs: monto_80_bs,
+        monto_80_bs,
+        monto_80_centavos,
+        multas_bs,
+        multas_centavos,
+        liquido_pagable_bs,
+        liquido_pagable_centavos,
       };
     });
 
     const filas_ordenadas = this.ordenarBecariosPorApellido(filas_becarios);
-    const total_general = Number(
-      filas_ordenadas.reduce((acc, f) => acc + f.total_bs, 0).toFixed(2),
+    const total_80_centavos = filas_ordenadas.reduce(
+      (acc, f) => acc + f.monto_80_centavos,
+      0,
     );
+    const total_multas_centavos = filas_ordenadas.reduce(
+      (acc, f) => acc + f.multas_centavos,
+      0,
+    );
+    const total_liquido_centavos = filas_ordenadas.reduce(
+      (acc, f) => acc + f.liquido_pagable_centavos,
+      0,
+    );
+    const total_general = total_80_centavos / 100;
+    const total_multas_general = total_multas_centavos / 100;
+    const total_liquido_general = total_liquido_centavos / 100;
 
     const filas_html = filas_ordenadas
-      .map(
-        (f, idx) => `
+      .map((f, idx) =>
+        aplicar_descuento_multas
+          ? `
+        <tr>
+          <td class="col-num">${idx + 1}</td>
+          <td class="col-nombres">${f.nombres}</td>
+          <td class="col-apellidos">${f.apellidos}</td>
+          <td class="col-monto">${this.formatearMontoBoliviano(f.monto_80_bs)}</td>
+          <td class="col-monto col-multa">${this.formatearMontoBoliviano(f.multas_bs)}</td>
+          <td class="col-monto col-liquido">${this.formatearMontoBoliviano(f.liquido_pagable_bs)}</td>
+          ${incluir_firma ? '<td class="col-firma"></td>' : ''}
+        </tr>
+      `
+          : `
         <tr>
           <td class="col-num">${idx + 1}</td>
           <td class="col-nombres">${f.nombres}</td>
@@ -4798,6 +4821,26 @@ export class PdfServicio {
       `,
       )
       .join('');
+
+    const columnas_encabezado_html = aplicar_descuento_multas
+      ? `
+                <th class="col-monto" style="text-align: center;">80% Reconocido Bs.</th>
+                <th class="col-monto" style="text-align: center;">(-) Multas Bs.</th>
+                <th class="col-monto" style="text-align: center;">Líquido Pagable Bs.</th>`
+      : `
+                <th class="col-monto" style="text-align: center;">Total Gral por c/u Bs.</th>`;
+
+    const celdas_totales_html = aplicar_descuento_multas
+      ? `
+                <td class="col-monto">${this.formatearMontoBoliviano(total_general)}</td>
+                <td class="col-monto col-multa">${this.formatearMontoBoliviano(total_multas_general)}</td>
+                <td class="col-monto col-liquido">${this.formatearMontoBoliviano(total_liquido_general)}</td>`
+      : `
+                <td class="col-monto">${this.formatearMontoBoliviano(total_general)}</td>`;
+
+    const leyenda_pie_texto = aplicar_descuento_multas
+      ? 'El presente detalle consolida los gastos de transporte de los BUMAN-D para el cumplimiento de sus Prácticas Pre Profesionales, aplicando el descuento reglamentario por multas de asistencia vigentes sobre el 80% reconocido.'
+      : 'El presente detalle consolida los gastos de transporte de los BUMAN-D para el cumplimiento de sus Prácticas Pre Profesionales.';
 
     return `
       <!DOCTYPE html>
@@ -4861,9 +4904,16 @@ export class PdfServicio {
               text-align: left;
             }
             .col-monto {
-              width: 115px;
+              width: ${aplicar_descuento_multas ? '88px' : '115px'};
               text-align: right;
               font-variant-numeric: tabular-nums;
+            }
+            .col-multa {
+              color: #B45309;
+            }
+            .col-liquido {
+              color: #065F46;
+              font-weight: bold;
             }
             .col-firma {
               width: 135px;
@@ -4929,7 +4979,7 @@ export class PdfServicio {
                 <th class="col-num">N°</th>
                 <th>NOMBRES</th>
                 <th>APELLIDOS</th>
-                <th class="col-monto" style="text-align: center;">Total Gral por c/u Bs.</th>
+                ${columnas_encabezado_html}
                 ${incluir_firma ? '<th class="col-firma">FIRMA</th>' : ''}
               </tr>
             </thead>
@@ -4939,14 +4989,14 @@ export class PdfServicio {
             <tfoot>
               <tr class="fila-total">
                 <td colspan="3" class="total-etiqueta">Total General Bs.</td>
-                <td class="col-monto">${this.formatearMontoBoliviano(total_general)}</td>
+                ${celdas_totales_html}
                 ${incluir_firma ? '<td class="col-firma"></td>' : ''}
               </tr>
             </tfoot>
           </table>
 
           <div class="leyenda-pie">
-            El presente detalle consolida los gastos de transporte de los BUMAN-D para el cumplimiento de sus Prácticas Pre Profesionales.
+            ${leyenda_pie_texto}
           </div>
 
           <div class="firmas-contenedor">
@@ -4973,10 +5023,14 @@ export class PdfServicio {
     fecha_fin?: string;
     mes?: string;
     con_firma?: boolean | string;
+    descontar_multas?: boolean | string;
     firmante_1?: string;
     firmante_2?: string;
   }): Promise<{ bufer: Buffer; nombre_archivo: string }> {
     const rango = this.resolverRangoFechasPlanilla(opciones);
+    const aplicar_descuento_multas =
+      opciones.descontar_multas === true ||
+      String(opciones.descontar_multas).toLowerCase() === 'true';
 
     let becarios: Becario[] = [];
     if (this.becario_repo && typeof this.becario_repo.find === 'function') {
@@ -5042,11 +5096,53 @@ export class PdfServicio {
       solicitudes = await qb_sol.getMany();
     }
 
+    let multas: Multa[] = [];
+    if (aplicar_descuento_multas && this.multa_repo) {
+      try {
+        if (typeof this.multa_repo.createQueryBuilder === 'function') {
+          const qb_multas = this.multa_repo.createQueryBuilder('m');
+          if (rango.fecha_inicio && rango.fecha_fin) {
+            qb_multas.where(
+              'm.fecha_aplicacion >= :inicio AND m.fecha_aplicacion <= :fin',
+              {
+                inicio: `${rango.fecha_inicio} 00:00:00`,
+                fin: `${rango.fecha_fin} 23:59:59`,
+              },
+            );
+          } else if (rango.fecha_inicio) {
+            qb_multas.where('m.fecha_aplicacion >= :inicio', {
+              inicio: `${rango.fecha_inicio} 00:00:00`,
+            });
+          } else if (rango.fecha_fin) {
+            qb_multas.where('m.fecha_aplicacion <= :fin', {
+              fin: `${rango.fecha_fin} 23:59:59`,
+            });
+          }
+          multas = await qb_multas.getMany();
+        } else if (typeof this.multa_repo.find === 'function') {
+          const todas_multas = await this.multa_repo.find();
+          multas = (todas_multas || []).filter((m) => {
+            if (!rango.fecha_inicio && !rango.fecha_fin) return true;
+            const fecha_ref = m.fecha_aplicacion || m.created_at;
+            if (!fecha_ref) return true;
+            const fecha_valida = new Date(fecha_ref);
+            if (isNaN(fecha_valida.getTime())) return true;
+            const fecha_str = fecha_valida.toISOString().slice(0, 10);
+            if (rango.fecha_inicio && fecha_str < rango.fecha_inicio) return false;
+            if (rango.fecha_fin && fecha_str > rango.fecha_fin) return false;
+            return true;
+          });
+        }
+      } catch {}
+    }
+
     const html = this.generarDonacionTransporteHtml({
       ...opciones,
+      descontar_multas: aplicar_descuento_multas,
       becarios,
       recorridos,
       solicitudes,
+      multas,
     });
     const bufer = await this.generarPdf(html);
 
@@ -5058,7 +5154,8 @@ export class PdfServicio {
       opciones.con_firma === true ||
       String(opciones.con_firma).toLowerCase() === 'true';
     const sufijo_firma = incluir_firma ? 'ConFirma' : 'SinFirma';
-    const nombre_archivo = `Donacion_Transporte_BUMAND_${mes_limpio}_${sufijo_firma}.pdf`;
+    const sufijo_multas = aplicar_descuento_multas ? '_ConDescuentoMultas' : '';
+    const nombre_archivo = `Donacion_Transporte_BUMAND_${mes_limpio}_${sufijo_firma}${sufijo_multas}.pdf`;
 
     return { bufer, nombre_archivo };
   }
