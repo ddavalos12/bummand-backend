@@ -54,6 +54,11 @@ export interface EstadisticasDashboard {
   tendencia_horas: ItemTendenciaMensualHoras[];
   ranking_puntualidad: PosicionRankingPuntualidad[];
   total_multas_bs?: number;
+  multas_recaudadas_bs?: number;
+  incidencias_multas?: number;
+  total_becarios?: number;
+  evaluaciones_completadas?: number;
+  porcentaje_puntualidad?: number;
   dias_permiso_aprobado?: number;
   horas_compensadas_permiso?: number;
 }
@@ -260,7 +265,7 @@ export class DashboardServicio {
     for (const b of becarios) {
       const cant_permisos = permisos_por_becario.get(b.id)?.size || 0;
       metricas_becario[b.id] = {
-        nombre: b.usuario?.nombre || `Becario #${b.id}`,
+        nombre: b.usuario?.nombre || b.nombre || `Becario #${b.id}`,
         carrera: b.carrera || 'No especificada',
         total: 0,
         a_tiempo: 0,
@@ -394,6 +399,26 @@ export class DashboardServicio {
       ...item,
     }));
 
+    let evaluaciones_completadas = 0;
+    if (typeof this.evaluacion_repo?.find === 'function') {
+      try {
+        const todas_evs = await this.evaluacion_repo.find();
+        evaluaciones_completadas = todas_evs.filter(
+          (e) =>
+            e.estado === EstadoEvaluacion.COMPLETADO &&
+            (!supervisor_id || set_becarios_permitidos.has(e.becario_id)),
+        ).length;
+      } catch {
+        evaluaciones_completadas = 0;
+      }
+    }
+
+    const total_a_tiempo = asistencias.filter((a) => a.dentro_de_horario).length;
+    const porcentaje_puntualidad =
+      asistencias.length > 0
+        ? Number(((total_a_tiempo / asistencias.length) * 100).toFixed(1))
+        : 0;
+
     return {
       metricas_generales: {
         total_becarios_activos,
@@ -416,6 +441,11 @@ export class DashboardServicio {
       tendencia_horas,
       ranking_puntualidad,
       total_multas_bs,
+      multas_recaudadas_bs: total_multas_bs,
+      incidencias_multas: multas_filtradas.length,
+      total_becarios: total_becarios_activos,
+      evaluaciones_completadas,
+      porcentaje_puntualidad,
       dias_permiso_aprobado: total_dias_permiso,
       horas_compensadas_permiso: total_horas_compensadas,
     };
@@ -517,7 +547,7 @@ export class DashboardServicio {
         becarios_con_retraso.push({
           becario: {
             id: b ? b.id : a.becario_id,
-            nombre: b?.usuario?.nombre || `Becario #${a.becario_id}`,
+            nombre: b?.usuario?.nombre || b?.nombre || `Becario #${a.becario_id}`,
             carrera: b?.carrera || 'No registrada',
             universidad: b?.universidad || 'Universidad',
             unidad: b?.unidad || null,
@@ -576,7 +606,7 @@ export class DashboardServicio {
       const horas_compensadas = Number((dias_permiso * 4.0).toFixed(2));
       const info: InfoBecarioResumen = {
         id: b.id,
-        nombre: b.usuario?.nombre || `Becario #${b.id}`,
+        nombre: b.usuario?.nombre || b.nombre || `Becario #${b.id}`,
         carrera: b.carrera || 'No registrada',
         universidad: b.universidad || 'Universidad',
         unidad: b.unidad || null,

@@ -123,7 +123,7 @@ export async function obtenerBecariosDesignadosMentor(
   let todos_becarios: Becario[] = [];
   try {
     todos_becarios = await becario_repo.find({
-      relations: { usuario: true, supervisor: true, lugar_practica: true, iglesia: true },
+      relations: { usuario: true, supervisor: true, lugar_practica: true, iglesia: true, horarios_apoyo: true },
       order: { id: 'ASC' },
     });
   } catch {

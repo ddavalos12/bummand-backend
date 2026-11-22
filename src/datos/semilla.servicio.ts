@@ -96,7 +96,6 @@ export class SemillaServicio implements OnModuleInit {
         await this.asegurarAdministradorPrimario();
       }
       await this.sincronizarSupervisoresYBecariosDesignados();
-      await this.asegurarDatosOperativosInstitucionales();
     } catch (error: any) {
       this.logger.warn(`No se pudo verificar la semilla automática en inicio: ${error.message}`);
     }
@@ -259,10 +258,15 @@ export class SemillaServicio implements OnModuleInit {
       'multas',
       'registros_asistencia',
       'justificaciones',
+      'citas_seguimiento',
       'casos_seguimiento_pastoral',
+      'entregas_tareas_lideres',
+      'documentos_semestrales_becarios',
       'evaluaciones_pastor',
       'evaluaciones',
       'asistencias_eventos',
+      'eventos',
+      'devocionales',
       'refrigerios',
       'aprobaciones_practicas',
       'reportes_generados',
@@ -438,7 +442,7 @@ export class SemillaServicio implements OnModuleInit {
       }
     }
 
-    // 3. Lugares de práctica
+    // 3. Lugares de práctica (solo existe la Sede Central Bloque A)
     const agencias_datos = [
       {
         nombre: 'Oficina Central Diaconía IFD - El Alto',
@@ -446,76 +450,6 @@ export class SemillaServicio implements OnModuleInit {
         latitud: -16.500054,
         longitud: -68.173455,
         radio_tolerancia_m: 60,
-      },
-      {
-        nombre: 'Sucursal La Paz - San Pedro',
-        direccion: 'Calle Colombia N° 450 esq. Cañada Strongest, Zona San Pedro, La Paz',
-        latitud: -16.501500,
-        longitud: -68.138200,
-        radio_tolerancia_m: 50,
-      },
-      {
-        nombre: 'Agencia Chasquipampa',
-        direccion: 'Calle 53 esq. Av. Principal Chasquipampa, Zona Sur, La Paz',
-        latitud: -16.541200,
-        longitud: -68.061100,
-        radio_tolerancia_m: 50,
-      },
-      {
-        nombre: 'Agencia Viacha',
-        direccion: 'Plaza Principal José Ballivián N° 85, Viacha',
-        latitud: -16.652100,
-        longitud: -68.301500,
-        radio_tolerancia_m: 60,
-      },
-      {
-        nombre: 'Agencia Laguna San Pedro',
-        direccion: 'Calle Boquerón N° 120 esq. Almirante Grau, La Paz',
-        latitud: -16.502800,
-        longitud: -68.136900,
-        radio_tolerancia_m: 50,
-      },
-      {
-        nombre: 'Agencia Puente Seco',
-        direccion: 'Av. Juan Pablo II, Altura Ceja de El Alto',
-        latitud: -16.512000,
-        longitud: -68.179500,
-        radio_tolerancia_m: 50,
-      },
-      {
-        nombre: 'Agencia Franz Tamayo',
-        direccion: 'Av. Franz Tamayo N° 230, Villa Adela, El Alto',
-        latitud: -16.529800,
-        longitud: -68.192300,
-        radio_tolerancia_m: 50,
-      },
-      {
-        nombre: 'Agencia Villa Dolores',
-        direccion: 'Plaza Juana Azurduy de Padilla N° 40, El Alto',
-        latitud: -16.516500,
-        longitud: -68.161000,
-        radio_tolerancia_m: 50,
-      },
-      {
-        nombre: 'Agencia Senkata',
-        direccion: 'Av. 6 de Marzo Km 14, Senkata, El Alto',
-        latitud: -16.568000,
-        longitud: -68.175000,
-        radio_tolerancia_m: 60,
-      },
-      {
-        nombre: 'Agencia Río Seco',
-        direccion: 'Av. Juan Pablo II, Ex-Tranca Río Seco, El Alto',
-        latitud: -16.488000,
-        longitud: -68.195000,
-        radio_tolerancia_m: 50,
-      },
-      {
-        nombre: 'Agencia Ciudad Satélite',
-        direccion: 'Av. del Policía esq. Calle 14, Ciudad Satélite, El Alto',
-        latitud: -16.518000,
-        longitud: -68.148000,
-        radio_tolerancia_m: 50,
       },
     ];
     for (const ag of agencias_datos) {
@@ -1130,8 +1064,7 @@ export class SemillaServicio implements OnModuleInit {
     // 4. Nómina Oficial de 23 Becarios (usuario_id = null)
     await this.sembrarBecarios();
 
-    // 5. Evento institucional
-    await this.sembrarEventoSemilla();
+    // 5. Evento institucional (deshabilitado datos simulados)
 
     // 6. HIGIENE ESTRICTA: Garantizar que NO se siembren ni existan pasajes simulados
     try {

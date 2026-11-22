@@ -359,18 +359,13 @@ describe('EvaluacionesServicio', () => {
       expect(servicio.obtenerCalificacionLiteralOficial(0)).toBe('Reprobó y debe abandonar el programa');
     });
 
-    it('debe obtener el consolidado semestral con los 21 becarios canónicos, criterios y rangos', async () => {
-      const consolidado = await servicio.obtenerConsolidadoSemestral('II-2025');
-      expect(consolidado.periodo).toBe('II-2025');
-      expect(consolidado.total_becarios).toBe(21);
-      expect(consolidado.registros.length).toBe(21);
+    it('debe obtener el consolidado semestral desde la base de datos sin registros simulados cuando está vacía', async () => {
+      const consolidado = await servicio.obtenerConsolidadoSemestral('II-2026');
+      expect(consolidado.periodo).toBe('II-2026');
+      expect(consolidado.total_becarios).toBe(0);
+      expect(consolidado.registros.length).toBe(0);
       expect(consolidado.criterios_oficiales).toBeDefined();
       expect(consolidado.rangos_aprobacion.length).toBe(3);
-
-      const primer_becario = consolidado.registros[0];
-      expect(primer_becario.nombre_completo).toBe('Jose Marcos Suñagua Quispe');
-      expect(primer_becario.total).toBe(68);
-      expect(primer_becario.ceti_tareas.length).toBe(12);
     });
   });
 
@@ -563,7 +558,7 @@ describe('EvaluacionesServicio', () => {
   });
 
   describe('TAREA-12: Escuela de Líderes CETI (Módulo 4) - Patrón Classroom', () => {
-    it('debe listar las 12 tareas CETI y resumen para un becario', async () => {
+    it('debe listar las tareas CETI registradas en configuración y resumen para un becario', async () => {
       const becario_user: Usuario = { id: 7, nombre: 'Estudiante', rol: Rol.BECARIO } as any;
       becario_repo.findOne.mockResolvedValue({ id: 1, usuario_id: 7 });
       periodo_repo.findOne.mockResolvedValue({ id: 2, estado: EstadoPeriodo.ABIERTO });
@@ -578,12 +573,10 @@ describe('EvaluacionesServicio', () => {
 
       const resultado = await servicio.obtenerTareasEscuelaLideres(becario_user, 1, 2);
 
-      expect(resultado.tareas.length).toBe(12);
-      expect(resultado.resumen.total_tareas).toBe(12);
-      expect(resultado.resumen.revisadas).toBe(1);
-      expect(resultado.resumen.puntaje_acumulado_100).toBe(8.33);
-      expect(resultado.tareas[0].estado).toBe(EstadoEntregaTarea.REVISADO);
-      expect(resultado.tareas[1].estado).toBe(EstadoEntregaTarea.PENDIENTE);
+      expect(resultado.tareas.length).toBe(0);
+      expect(resultado.resumen.total_tareas).toBe(0);
+      expect(resultado.resumen.revisadas).toBe(0);
+      expect(resultado.resumen.puntaje_acumulado_100).toBe(0);
     });
 
     it('debe entregar una tarea CETI registrando archivo de evidencia', async () => {

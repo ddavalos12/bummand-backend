@@ -139,14 +139,9 @@ export class PdfServicio {
   async generarPdfEvaluacionF03(evaluacion: any): Promise<Buffer> {
     const modulo_nombre = evaluacion.modulo?.nombre || 'Liderazgo en la Iglesia (Formulario F-03)';
     const periodo_nombre = evaluacion.periodo?.nombre || 'Gestión II-2026';
-    const evaluador_nombre = evaluacion.evaluador?.nombre || 'Pastor Evaluador Diaconía';
+    const evaluador_nombre = evaluacion.evaluador?.nombre || 'Sin evaluador';
     const evaluador_tipo = evaluacion.evaluador?.tipo || 'Mentor';
-    const respuestas = evaluacion.detalle_pastor?.campos_formulario || {
-      'Compromiso y Asistencia': 'Excelente',
-      'Testimonio Eclesial': 'Sobresaliente',
-      'Liderazgo en Ministerio': 'Muy Bueno',
-      'Participación y Servicio': 'Activo y constante',
-    };
+    const respuestas = evaluacion.detalle_pastor?.campos_formulario || {};
 
     const html = `
       <html>
@@ -168,20 +163,20 @@ export class PdfServicio {
           <p><strong>Módulo:</strong> ${modulo_nombre}</p>
           <p><strong>Periodo:</strong> ${periodo_nombre}</p>
           <p><strong>Evaluador:</strong> ${evaluador_nombre} (${evaluador_tipo})</p>
-          <p><strong>Puntaje:</strong> ${evaluacion.puntaje !== null && evaluacion.puntaje !== undefined ? evaluacion.puntaje : '95 / 100'}</p>
-          <p><strong>Estado:</strong> <span class="badge">${(evaluacion.estado || 'COMPLETADA').toUpperCase()}</span></p>
+          <p><strong>Puntaje:</strong> ${evaluacion.puntaje !== null && evaluacion.puntaje !== undefined ? evaluacion.puntaje : '0 / 100'}</p>
+          <p><strong>Estado:</strong> <span class="badge">${(evaluacion.estado || 'PENDIENTE').toUpperCase()}</span></p>
 
           <div class="section">
             <h3>Respuestas / Formulario Estructurado</h3>
             <table>
               <tr><th>Campo / Ítem</th><th>Valoración</th></tr>
-              ${Object.entries(respuestas).map(([key, val]) => `<tr><td>${key}</td><td>${val}</td></tr>`).join('')}
+              ${Object.entries(respuestas).length > 0 ? Object.entries(respuestas).map(([key, val]) => `<tr><td>${key}</td><td>${val}</td></tr>`).join('') : '<tr><td colspan="2" style="text-align:center;color:#64748b;">Sin respuestas registradas en el formulario F-03.</td></tr>'}
             </table>
           </div>
 
           <div class="section">
             <h3>Observaciones del Evaluador</h3>
-            <p>${evaluacion.observaciones || 'Evaluación oficial generada y aprobada con conformidad institucional en sistema.'}</p>
+            <p>${evaluacion.observaciones || 'Sin observaciones registradas.'}</p>
           </div>
 
           <div class="trazabilidad-box">
@@ -214,14 +209,14 @@ export class PdfServicio {
 
     if (!evento) {
       evento = {
-        id: evento_id || 1,
-        titulo: 'Acta Oficial de Asistencia a Evento BUMAND',
-        descripcion: 'Registro de asistencia oficial institucional.',
+        id: evento_id || 0,
+        titulo: 'Sin evento registrado en base de datos',
+        descripcion: 'No existen eventos registrados para generar el acta.',
         fecha_inicio: new Date().toISOString(),
         fecha_fin: new Date().toISOString(),
-        tipo: 'Taller',
-        estado: 'Finalizado',
-        creador: { nombre: 'Coordinador BUMAND' } as any,
+        tipo: 'General',
+        estado: 'Sin registros',
+        creador: { nombre: 'Sin asignar' } as any,
       } as any;
     }
 
@@ -461,7 +456,7 @@ export class PdfServicio {
     const lista =
       registros && registros.length > 0
         ? registros
-        : REGISTROS_CONSOLIDADO_SEM_II;
+        : [];
 
     const filas_principales = lista
       .map((r, i) => {
@@ -846,24 +841,10 @@ export class PdfServicio {
       };
     });
 
-    if (items_render.length === 0) {
-      // Datos canónicos de respaldo de la nómina BUMAND 2026
-      items_render = [
-        { numero: 1, nombre: "Carlos Oscar Luna Lizarraga", ci: "9943280 LP", carrera: "Economía", sede: "Oficina Central Bloque A", tipo: "Prácticas", fecha: inicio_str, previsto: "08:00", real: "08:24", retraso_m: 24, horas: 4.0, estado: "Tardanza (+24m)" },
-        { numero: 2, nombre: "Jhonny Poma", ci: "8374921 LP", carrera: "Derecho", sede: "Agencia Villa Adela", tipo: "Escuela de Líderes", fecha: inicio_str, previsto: "14:30", real: "15:20", retraso_m: 50, horas: 3.5, estado: "Tardanza (+50m)" },
-        { numero: 3, nombre: "Mariela Dayana Jimenez Chambi", ci: "12959656 LP", carrera: "Contaduría Pública", sede: "Sucursal Juan Pablo II", tipo: "Prácticas", fecha: inicio_str, previsto: "14:00", real: "14:35", retraso_m: 35, horas: 4.0, estado: "Tardanza (+35m)" },
-        { numero: 4, nombre: "Daniel Davalos Quiñoñez", ci: "9107373 LP", carrera: "Informática", sede: "Oficina Central Bloque A", tipo: "Escuela de Líderes", fecha: inicio_str, previsto: "14:30", real: "14:48", retraso_m: 18, horas: 3.5, estado: "Tardanza (+18m)" },
-        { numero: 5, nombre: "Mayherli Alejandra Loza Villalobos", ci: "9925727 LP", carrera: "Contaduría Pública", sede: "Agencia Ceja El Alto", tipo: "Acciones de Servicio", fecha: inicio_str, previsto: "08:15", real: "08:42", retraso_m: 27, horas: 4.5, estado: "Tardanza (+27m)" },
-        { numero: 6, nombre: "Adai Belen Huayta Cardozo", ci: "13696496 LP", carrera: "Estadística", sede: "Sede Central Blq. A", tipo: "Prácticas", fecha: inicio_str, previsto: "08:00", real: "08:00", retraso_m: 0, horas: 4.0, estado: "Puntual Conforme" },
-        { numero: 7, nombre: "Edgar Elías Alarcon Huanca", ci: "9160054 LP", carrera: "Medicina", sede: "Consultorio Médico", tipo: "Prácticas", fecha: inicio_str, previsto: "08:00", real: "07:55", retraso_m: 0, horas: 4.0, estado: "Puntual Conforme" },
-        { numero: 8, nombre: "Nilda Amalia Churata Paye", ci: "10028341 LP", carrera: "Educación Parvularia", sede: "Centro Infantil", tipo: "Acciones de Servicio", fecha: inicio_str, previsto: "08:30", real: "08:28", retraso_m: 0, horas: 4.0, estado: "Puntual Conforme" },
-      ];
-    }
-
     const total_registros = items_render.length;
     const con_retraso = items_render.filter((i) => i.retraso_m > 0);
     const puntuales = total_registros - con_retraso.length;
-    const pct_puntualidad = total_registros > 0 ? ((puntuales / total_registros) * 100).toFixed(1) : '100.0';
+    const pct_puntualidad = total_registros > 0 ? ((puntuales / total_registros) * 100).toFixed(1) : '0.0';
     const promedio_demora =
       con_retraso.length > 0
         ? Math.round(con_retraso.reduce((acc, i) => acc + i.retraso_m, 0) / con_retraso.length)
@@ -1240,23 +1221,19 @@ export class PdfServicio {
         relations: { usuario: true, supervisor: true, lugar_practica: true, iglesia: true },
       });
       if (!becario) {
-        becario = await this.becario_repo.findOne({
-          where: {},
-          order: { id: 'ASC' },
-          relations: { usuario: true, supervisor: true, lugar_practica: true, iglesia: true },
-        });
+        becario = null;
       }
     }
 
     // Extracción de datos del estudiante
     const nombre_estudiante =
       becario?.usuario?.nombre || becario?.nombre || `Estudiante BUMAND #${opciones.becario_id}`;
-    const ci_estudiante = becario?.ci || '9943280 LP';
-    const carrera_estudiante = becario?.carrera || 'Economía';
-    const universidad_estudiante = becario?.universidad || 'Universidad Mayor de San Andrés';
+    const ci_estudiante = becario?.ci || 'S/N';
+    const carrera_estudiante = becario?.carrera || 'Sin especificar';
+    const universidad_estudiante = becario?.universidad || 'Sin especificar';
     const sede_estudiante =
       becario?.lugar_practica?.nombre || becario?.ubicacion || 'Oficina Central Bloque A';
-    const supervisor_nombre = becario?.supervisor?.nombre || 'Lic. Angel Javier Ali Paz';
+    const supervisor_nombre = becario?.supervisor?.nombre || 'Sin asignar';
 
     let recorridos_db: Recorrido[] = [];
     let solicitud_db: SolicitudPasajes | null = null;
@@ -1328,24 +1305,6 @@ export class PdfServicio {
         tarifa: tarifa_num,
       };
     });
-
-    if (!hubo_registros_db && items_render.length === 0) {
-      const mes_prefijo = `${anio}-${String(mes_num).padStart(2, '0')}`;
-      items_render = [
-        { numero: 1, fecha: `${mes_prefijo}-02`, dia_semana: 'Viernes', tramo: 'Ida', origen: 'Ceja El Alto', destino: 'San Francisco (Centro LP)', calles_declaradas: 'Av. 6 de Marzo, Autopista LP-EA, Av. Montes', medio_transporte: 'Minibús Interciudad', tipo_actividad: 'Prácticas', apoyo_realizado: 'Conciliación de expedientes de cartera crediticia', tarifa: 3.50 },
-        { numero: 2, fecha: `${mes_prefijo}-02`, dia_semana: 'Viernes', tramo: 'Vuelta', origen: 'San Francisco (Centro LP)', destino: 'Ceja El Alto', calles_declaradas: 'Av. Montes, Autopista LP-EA, Av. Franco Valle', medio_transporte: 'Minibús Interciudad', tipo_actividad: 'Prácticas', apoyo_realizado: 'Retorno de turno vespertino', tarifa: 3.50 },
-        { numero: 3, fecha: `${mes_prefijo}-05`, dia_semana: 'Lunes', tramo: 'Ida', origen: 'Villa Adela', destino: 'Cruce Viacha', calles_declaradas: 'Av. Bolivia, Av. Ladislao Cabrera', medio_transporte: 'Minibús Tramo Corto', tipo_actividad: 'Prácticas', apoyo_realizado: 'Digitalización y archivo de comprobantes contables', tarifa: 2.00 },
-        { numero: 4, fecha: `${mes_prefijo}-05`, dia_semana: 'Lunes', tramo: 'Vuelta', origen: 'Cruce Viacha', destino: 'Villa Adela', calles_declaradas: 'Av. Ladislao Cabrera, Av. Bolivia', medio_transporte: 'Minibús Tramo Corto', tipo_actividad: 'Prácticas', apoyo_realizado: 'Retorno de jornada de prácticas', tarifa: 2.00 },
-        { numero: 5, fecha: `${mes_prefijo}-09`, dia_semana: 'Viernes', tramo: 'Ida', origen: 'Estación Obelisco', destino: 'Estación San Jorge', calles_declaradas: 'Red Mi Teleférico Línea Morada', medio_transporte: 'Mi Teleférico', tipo_actividad: 'Prácticas', apoyo_realizado: 'Apoyo operativo en ventanilla institucional', tarifa: 3.00 },
-        { numero: 6, fecha: `${mes_prefijo}-09`, dia_semana: 'Viernes', tramo: 'Vuelta', origen: 'Estación San Jorge', destino: 'Estación Obelisco', calles_declaradas: 'Red Mi Teleférico Línea Morada', medio_transporte: 'Mi Teleférico', tipo_actividad: 'Prácticas', apoyo_realizado: 'Retorno de jornada de prácticas en sede San Jorge', tarifa: 3.00 },
-        { numero: 7, fecha: `${mes_prefijo}-13`, dia_semana: 'Martes', tramo: 'Ida', origen: 'Pérez Velasco', destino: 'Miraflores (Hospital Obrero)', calles_declaradas: 'Av. Saavedra, Plaza Uyuni, Av. Busch', medio_transporte: 'Micro / Colectivo Urbano', tipo_actividad: 'Prácticas', apoyo_realizado: 'Atención a usuarios y verificación de solicitudes', tarifa: 1.50 },
-        { numero: 8, fecha: `${mes_prefijo}-13`, dia_semana: 'Martes', tramo: 'Vuelta', origen: 'Miraflores', destino: 'Pérez Velasco', calles_declaradas: 'Av. Busch, Calle Juan de la Riva, Comercio', medio_transporte: 'Micro / Colectivo Urbano', tipo_actividad: 'Prácticas', apoyo_realizado: 'Retorno de asignación en consultorio', tarifa: 1.50 },
-        { numero: 9, fecha: `${mes_prefijo}-16`, dia_semana: 'Viernes', tramo: 'Ida', origen: 'Ciudad Satélite', destino: 'Plaza Murillo', calles_declaradas: 'Av. Satélite, Autopista LP-EA, Calle Yanacocha', medio_transporte: 'Minibús Tramo Directo', tipo_actividad: 'Prácticas', apoyo_realizado: 'Clasificación y verificación documental en agencia', tarifa: 2.60 },
-        { numero: 10, fecha: `${mes_prefijo}-16`, dia_semana: 'Viernes', tramo: 'Vuelta', origen: 'Plaza Murillo', destino: 'Ciudad Satélite', calles_declaradas: 'Calle Ingavi, Autopista LP-EA, Av. Satélite', medio_transporte: 'Minibús Tramo Directo', tipo_actividad: 'Prácticas', apoyo_realizado: 'Retorno a residencia', tarifa: 2.60 },
-        { numero: 11, fecha: `${mes_prefijo}-20`, dia_semana: 'Martes', tramo: 'Ida', origen: 'Estación 16 de Julio', destino: 'Estación Central (Taypi Uta)', calles_declaradas: 'Red Mi Teleférico Línea Roja', medio_transporte: 'Mi Teleférico', tipo_actividad: 'Prácticas', apoyo_realizado: 'Procesamiento de datos en plataforma institucional', tarifa: 3.00 },
-        { numero: 12, fecha: `${mes_prefijo}-20`, dia_semana: 'Martes', tramo: 'Vuelta', origen: 'Estación Central', destino: 'Estación 16 de Julio', calles_declaradas: 'Red Mi Teleférico Línea Roja', medio_transporte: 'Mi Teleférico', tipo_actividad: 'Prácticas', apoyo_realizado: 'Retorno de actividades asignadas', tarifa: 3.00 },
-      ];
-    }
 
     const total_centavos = items_render.reduce((acc, i) => acc + Math.round(i.tarifa * 100), 0);
     const devolucion_centavos = Math.round((total_centavos * 80) / 100);
@@ -1864,25 +1823,6 @@ export class PdfServicio {
       };
     });
 
-    if (items_render.length === 0) {
-      // Fallback institucional de jornadas del mes
-      const mes_prefijo = `${anio}-${String(mes_num).padStart(2, '0')}`;
-      items_render = [
-        { numero: 1, fecha: `${mes_prefijo}-02`, dia_semana: 'Viernes', tipo: 'Escuela de Líderes', sede: 'Auditorio Central Diaconía', hora_prevista: '14:30', hora_ingreso: '14:25', hora_salida: '17:00', retraso_m: 0, horas: 2.5, geocerca: 'Conforme (22m GPS)', estado: 'Puntual Conforme', es_retraso: false },
-        { numero: 2, fecha: `${mes_prefijo}-05`, dia_semana: 'Lunes', tipo: 'Prácticas', sede: sede_estudiante, hora_prevista: '08:00', hora_ingreso: '07:55', hora_salida: '12:05', retraso_m: 0, horas: 4.15, geocerca: 'Conforme (18m GPS)', estado: 'Puntual Conforme', es_retraso: false },
-        { numero: 3, fecha: `${mes_prefijo}-06`, dia_semana: 'Martes', tipo: 'Prácticas', sede: sede_estudiante, hora_prevista: '08:00', hora_ingreso: '08:00', hora_salida: '12:00', retraso_m: 0, horas: 4.0, geocerca: 'Conforme (25m GPS)', estado: 'Puntual Conforme', es_retraso: false },
-        { numero: 4, fecha: `${mes_prefijo}-07`, dia_semana: 'Miércoles', tipo: 'Prácticas', sede: sede_estudiante, hora_prevista: '08:00', hora_ingreso: '08:02', hora_salida: '12:02', retraso_m: 0, horas: 4.0, geocerca: 'Conforme (12m GPS)', estado: 'Puntual Conforme', es_retraso: false },
-        { numero: 5, fecha: `${mes_prefijo}-08`, dia_semana: 'Jueves', tipo: 'Prácticas', sede: sede_estudiante, hora_prevista: '08:00', hora_ingreso: '07:58', hora_salida: '12:00', retraso_m: 0, horas: 4.03, geocerca: 'Conforme (30m GPS)', estado: 'Puntual Conforme', es_retraso: false },
-        { numero: 6, fecha: `${mes_prefijo}-09`, dia_semana: 'Viernes', tipo: 'Escuela de Líderes', sede: 'Auditorio Central Diaconía', hora_prevista: '14:30', hora_ingreso: '14:42', hora_salida: '17:00', retraso_m: 12, horas: 2.3, geocerca: 'Conforme (35m GPS)', estado: 'Tardanza (+12m) Justificada', es_retraso: true },
-        { numero: 7, fecha: `${mes_prefijo}-10`, dia_semana: 'Sábado', tipo: 'Acciones de Servicio', sede: 'Comunidad Eclesiástica Caluyo', hora_prevista: '09:00', hora_ingreso: '08:50', hora_salida: '13:00', retraso_m: 0, horas: 4.15, geocerca: 'Conforme (40m GPS)', estado: 'Puntual Conforme', es_retraso: false },
-        { numero: 8, fecha: `${mes_prefijo}-13`, dia_semana: 'Martes', tipo: 'Prácticas', sede: sede_estudiante, hora_prevista: '08:00', hora_ingreso: '08:00', hora_salida: '12:00', retraso_m: 0, horas: 4.0, geocerca: 'Conforme (15m GPS)', estado: 'Puntual Conforme', es_retraso: false },
-        { numero: 9, fecha: `${mes_prefijo}-15`, dia_semana: 'Jueves', tipo: 'Prácticas', sede: sede_estudiante, hora_prevista: '08:00', hora_ingreso: '07:57', hora_salida: '12:00', retraso_m: 0, horas: 4.05, geocerca: 'Conforme (20m GPS)', estado: 'Puntual Conforme', es_retraso: false },
-        { numero: 10, fecha: `${mes_prefijo}-16`, dia_semana: 'Viernes', tipo: 'Escuela de Líderes', sede: 'Auditorio Central Diaconía', hora_prevista: '14:30', hora_ingreso: '14:28', hora_salida: '17:00', retraso_m: 0, horas: 2.53, geocerca: 'Conforme (28m GPS)', estado: 'Puntual Conforme', es_retraso: false },
-        { numero: 11, fecha: `${mes_prefijo}-19`, dia_semana: 'Lunes', tipo: 'Prácticas', sede: sede_estudiante, hora_prevista: '08:00', hora_ingreso: '08:00', hora_salida: '12:00', retraso_m: 0, horas: 4.0, geocerca: 'Conforme (16m GPS)', estado: 'Puntual Conforme', es_retraso: false },
-        { numero: 12, fecha: `${mes_prefijo}-20`, dia_semana: 'Martes', tipo: 'Prácticas', sede: sede_estudiante, hora_prevista: '08:00', hora_ingreso: '08:01', hora_salida: '12:01', retraso_m: 0, horas: 4.0, geocerca: 'Conforme (22m GPS)', estado: 'Puntual Conforme', es_retraso: false },
-      ];
-    }
-
     const total_dias = items_render.length;
     const horas_totales = items_render.reduce((acc, i) => acc + i.horas, 0);
     const meta_horas = 36.0;
@@ -1890,7 +1830,7 @@ export class PdfServicio {
     const retrasos = items_render.filter((i) => i.es_retraso);
     const asistencias_conformes = total_dias - retrasos.length;
     const pct_puntualidad =
-      total_dias > 0 ? ((asistencias_conformes / total_dias) * 100).toFixed(1) : '100.0';
+      total_dias > 0 ? ((asistencias_conformes / total_dias) * 100).toFixed(1) : '0.0';
     const minutos_totales_retraso = retrasos.reduce((acc, i) => acc + i.retraso_m, 0);
 
     const horas_practicas = items_render
@@ -2732,13 +2672,13 @@ export class PdfServicio {
 
     if (!refrigerio) {
       refrigerio = {
-        id: id || 1,
+        id: id || 0,
         fecha: new Date(),
-        costo_total_bs: 120,
-        monto_devolucion_bs: 120,
-        cantidad_raciones: 20,
-        menu_preparado: 'Desayuno / Refrigerio Institucional',
-        responsable: { nombre: 'Responsable Institucional' } as any,
+        costo_total_bs: 0,
+        monto_devolucion_bs: 0,
+        cantidad_raciones: 0,
+        menu_preparado: 'Sin refrigerio registrado',
+        responsable: { nombre: 'Sin asignar' } as any,
       } as any;
     }
 
@@ -3293,21 +3233,6 @@ export class PdfServicio {
       });
     }
 
-    if (!hubo_registros_db && items_render.length === 0) {
-      items_render = [
-        { numero: 1, becario_id: 1, becario_nombre: 'Aruquipa Mamani Juan Carlos', ci: '9123841 LP', fecha: '2026-10-02', tramo: 'Ida', medio_transporte: 'Minibús Interciudad', origen: 'Ceja El Alto', calles: 'Av. 6 de Marzo, Autopista LP-EA, Av. Montes', destino: 'San Francisco (Centro LP)', tarifa: 3.50, reembolso_80: 2.80, estado: 'APROBADO' },
-        { numero: 2, becario_id: 1, becario_nombre: 'Aruquipa Mamani Juan Carlos', ci: '9123841 LP', fecha: '2026-10-02', tramo: 'Vuelta', medio_transporte: 'Minibús Interciudad', origen: 'San Francisco (Centro LP)', calles: 'Av. Montes, Autopista LP-EA, Av. Franco Valle', destino: 'Ceja El Alto', tarifa: 3.50, reembolso_80: 2.80, estado: 'APROBADO' },
-        { numero: 3, becario_id: 2, becario_nombre: 'Condori Quispe Maria Belen', ci: '8492018 LP', fecha: '2026-10-05', tramo: 'Ida', medio_transporte: 'Minibús Tramo Corto', origen: 'Villa Adela', calles: 'Av. Bolivia, Av. Ladislao Cabrera', destino: 'Cruce Viacha', tarifa: 2.00, reembolso_80: 1.60, estado: 'APROBADO' },
-        { numero: 4, becario_id: 2, becario_nombre: 'Condori Quispe Maria Belen', ci: '8492018 LP', fecha: '2026-10-05', tramo: 'Vuelta', medio_transporte: 'Minibús Tramo Corto', origen: 'Cruce Viacha', calles: 'Av. Ladislao Cabrera, Av. Bolivia', destino: 'Villa Adela', tarifa: 2.00, reembolso_80: 1.60, estado: 'APROBADO' },
-        { numero: 5, becario_id: 3, becario_nombre: 'Flores Choque Samuel David', ci: '10293847 LP', fecha: '2026-10-09', tramo: 'Ida', medio_transporte: 'Mi Teleférico Morado', origen: 'Estación Obelisco', calles: 'Red Mi Teleférico Línea Morada', destino: 'Estación San Jorge', tarifa: 3.00, reembolso_80: 2.40, estado: 'APROBADO' },
-        { numero: 6, becario_id: 3, becario_nombre: 'Flores Choque Samuel David', ci: '10293847 LP', fecha: '2026-10-09', tramo: 'Vuelta', medio_transporte: 'Mi Teleférico Morado', origen: 'Estación San Jorge', calles: 'Red Mi Teleférico Línea Morada', destino: 'Estación Obelisco', tarifa: 3.00, reembolso_80: 2.40, estado: 'APROBADO' },
-        { numero: 7, becario_id: 4, becario_nombre: 'Mamani Gutierrez Noemi Ruth', ci: '7392011 LP', fecha: '2026-10-13', tramo: 'Ida', medio_transporte: 'Micro Urbano', origen: 'Pérez Velasco', calles: 'Av. Saavedra, Plaza Uyuni, Av. Busch', destino: 'Miraflores (Hospital Obrero)', tarifa: 1.50, reembolso_80: 1.20, estado: 'APROBADO' },
-        { numero: 8, becario_id: 4, becario_nombre: 'Mamani Gutierrez Noemi Ruth', ci: '7392011 LP', fecha: '2026-10-13', tramo: 'Vuelta', medio_transporte: 'Micro Urbano', origen: 'Miraflores (Hospital Obrero)', calles: 'Av. Busch, Calle Juan de la Riva', destino: 'Pérez Velasco', tarifa: 1.50, reembolso_80: 1.20, estado: 'APROBADO' },
-        { numero: 9, becario_id: 5, becario_nombre: 'Quisbert Alanoca Joel Alex', ci: '8910293 LP', fecha: '2026-10-16', tramo: 'Ida', medio_transporte: 'Minibús Directo', origen: 'Ciudad Satélite', calles: 'Av. Satélite, Autopista LP-EA, Calle Yanacocha', destino: 'Plaza Murillo', tarifa: 2.60, reembolso_80: 2.08, estado: 'APROBADO' },
-        { numero: 10, becario_id: 5, becario_nombre: 'Quisbert Alanoca Joel Alex', ci: '8910293 LP', fecha: '2026-10-16', tramo: 'Vuelta', medio_transporte: 'Minibús Directo', origen: 'Plaza Murillo', calles: 'Calle Ingavi, Autopista LP-EA, Av. Satélite', destino: 'Ciudad Satélite', tarifa: 2.60, reembolso_80: 2.08, estado: 'APROBADO' },
-      ];
-    }
-
     let total_multas_bs = 0;
     const mapa_multas_becario_mes = new Map<string, number>();
     const mapa_multas_becario_sin_mes = new Map<number, number>();
@@ -3704,15 +3629,6 @@ export class PdfServicio {
       });
     }
 
-    if (items_render.length === 0) {
-      items_render = [
-        { numero: 1, becario_nombre: 'Aruquipa Mamani Juan Carlos', ci: '9123841 LP', fecha_incidencia: '2026-10-09', tipo: 'escuela_lideres', motivo: 'Cita médica odontológica de urgencia', explicacion: 'Atención de emergencia en la Caja Nacional de Salud por dolor agudo.', documento_adjunto: true, estado: 'APROBADA', observacion_revisor: 'Certificado de baja médica validado en sistema' },
-        { numero: 2, becario_nombre: 'Condori Quispe Maria Belen', ci: '8492018 LP', fecha_incidencia: '2026-10-14', tipo: 'asistencia_practicas', motivo: 'Examen parcial universitario presencial', explicacion: 'Coincidencia con evaluación de la materia Auditoría de Sistemas.', documento_adjunto: true, estado: 'APROBADA', observacion_revisor: 'Constancia de examen docente verificada' },
-        { numero: 3, becario_nombre: 'Flores Choque Samuel David', ci: '10293847 LP', fecha_incidencia: '2026-10-16', tipo: 'escuela_lideres', motivo: 'Bloqueo del transporte interciudad en La Portada', explicacion: 'Cierre intempestivo de autopista que retrasó el ingreso en 25 minutos.', documento_adjunto: false, estado: 'APROBADA', observacion_revisor: 'Retraso de viernes justificado sin multa' },
-        { numero: 4, becario_nombre: 'Mamani Gutierrez Noemi Ruth', ci: '7392011 LP', fecha_incidencia: '2026-10-21', tipo: 'asistencia_practicas', motivo: 'Defensa de perfil de tesis universitaria', explicacion: 'Audiencia de evaluación en la facultad de Ciencias Económicas.', documento_adjunto: true, estado: 'APROBADA', observacion_revisor: 'Permiso autorizado por Dirección' },
-      ];
-    }
-
     const total_solicitudes = items_render.length;
     const total_aprobadas = items_render.filter((j) => j.estado.includes('APROB')).length;
     const total_pendientes = items_render.filter((j) => j.estado.includes('PEND') || j.estado.includes('REVIS')).length;
@@ -3947,25 +3863,12 @@ export class PdfServicio {
       });
     }
 
-    if (items_render.length === 0) {
-      items_render = [
-        { numero: 1, becario_nombre: 'Aruquipa Mamani Juan Carlos', ci: '9123841 LP', sede: 'Agencia El Alto Central', fecha: '2026-10-02', hora_prevista: '14:30', hora_gps: '14:25', horas: 2.50, retraso_m: 0, estado: 'Puntual Conforme' },
-        { numero: 2, becario_nombre: 'Aruquipa Mamani Juan Carlos', ci: '9123841 LP', sede: 'Agencia El Alto Central', fecha: '2026-10-05', hora_prevista: '08:00', hora_gps: '07:55', horas: 4.15, retraso_m: 0, estado: 'Puntual Conforme' },
-        { numero: 3, becario_nombre: 'Condori Quispe Maria Belen', ci: '8492018 LP', sede: 'Agencia Villa Adela', fecha: '2026-10-06', hora_prevista: '08:00', hora_gps: '08:00', horas: 4.00, retraso_m: 0, estado: 'Puntual Conforme' },
-        { numero: 4, becario_nombre: 'Condori Quispe Maria Belen', ci: '8492018 LP', sede: 'Agencia Villa Adela', fecha: '2026-10-07', hora_prevista: '08:00', hora_gps: '08:02', horas: 4.00, retraso_m: 0, estado: 'Puntual Conforme' },
-        { numero: 5, becario_nombre: 'Flores Choque Samuel David', ci: '10293847 LP', sede: 'Oficina Central Bloque A', fecha: '2026-10-09', hora_prevista: '14:30', hora_gps: '14:42', horas: 2.30, retraso_m: 12, estado: 'Tardanza (+12m)' },
-        { numero: 6, becario_nombre: 'Flores Choque Samuel David', ci: '10293847 LP', sede: 'Oficina Central Bloque A', fecha: '2026-10-12', hora_prevista: '08:00', hora_gps: '07:58', horas: 4.03, retraso_m: 0, estado: 'Puntual Conforme' },
-        { numero: 7, becario_nombre: 'Mamani Gutierrez Noemi Ruth', ci: '7392011 LP', sede: 'Agencia Ciudad Satélite', fecha: '2026-10-14', hora_prevista: '08:00', hora_gps: '08:00', horas: 4.00, retraso_m: 0, estado: 'Puntual Conforme' },
-        { numero: 8, becario_nombre: 'Mamani Gutierrez Noemi Ruth', ci: '7392011 LP', sede: 'Agencia Ciudad Satélite', fecha: '2026-10-16', hora_prevista: '14:30', hora_gps: '14:28', horas: 2.53, retraso_m: 0, estado: 'Puntual Conforme' },
-      ];
-    }
-
     const total_registros = items_render.length;
     const con_retraso = items_render.filter((i) => i.retraso_m > 0);
     const pct_puntualidad =
       total_registros > 0
         ? Math.round(((total_registros - con_retraso.length) / total_registros) * 100)
-        : 100;
+        : 0;
     const total_horas = items_render.reduce((acc, i) => acc + i.horas, 0).toFixed(2);
 
     const filas_html = items_render
@@ -5427,7 +5330,7 @@ export class PdfServicio {
     };
 
     for (const b of datos.becarios || []) {
-      const nombre = b.usuario?.nombre?.trim();
+      const nombre = b.usuario?.nombre?.trim() || (b as any).nombre?.trim();
       if (!nombre) continue;
       registrarBecarioEnMapa(b.id, nombre, b.ci || 'S/C');
     }

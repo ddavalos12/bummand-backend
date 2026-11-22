@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { RegistroAsistencia, TipoAsistencia, EstadoAprobacionAsistencia } from './entidades/registro-asistencia.entidad';
 import { Multa } from './entidades/multa.entidad';
 import { CoordenadasDto } from './dtos/coordenadas.dto';
@@ -311,7 +311,7 @@ export class AsistenciaServicio {
     hoy.setHours(0, 0, 0, 0);
 
     const ingresoAbierto = await this.asistenciaRepositorio.findOne({
-      where: { becario_id: becario.id, fecha: hoy, tipo, hora_salida: null as any },
+      where: { becario_id: becario.id, fecha: hoy, tipo, hora_salida: IsNull() },
     });
 
     if (ingresoAbierto) {
@@ -594,7 +594,7 @@ export class AsistenciaServicio {
     const id_busqueda = becario ? becario.id : dto.becario_id;
 
     const registro_abierto = await this.asistenciaRepositorio.findOne({
-      where: { becario_id: id_busqueda, fecha: hoy, tipo, hora_salida: null as any },
+      where: { becario_id: id_busqueda, fecha: hoy, tipo, hora_salida: IsNull() },
     });
 
     if (!registro_abierto) {
@@ -1423,6 +1423,8 @@ export class AsistenciaServicio {
         });
       }
 
+      if (movimientos_mes.length === 0) continue;
+
       movimientos_mes.sort((a, b) => a.fecha.localeCompare(b.fecha));
 
       let saldo_progresivo = 0;
@@ -1433,9 +1435,7 @@ export class AsistenciaServicio {
         mov.saldo_acumulado = saldo_progresivo;
       }
 
-      const horas_acumuladas = movimientos_mes.length > 0
-        ? movimientos_mes[movimientos_mes.length - 1].saldo_acumulado
-        : 0;
+      const horas_acumuladas = movimientos_mes[movimientos_mes.length - 1].saldo_acumulado;
 
       const diferencia_horas = Number((horas_acumuladas - META_HORAS_MENSUAL).toFixed(2));
       const porcentaje_cumplimiento = Math.round((horas_acumuladas / META_HORAS_MENSUAL) * 100);
@@ -1450,9 +1450,7 @@ export class AsistenciaServicio {
       }
 
       const puntuales = movimientos_mes.filter((m) => m.minutos_retraso === 0).length;
-      const tasa_puntualidad = movimientos_mes.length > 0
-        ? Math.round((puntuales / movimientos_mes.length) * 100)
-        : 100;
+      const tasa_puntualidad = Math.round((puntuales / movimientos_mes.length) * 100);
 
       const dias_permiso_mes = set_permisos_mes.size;
       const horas_compensadas_mes = Number((dias_permiso_mes * 4.0).toFixed(2));

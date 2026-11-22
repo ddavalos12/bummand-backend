@@ -28,7 +28,7 @@ export class LugaresPracticaControlador {
   }
 
   @Get()
-  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
   @ApiOperation({
     summary: 'Listar lugares de práctica',
     description: 'Retorna todas las agencias, sucursales y sedes operativas registradas con sus coordenadas.',
@@ -39,7 +39,7 @@ export class LugaresPracticaControlador {
   }
 
   @Get(':id')
-  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
   @ApiOperation({
     summary: 'Obtener lugar de práctica por ID',
     description: 'Consulta los parámetros geoespaciales y detalles de una sede específica.',

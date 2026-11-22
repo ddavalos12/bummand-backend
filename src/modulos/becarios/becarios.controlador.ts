@@ -45,6 +45,16 @@ export class BecariosControlador {
     return this.becariosServicio.listar(usuarioAutenticado);
   }
 
+  @Get('directorio-nombres')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @ApiOperation({
+    summary: 'Listar directorio nominal de becarios activos',
+    description: 'Retorna únicamente IDs y nombres de becarios para selección institucional (ej. duplas de refrigerio).',
+  })
+  listarDirectorioNombres(): Promise<Array<{ id: number; nombre: string }>> {
+    return this.becariosServicio.listarDirectorioNombres();
+  }
+
   @Get('me')
   @Roles(Rol.BECARIO)
   @ApiOperation({

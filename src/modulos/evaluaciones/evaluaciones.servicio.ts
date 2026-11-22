@@ -81,128 +81,7 @@ export interface TareaCatalogoLideres {
   enlace_lectura?: string | null;
 }
 
-export const TAREAS_CETI_CATALOGO: TareaCatalogoLideres[] = [
-  {
-    numero: 1,
-    codigo: 'CETI-01',
-    titulo: 'Liderazgo Servidor y Mayordomía Cristiana',
-    modulo: 'Módulo I: Fundamentos del Carácter Diaconal',
-    descripcion: 'Ensayo analítico sobre los principios bíblicos del liderazgo de servicio según el modelo de Jesús en los Evangelios.',
-    fecha_limite: '2026-08-15',
-    ponderacion: 8.33,
-    publicada_apk: true,
-  },
-  {
-    numero: 2,
-    codigo: 'CETI-02',
-    titulo: 'Misión Integral y Vocación Diaconal',
-    modulo: 'Módulo I: Fundamentos del Carácter Diaconal',
-    descripcion: 'Investigación sobre las 5 dimensiones de la misión integral de la iglesia y el desarrollo humano en comunidades vulnerables.',
-    fecha_limite: '2026-08-29',
-    ponderacion: 8.33,
-    publicada_apk: true,
-  },
-  {
-    numero: 3,
-    codigo: 'CETI-03',
-    titulo: 'Ética Profesional en el Ámbito Financiero y Social',
-    modulo: 'Módulo II: Conducta y Mayordomía',
-    descripcion: 'Resolución de dilemas éticos reales con sustento moral bíblico y normativa institucional.',
-    fecha_limite: '2026-09-12',
-    ponderacion: 8.33,
-    publicada_apk: true,
-  },
-  {
-    numero: 4,
-    codigo: 'CETI-04',
-    titulo: 'Acompañamiento a Grupos Vulnerables',
-    modulo: 'Módulo II: Conducta y Mayordomía',
-    descripcion: 'Diagnóstico participativo y plan de acompañamiento pastoral a familias en situación de vulnerabilidad.',
-    fecha_limite: '2026-09-26',
-    ponderacion: 8.33,
-    publicada_apk: true,
-  },
-  {
-    numero: 5,
-    codigo: 'CETI-05',
-    titulo: 'Resolución de Conflictos en la Comunidad Eclesial',
-    modulo: 'Módulo III: Mediación y Comunidad',
-    descripcion: 'Aplicación práctica de principios bíblicos de reconciliación, diálogo constructivo y mediación comunitaria.',
-    fecha_limite: '2026-10-10',
-    ponderacion: 8.33,
-    publicada_apk: true,
-  },
-  {
-    numero: 6,
-    codigo: 'CETI-06',
-    titulo: 'Diseño y Planificación de Proyectos de Servicio',
-    modulo: 'Módulo III: Mediación y Comunidad',
-    descripcion: 'Formulación de proyecto social con objetivos medibles, cronograma de ejecución e indicadores de impacto.',
-    fecha_limite: '2026-10-24',
-    ponderacion: 8.33,
-    publicada_apk: true,
-  },
-  {
-    numero: 7,
-    codigo: 'CETI-07',
-    titulo: 'Oración, Intercesión y Vida Devocional Comunitaria',
-    modulo: 'Módulo IV: Espiritualidad Práctica',
-    descripcion: 'Bitácora de disciplina espiritual, tiempos de intercesión grupal y reflexión bíblica aplicada.',
-    fecha_limite: '2026-11-07',
-    ponderacion: 8.33,
-    publicada_apk: true,
-  },
-  {
-    numero: 8,
-    codigo: 'CETI-08',
-    titulo: 'Comunicación Asertiva y Testimonio Universitario',
-    modulo: 'Módulo IV: Espiritualidad Práctica',
-    descripcion: 'Informe de taller sobre liderazgo ético, oratoria y testimonio cristiano en el entorno universitario.',
-    fecha_limite: '2026-11-14',
-    ponderacion: 8.33,
-    publicada_apk: true,
-  },
-  {
-    numero: 9,
-    codigo: 'CETI-09',
-    titulo: 'Finanzas Personales Bíblicas y Responsabilidad',
-    modulo: 'Módulo V: Gestión Integral',
-    descripcion: 'Elaboración de presupuesto personal mensual, cultura de ahorro, generosidad y administración fiel.',
-    fecha_limite: '2026-11-21',
-    ponderacion: 8.33,
-    publicada_apk: true,
-  },
-  {
-    numero: 10,
-    codigo: 'CETI-10',
-    titulo: 'Salud Mental y Manejo del Estrés en Época Académica',
-    modulo: 'Módulo V: Gestión Integral',
-    descripcion: 'Plan de autocuidado integral, equilibrio emocional y prevención del agotamiento académico.',
-    fecha_limite: '2026-11-28',
-    ponderacion: 8.33,
-    publicada_apk: true,
-  },
-  {
-    numero: 11,
-    codigo: 'CETI-11',
-    titulo: 'Discipulado Generacional y Mentoría a Nuevos Becarios',
-    modulo: 'Módulo VI: Proyección y Legado',
-    descripcion: 'Sistematización de sesiones de acompañamiento y mentoría brindadas a estudiantes de nuevo ingreso.',
-    fecha_limite: '2026-12-05',
-    ponderacion: 8.33,
-    publicada_apk: true,
-  },
-  {
-    numero: 12,
-    codigo: 'CETI-12',
-    titulo: 'Evaluación Integral de Impacto Comunitario',
-    modulo: 'Módulo VI: Proyección y Legado',
-    descripcion: 'Informe final integrador de resultados alcanzados en la iglesia local, universidad y prácticas.',
-    fecha_limite: '2026-12-12',
-    ponderacion: 8.37,
-    publicada_apk: true,
-  },
-];
+export const TAREAS_CETI_CATALOGO: TareaCatalogoLideres[] = [];
 
 export const PESOS_PONDERADOS_MODULOS: Record<
   number,
@@ -271,7 +150,7 @@ export class EvaluacionesServicio {
     }
   >();
 
-  private catalogo_tareas_memoria: TareaCatalogoLideres[] = TAREAS_CETI_CATALOGO.map((t) => ({ ...t }));
+  private catalogo_tareas_memoria: TareaCatalogoLideres[] = [];
   private estructura_calificacion_memoria: Record<string, unknown> | null = null;
 
   constructor(
@@ -847,32 +726,31 @@ export class EvaluacionesServicio {
       relations: { becario: { usuario: true, iglesia: true } },
     });
 
-    if (!evaluacion) {
-      let evaluador_id = 1;
-      const evaluador_pastor = await this.evaluador_repo.findOne({
-        where: { tipo: TipoEvaluador.PASTOR },
-      });
-      if (evaluador_pastor) evaluador_id = evaluador_pastor.id;
-
-      evaluacion = this.evaluacion_repo.create({
-        becario_id,
-        modulo_id: 1,
-        periodo_id,
-        evaluador_id,
-        puntaje: 19.0,
-        estado: EstadoEvaluacion.COMPLETADO,
-        observaciones: 'Evaluación F-03 ministerial favorable por el pastor local.',
-        fecha_evaluacion: new Date(),
-      });
-      evaluacion = await this.evaluacion_repo.save(evaluacion);
+    if (!evaluacion || !this.evaluacion_pastor_repo) {
+      const b = this.becario_repo
+        ? await this.becario_repo.findOne({
+            where: { id: becario_id },
+            relations: { usuario: true, iglesia: true },
+          })
+        : null;
+      return {
+        evaluacion_id: evaluacion?.id || null,
+        pastor_nombre: b?.iglesia?.pastor_nombre || null,
+        pastor_correo: b?.iglesia?.pastor_correo || null,
+        pastor_celular: b?.iglesia?.pastor_telefono || null,
+        iglesia_nombre: b?.iglesia?.nombre || null,
+        iglesia_direccion: b?.iglesia?.direccion || null,
+        campos_formulario: null,
+        evaluacion: evaluacion || (b ? { becario: b } : null),
+      } as any;
     }
 
-    let pastor = await this.evaluacion_pastor_repo.findOne({
+    const pastor = await this.evaluacion_pastor_repo.findOne({
       where: { evaluacion_id: evaluacion.id },
       relations: { evaluacion: { becario: { usuario: true, iglesia: true } } },
     });
 
-    if (!pastor || !pastor.campos_formulario) {
+    if (!pastor) {
       const b =
         evaluacion.becario ||
         (this.becario_repo
@@ -881,72 +759,16 @@ export class EvaluacionesServicio {
               relations: { usuario: true, iglesia: true },
             })
           : null);
-      const nombre_becario = b?.usuario?.nombre || b?.nombre || `Becario #${becario_id}`;
-      const iglesia_nombre =
-        b?.iglesia?.nombre ||
-        'Iglesia Evangélica Amigos Central de Bolivia Bautista Saavedra Más que Vencedores';
-      const pastor_nombre = b?.iglesia?.pastor_nombre || 'Luis Álvaro Quispe Condori';
-      const pastor_correo = b?.iglesia?.pastor_correo || 'pastor.luis.quispe@diaconia.bo';
-      const pastor_celular = b?.iglesia?.pastor_telefono || '73236864';
-      const iglesia_direccion =
-        b?.iglesia?.direccion || 'Zona Bautista Saavedra / Villa Adela, El Alto';
-      const carrera = b?.carrera || 'Universitaria';
-
-      const cargos_rotativos = [
-        'Líder de Jóvenes',
-        'Servidor en Diaconía',
-        'Coordinador de Alabanza',
-        'Maestro de Escuela Dominical',
-        'Líder de Célula Universitaria',
-      ];
-      const cargo_asignado = cargos_rotativos[becario_id % cargos_rotativos.length];
-
-      const campos_formulario: Record<string, unknown> = {
-        lider_nombre: 'Hno. David Mendoza',
-        lider_cargo: 'Líder de Diaconía',
-        frecuencia_asistencia:
-          'Es miembro en plena comunión y asiste con fidelidad a las actividades dominicales y de discipulado.',
-        demuestra_compromiso: 'Sí',
-        ocupa_cargo: 'Sí',
-        cargo_actual: cargo_asignado,
-        cargo_2025: cargo_asignado,
-        cumplimiento_cargos: 'Muy bien',
-        conviccion_llamado: `Demuestra una convicción espiritual profunda y compromiso con la obra misionera en ${iglesia_nombre}.`,
-        ejemplo_congregacion: `Puntualidad, sobriedad y testimonio intachable en la comunidad de fe y en sus estudios de ${carrera}.`,
-        compromiso_capacitaciones:
-          'Participación regular y activa en los talleres bíblicos, retiros y actividades diaconales.',
-        testimonio_cristiano:
-          'Reconocido como un joven de testimonio íntegro, maduro en su fe y con estima dentro de la congregación.',
-        relacion_miembros:
-          'Trato respetuoso, empático y solidario con todas las generaciones de la congregación.',
-        desarrollo_nuevos_lideres:
-          'Acompaña y discipula con dedicación a nuevos miembros en formación espiritual.',
-        fortalezas:
-          'Liderazgo, fidelidad en el servicio, disciplina, humildad y compromiso social diaconal.',
-        debilidades:
-          'A veces la exigencia académica universitaria requiere optimizar el balance de sus descansos.',
-        opinion_general: `El hermano(a) ${nombre_becario} es altamente recomendado(a) por el pastorado para continuar en el programa BUMAND.`,
-        declara_nombre: pastor_nombre,
-        declara_ci: '3498214 LP',
-        declara_conforme: true,
-      };
-
-      if (!pastor) {
-        pastor = this.evaluacion_pastor_repo.create({
-          evaluacion_id: evaluacion.id,
-          pastor_nombre,
-          pastor_correo,
-          pastor_celular,
-          iglesia_nombre,
-          iglesia_direccion,
-          campos_formulario,
-        });
-      } else {
-        pastor.campos_formulario = campos_formulario;
-        if (!pastor.pastor_nombre) pastor.pastor_nombre = pastor_nombre;
-        if (!pastor.iglesia_nombre) pastor.iglesia_nombre = iglesia_nombre;
-      }
-      pastor = await this.evaluacion_pastor_repo.save(pastor);
+      return {
+        evaluacion_id: evaluacion.id,
+        pastor_nombre: b?.iglesia?.pastor_nombre || null,
+        pastor_correo: b?.iglesia?.pastor_correo || null,
+        pastor_celular: b?.iglesia?.pastor_telefono || null,
+        iglesia_nombre: b?.iglesia?.nombre || null,
+        iglesia_direccion: b?.iglesia?.direccion || null,
+        campos_formulario: null,
+        evaluacion,
+      } as any;
     }
 
     return pastor;
@@ -1047,95 +869,34 @@ export class EvaluacionesServicio {
     }> = [];
 
     for (const b of becarios) {
-      let ev = mapa_evs.get(b.id);
-      let ev_pastor = ev ? mapa_pastor.get(ev.id) : null;
+      const ev = mapa_evs.get(b.id) || null;
+      const ev_pastor = ev ? mapa_pastor.get(ev.id) || null : null;
 
       const nombre_becario = b.usuario?.nombre || b.nombre || `Becario #${b.id}`;
-      const iglesia_nombre =
-        b.iglesia?.nombre ||
-        'Iglesia Evangélica Amigos Central de Bolivia Bautista Saavedra Más que Vencedores';
-      const pastor_nombre = b.iglesia?.pastor_nombre || 'Luis Álvaro Quispe Condori';
-      const pastor_correo = b.iglesia?.pastor_correo || 'pastor.luis.quispe@diaconia.bo';
-      const pastor_celular = b.iglesia?.pastor_telefono || '73236864';
-      const iglesia_direccion =
-        b.iglesia?.direccion || 'Zona Bautista Saavedra / Villa Adela, El Alto';
-      const carrera = b.carrera || 'Universitaria';
+      const iglesia_nombre = b.iglesia?.nombre || null;
+      const pastor_nombre = b.iglesia?.pastor_nombre || null;
+      const pastor_celular = b.iglesia?.pastor_telefono || null;
 
       if (!ev) {
-        let evaluador_id = 1;
-        const evaluador_pastor = await this.evaluador_repo.findOne({
-          where: { tipo: TipoEvaluador.PASTOR },
-        });
-        if (evaluador_pastor) evaluador_id = evaluador_pastor.id;
-
-        const puntaje_f03 = Number((18.0 + (b.id % 5) * 0.5).toFixed(1));
-        ev = this.evaluacion_repo.create({
+        resultado.push({
           becario_id: b.id,
-          modulo_id: 1,
-          periodo_id,
-          evaluador_id,
-          puntaje: puntaje_f03,
-          estado: EstadoEvaluacion.PENDIENTE,
-          observaciones: 'Evaluación F-03 inicial registrada. Pendiente de convalidación.',
-          fecha_evaluacion: new Date(),
+          supervisor_id: b.supervisor_id ?? b.supervisor?.id ?? null,
+          nombre: nombre_becario,
+          ci: b.ci || '—',
+          evaluacion_id: null,
+          puntaje: null,
+          estado: 'pendiente',
+          convalidado: false,
+          iglesia_nombre,
+          pastor_nombre,
+          pastor_celular,
+          campos_formulario: null,
+          fecha_evaluacion: null,
         });
-        ev = await this.evaluacion_repo.save(ev);
-        mapa_evs.set(b.id, ev);
+        continue;
       }
 
-      if (!ev_pastor || !ev_pastor.campos_formulario) {
-        const cargo_asignado = cargos_rotativos[b.id % cargos_rotativos.length];
-        const campos_formulario: Record<string, unknown> = {
-          lider_nombre: 'Hno. David Mendoza',
-          lider_cargo: 'Líder de Diaconía',
-          frecuencia_asistencia:
-            'Es miembro en plena comunión y asiste con fidelidad a las actividades dominicales y de discipulado.',
-          demuestra_compromiso: 'Sí',
-          ocupa_cargo: 'Sí',
-          cargo_actual: cargo_asignado,
-          cargo_2025: cargo_asignado,
-          cumplimiento_cargos: 'Muy bien',
-          conviccion_llamado: `Demuestra una convicción espiritual profunda y compromiso con la obra misionera en ${iglesia_nombre}.`,
-          ejemplo_congregacion: `Puntualidad, sobriedad y testimonio intachable en la comunidad de fe y en sus estudios de ${carrera}.`,
-          compromiso_capacitaciones:
-            'Participación regular y activa en los talleres bíblicos, retiros y actividades diaconales.',
-          testimonio_cristiano:
-            'Reconocido como un joven de testimonio íntegro, maduro en su fe y con estima dentro de la congregación.',
-          relacion_miembros:
-            'Trato respetuoso, empático y solidario con todas las generaciones de la congregación.',
-          desarrollo_nuevos_lideres:
-            'Acompaña y discipula con dedicación a nuevos miembros en formación espiritual.',
-          fortalezas:
-            'Liderazgo, fidelidad en el servicio, disciplina, humildad y compromiso social diaconal.',
-          debilidades:
-            'A veces la exigencia académica universitaria requiere optimizar el balance de sus descansos.',
-          opinion_general: `El hermano(a) ${nombre_becario} es altamente recomendado(a) por el pastorado para continuar en el programa BUMAND.`,
-          declara_nombre: pastor_nombre,
-          declara_ci: '3498214 LP',
-          declara_conforme: true,
-        };
-
-        if (!ev_pastor) {
-          ev_pastor = this.evaluacion_pastor_repo.create({
-            evaluacion_id: ev.id,
-            pastor_nombre,
-            pastor_correo,
-            pastor_celular,
-            iglesia_nombre,
-            iglesia_direccion,
-            campos_formulario,
-          });
-        } else {
-          ev_pastor.campos_formulario = campos_formulario;
-          if (!ev_pastor.pastor_nombre) ev_pastor.pastor_nombre = pastor_nombre;
-          if (!ev_pastor.iglesia_nombre) ev_pastor.iglesia_nombre = iglesia_nombre;
-        }
-        ev_pastor = await this.evaluacion_pastor_repo.save(ev_pastor);
-        mapa_pastor.set(ev.id, ev_pastor);
-      }
-
-      const campos_ev = (ev_pastor.campos_formulario || {}) as Record<string, unknown>;
-      // Registros autogenerados previos sin marca explícita de convalidación deben permanecer pendientes de aprobación
+      const campos_ev = (ev_pastor?.campos_formulario || {}) as Record<string, unknown>;
       const es_placeholder_autogenerado =
         ev.observaciones === 'Evaluación F-03 ministerial favorable por el pastor local.' &&
         campos_ev.convalidado !== true;
@@ -1153,10 +914,10 @@ export class EvaluacionesServicio {
         puntaje: ev.puntaje !== null && ev.puntaje !== undefined ? Number(ev.puntaje) : null,
         estado: convalidado ? 'completada' : 'en_revision',
         convalidado,
-        iglesia_nombre: ev_pastor.iglesia_nombre || iglesia_nombre,
-        pastor_nombre: ev_pastor.pastor_nombre || pastor_nombre,
-        pastor_celular: ev_pastor.pastor_celular || pastor_celular,
-        campos_formulario: ev_pastor.campos_formulario,
+        iglesia_nombre: ev_pastor?.iglesia_nombre || iglesia_nombre,
+        pastor_nombre: ev_pastor?.pastor_nombre || pastor_nombre,
+        pastor_celular: ev_pastor?.pastor_celular || pastor_celular,
+        campos_formulario: ev_pastor?.campos_formulario || null,
         fecha_evaluacion: ev.fecha_evaluacion ? new Date(ev.fecha_evaluacion).toISOString() : null,
       });
     }
@@ -1347,34 +1108,22 @@ export class EvaluacionesServicio {
           where: [{ id }, { usuario_id: id }],
           relations: { usuario: true },
         });
-        if (!becario) {
-          becario = await this.becario_repo.findOne({
-            where: {},
-            order: { id: 'ASC' },
-            relations: { usuario: true },
-          });
-        }
       }
 
       evaluacion = {
-        id: id || 1,
-        becario_id: becario?.id || 1,
-        becario: becario || ({ id: 1, usuario: { nombre: 'Estudiante BUMAND' } } as any),
+        id: id || 0,
+        becario_id: becario?.id || 0,
+        becario: becario || ({ id: 0, usuario: { nombre: 'Sin registro' } } as any),
         modulo_id: 1,
         modulo: { id: 1, nombre: 'Liderazgo en la Iglesia (Formulario F-03)' } as any,
-        periodo_id: 1,
-        periodo: { id: 1, nombre: 'Gestión II-2026' } as any,
-        evaluador: { nombre: 'Pastor Evaluador Diaconía', tipo: 'Supervisor' } as any,
-        puntaje: 95,
-        estado: EstadoEvaluacion.COMPLETADO,
-        observaciones: 'Evaluación oficial generada y aprobada con conformidad institucional en sistema.',
+        periodo_id: 2,
+        periodo: { id: 2, nombre: 'Gestión II-2026' } as any,
+        evaluador: { nombre: 'Sin evaluador asignado', tipo: 'Supervisor' } as any,
+        puntaje: 0,
+        estado: EstadoEvaluacion.PENDIENTE,
+        observaciones: 'Sin evaluación F-03 registrada en el sistema.',
         detalle_pastor: {
-          campos_formulario: {
-            'Compromiso y Asistencia': 'Excelente',
-            'Testimonio Eclesial': 'Sobresaliente',
-            'Liderazgo en Ministerio': 'Muy Bueno',
-            'Participación y Servicio': 'Activo y constante',
-          },
+          campos_formulario: {},
         } as any,
       } as Evaluacion;
     }
@@ -2363,21 +2112,17 @@ export class EvaluacionesServicio {
     if (becarios_bd.length > 0) {
       return becarios_bd.map((b, idx) => {
         const ev = evaluaciones_mod5.find((e) => e.becario_id === b.id);
-        const ci_limpio = (b.ci || '').split(/[- ]/)[0].trim();
-        const ref_sem2 = REGISTROS_CONSOLIDADO_SEM_II.find(
-          (r) =>
-            (ci_limpio && r.ci === ci_limpio) ||
-            (b.nombre && normalizar(r.nombre_completo) === normalizar(b.nombre)),
-        );
-
-        const puntaje_sobre_20 =
-          ev?.puntaje !== undefined && ev?.puntaje !== null
-            ? Number(ev.puntaje)
-            : ref_sem2?.socioeconomico ?? 15;
+        const tiene_evaluacion = Boolean(ev && ev.puntaje !== undefined && ev.puntaje !== null);
+        const puntaje_sobre_20 = tiene_evaluacion ? Number(ev!.puntaje) : 0;
         const puntaje_sobre_100 = Number(((puntaje_sobre_20 / 20) * 100).toFixed(1));
 
-        let semaforo: 'verde' | 'amarillo' | 'rojo' =
-          puntaje_sobre_20 >= 12 ? 'verde' : puntaje_sobre_20 >= 8 ? 'amarillo' : 'rojo';
+        let semaforo: 'verde' | 'amarillo' | 'rojo' = !tiene_evaluacion
+          ? 'amarillo'
+          : puntaje_sobre_20 >= 12
+            ? 'verde'
+            : puntaje_sobre_20 >= 8
+              ? 'amarillo'
+              : 'rojo';
         if (
           ev?.semaforo_socioeconomico === 'verde' ||
           ev?.semaforo_socioeconomico === 'amarillo' ||
@@ -2387,7 +2132,9 @@ export class EvaluacionesServicio {
         }
 
         const datos_form = (ev?.datos_formulario || {}) as Record<string, unknown>;
-        const respuestas_mapa = this.construirMapaRespuestas26(datos_form, puntaje_sobre_20);
+        const respuestas_mapa = tiene_evaluacion
+          ? this.construirMapaRespuestas26(datos_form, puntaje_sobre_20)
+          : {};
         const convalidado = Boolean(datos_form.convalidado || ev?.estado === EstadoEvaluacion.COMPLETADO);
         const estado = ev?.estado || (convalidado ? EstadoEvaluacion.COMPLETADO : EstadoEvaluacion.PENDIENTE);
 
@@ -2396,12 +2143,12 @@ export class EvaluacionesServicio {
           becario_id: b.id,
           supervisor_id: b.supervisor_id ?? b.supervisor?.id ?? null,
           nombre_completo: b.nombre || b.usuario?.nombre || `Becario #${b.id}`,
-          ci: b.ci || ref_sem2?.ci || 'S/N',
-          universidad: b.universidad || ref_sem2?.universidad || 'Universidad Mayor de San Andrés',
-          carrera: b.carrera || ref_sem2?.carrera || 'General',
-          semestre: b.modalidad_carrera || ref_sem2?.modalidad_carrera || 'Semestral',
-          respuestas_contestadas: 26,
-          respuestas_completadas: 26,
+          ci: b.ci || 'S/N',
+          universidad: b.universidad || 'Sin especificar',
+          carrera: b.carrera || 'General',
+          semestre: b.modalidad_carrera || 'Semestral',
+          respuestas_contestadas: tiene_evaluacion ? 26 : 0,
+          respuestas_completadas: tiene_evaluacion ? 26 : 0,
           total_preguntas: 26,
           puntaje_20: puntaje_sobre_20,
           puntaje_sobre_20,
@@ -2410,58 +2157,14 @@ export class EvaluacionesServicio {
           estado,
           convalidado,
           observaciones:
-            ev?.observaciones ||
-            `Evaluación socioeconómica registrada (${puntaje_sobre_20}/20 pts).`,
+            ev?.observaciones || 'Evaluación socioeconómica pendiente de registro.',
           respuestas: respuestas_mapa,
           respuestas_detalle: datos_form,
         };
       });
     }
 
-    let registros_fallback = REGISTROS_CONSOLIDADO_SEM_II;
-    if (filtrar_por_mentor) {
-      const { cis, nombres } = obtenerSemillaDesignadaMentor(
-        usuario,
-        supervisor_id ?? usuario?.id,
-      );
-      const filtrados_semilla = REGISTROS_CONSOLIDADO_SEM_II.filter(
-        (r) => cis.has(limpiarCi(r.ci)) || nombres.has(normalizarTextoMentor(r.nombre_completo)),
-      );
-      if (filtrados_semilla.length > 0) {
-        registros_fallback = filtrados_semilla;
-      }
-    }
-
-    return registros_fallback.map((r, idx) => {
-      const puntaje_sobre_20 = r.socioeconomico;
-      const puntaje_sobre_100 = Number(((puntaje_sobre_20 / 20) * 100).toFixed(1));
-      const semaforo: 'verde' | 'amarillo' | 'rojo' =
-        puntaje_sobre_20 >= 12 ? 'verde' : puntaje_sobre_20 >= 8 ? 'amarillo' : 'rojo';
-      const respuestas_mapa = this.construirMapaRespuestas26(null, puntaje_sobre_20);
-
-      return {
-        id: idx + 1,
-        becario_id: idx + 1,
-        supervisor_id: supervisor_id ?? usuario?.id ?? null,
-        nombre_completo: r.nombre_completo,
-        ci: r.ci,
-        universidad: r.universidad,
-        carrera: r.carrera,
-        semestre: r.modalidad_carrera,
-        respuestas_contestadas: 26,
-        respuestas_completadas: 26,
-        total_preguntas: 26,
-        puntaje_20: puntaje_sobre_20,
-        puntaje_sobre_20,
-        puntaje_sobre_100,
-        semaforo,
-        estado: EstadoEvaluacion.COMPLETADO,
-        convalidado: true,
-        observaciones: `Evaluación socioeconómica semestral (${puntaje_sobre_20}/20 pts).`,
-        respuestas: respuestas_mapa,
-        respuestas_detalle: respuestas_mapa,
-      };
-    });
+    return [];
   }
 
   async revisarEvaluacionSocioeconomica(
@@ -2951,95 +2654,89 @@ export class EvaluacionesServicio {
     rangos_aprobacion: RangoAprobacion[];
     registros: RegistroConsolidadoSemestral[];
   }> {
-    const periodo_nombre = periodo || 'II-2025';
-    let registros_copia: Array<RegistroConsolidadoSemestral & { becario_id?: number; supervisor_id?: number | null }> =
-      REGISTROS_CONSOLIDADO_SEM_II.map((r, idx) => ({
-        ...r,
-        becario_id: idx + 1,
-        supervisor_id: null,
-      }));
-
+    const periodo_nombre = periodo || 'II-2026';
+    let becarios_bd: Becario[] = [];
     if (this.becario_repo?.find) {
       try {
-        const becarios_bd = await this.becario_repo.find({
-          relations: { usuario: true, supervisor: true },
-        });
-        for (const reg of registros_copia) {
-          const ci_reg = limpiarCi(reg.ci);
-          const nom_reg = normalizarTextoMentor(reg.nombre_completo);
-          const match_b = becarios_bd.find(
-            (b) =>
-              (ci_reg && limpiarCi(b.ci) === ci_reg) ||
-              (nom_reg && normalizarTextoMentor(b.nombre || b.usuario?.nombre) === nom_reg),
+        if (esRolMentor(usuario?.rol) || supervisor_id) {
+          becarios_bd = await obtenerBecariosDesignadosMentor(
+            this.becario_repo,
+            usuario,
+            supervisor_id ?? usuario?.id,
+            this.usuario_repo,
           );
-          if (match_b) {
-            reg.becario_id = match_b.id;
-            reg.supervisor_id = match_b.supervisor_id ?? match_b.supervisor?.id ?? null;
-          }
-        }
-      } catch {}
-    }
-
-    if (esRolMentor(usuario?.rol) || supervisor_id) {
-      const designados = await obtenerBecariosDesignadosMentor(
-        this.becario_repo,
-        usuario,
-        supervisor_id ?? usuario?.id,
-        this.usuario_repo,
-      );
-      const { cis, nombres } = obtenerSemillaDesignadaMentor(
-        usuario,
-        supervisor_id ?? usuario?.id,
-      );
-      for (const d of designados) {
-        if (d.ci) cis.add(limpiarCi(d.ci));
-        if (d.nombre) nombres.add(normalizarTextoMentor(d.nombre));
-        if (d.usuario?.nombre) nombres.add(normalizarTextoMentor(d.usuario.nombre));
-      }
-
-      const filtrados = registros_copia.filter(
-        (r) => cis.has(limpiarCi(r.ci)) || nombres.has(normalizarTextoMentor(r.nombre_completo)),
-      );
-      if (filtrados.length > 0) {
-        const sup_id = supervisor_id ?? usuario?.id ?? null;
-        registros_copia = filtrados.map((r) => ({
-          ...r,
-          supervisor_id: r.supervisor_id ?? sup_id,
-        }));
-      }
-    }
-
-    if (this.evaluacion_repo?.find) {
-      try {
-        const evaluaciones_bd = await this.evaluacion_repo.find({
-          relations: { becario: true },
-        });
-
-        for (const reg of registros_copia) {
-          const evs_becario = evaluaciones_bd.filter((e) => e.becario?.ci === reg.ci);
-          for (const ev of evs_becario) {
-            const pts = ev.puntaje !== null && ev.puntaje !== undefined ? Number(ev.puntaje) : null;
-            if (pts === null) continue;
-            if (ev.modulo_id === 1) reg.liderazgo_iglesia = pts;
-            else if (ev.modulo_id === 2) reg.academica = pts;
-            else if (ev.modulo_id === 3) reg.practicas_preprofesionales = pts;
-            else if (ev.modulo_id === 4) reg.escuela_lideres = pts;
-            else if (ev.modulo_id === 5) reg.socioeconomico = pts;
-          }
-          const total = Number(
-            (reg.academica + reg.liderazgo_iglesia + reg.practicas_preprofesionales + reg.escuela_lideres + reg.socioeconomico).toFixed(1),
-          );
-          reg.total = total;
-          reg.total_calificacion = this.obtenerCalificacionLiteralOficial(total);
+        } else {
+          becarios_bd = await this.becario_repo.find({
+            relations: { usuario: true, supervisor: true },
+            order: { id: 'ASC' },
+          });
         }
       } catch {
-        // En caso de que la tabla aún no contenga registros, se retorna la lista canónica del Excel
+        becarios_bd = [];
       }
+    }
+
+    let evaluaciones_bd: Evaluacion[] = [];
+    if (this.evaluacion_repo?.find) {
+      try {
+        evaluaciones_bd = await this.evaluacion_repo.find({
+          relations: { becario: true },
+        });
+      } catch {
+        evaluaciones_bd = [];
+      }
+    }
+
+    const registros_copia: Array<RegistroConsolidadoSemestral & { becario_id?: number; supervisor_id?: number | null }> = [];
+    for (const b of becarios_bd) {
+      const evs_becario = evaluaciones_bd.filter((e) => e.becario_id === b.id || e.becario?.id === b.id);
+      if (evs_becario.length === 0) continue;
+
+      let liderazgo_iglesia = 0;
+      let academica = 0;
+      let practicas_preprofesionales = 0;
+      let escuela_lideres = 0;
+      let socioeconomico = 0;
+
+      for (const ev of evs_becario) {
+        const pts = ev.puntaje !== null && ev.puntaje !== undefined ? Number(ev.puntaje) : null;
+        if (pts === null) continue;
+        if (ev.modulo_id === 1) liderazgo_iglesia = pts;
+        else if (ev.modulo_id === 2) academica = pts;
+        else if (ev.modulo_id === 3) practicas_preprofesionales = pts;
+        else if (ev.modulo_id === 4) escuela_lideres = pts;
+        else if (ev.modulo_id === 5) socioeconomico = pts;
+      }
+
+      const total = Number(
+        (academica + liderazgo_iglesia + practicas_preprofesionales + escuela_lideres + socioeconomico).toFixed(1),
+      );
+      registros_copia.push({
+        becario_id: b.id,
+        supervisor_id: b.supervisor_id ?? b.supervisor?.id ?? null,
+        nombre_completo: b.usuario?.nombre || b.nombre || `Becario #${b.id}`,
+        ci: b.ci || 'S/N',
+        universidad: b.universidad || 'Sin especificar',
+        carrera: b.carrera || 'General',
+        modalidad_carrera: b.modalidad_carrera || 'Semestral',
+        tipo_beca: b.tipo_beca || '650',
+        academica,
+        liderazgo_iglesia,
+        practicas_preprofesionales,
+        escuela_lideres,
+        socioeconomico,
+        total,
+        total_calificacion: this.obtenerCalificacionLiteralOficial(total),
+        observaciones: '',
+        debilidades: '',
+        comentario_academico: '',
+        comentario_iglesia: '',
+      } as any);
     }
 
     return {
       periodo: periodo_nombre,
-      total_becarios: registros_copia.length,
+      total_becarios: becarios_bd.length,
       criterios_oficiales: CRITERIOS_OFICIALES_TABLA,
       rangos_aprobacion: RANGOS_APROBACION_OFICIALES,
       registros: registros_copia,
@@ -3284,123 +2981,7 @@ export class EvaluacionesServicio {
   }
 
   obtenerCasosPastoralesPorDefecto(): any[] {
-    return [
-      {
-        id: 1,
-        becario_id: 1,
-        becario: { nombre: 'Carlos Oscar Luna Lizarraga', carrera: 'Economía', universidad: 'UMSA' },
-        origen: 'Formulario F-03 (Pastor)',
-        observacion_pastoral: 'Aún no es miembro de la iglesia; requiere mayor contacto con la congregación.',
-        plan_accion: '3 sesiones de acompañamiento con pastor de jóvenes y vinculación a discipulado.',
-        estado: EstadoCasoPastoral.PENDIENTE,
-        prioridad: PrioridadCasoPastoral.ALTA,
-        responsable_nombre: 'Pr. Juan Ramos (Tutoría Pastoral)',
-        notas_seguimiento: [
-          {
-            fecha: '2026-08-10',
-            autor: 'Pr. Juan Ramos',
-            rol_autor: 'Pastor Local',
-            contenido: 'Primera entrevista inicial de acogida pastoral.',
-            acuerdos: 'Asistir a reunión de jóvenes los sábados.',
-          },
-        ],
-        created_at: new Date('2026-08-01'),
-      },
-      {
-        id: 2,
-        becario_id: 2,
-        becario: { nombre: 'Jhoselin Quispe Morales', carrera: 'Comunicación Social', universidad: 'UMSA' },
-        origen: 'Formulario F-03 (Pastor)',
-        observacion_pastoral: 'No desempeña algún cargo de liderazgo.',
-        plan_accion: 'Mentoría de servicio: integración en el equipo de medios y transmisión dominical.',
-        estado: EstadoCasoPastoral.EN_TUTORIA,
-        prioridad: PrioridadCasoPastoral.MEDIA,
-        responsable_nombre: 'Hno. David Mendoza (Diaconía)',
-        notas_seguimiento: [
-          {
-            fecha: '2026-08-15',
-            autor: 'Hno. David Mendoza',
-            rol_autor: 'Mentor',
-            contenido: 'Becaria muestra buena disposición a colaborar con streaming.',
-            acuerdos: 'Capacitación en consola de audio el viernes.',
-          },
-        ],
-        created_at: new Date('2026-08-01'),
-      },
-      {
-        id: 3,
-        becario_id: 3,
-        becario: { nombre: 'José Marcos Suñagua Quispe', carrera: 'Informática', universidad: 'UMSA' },
-        origen: 'Formulario F-03 (Pastor)',
-        observacion_pastoral: 'Trabajar en debilidades: puntualidad en la iglesia.',
-        plan_accion: 'Compromiso de puntualidad y asignación de bienvenida 15 min antes del culto.',
-        estado: EstadoCasoPastoral.PENDIENTE,
-        prioridad: PrioridadCasoPastoral.ALTA,
-        responsable_nombre: 'Tutor Pastoral Diaconía',
-        notas_seguimiento: [],
-        created_at: new Date('2026-08-01'),
-      },
-      {
-        id: 4,
-        becario_id: 4,
-        becario: { nombre: 'Luis Santiago Enrriquez Conde', carrera: 'Cs. de la Comunicación Social', universidad: 'UMSA' },
-        origen: 'Formulario F-03 (Pastor)',
-        observacion_pastoral: 'No desempeña algún cargo; no forma a nuevos líderes, pero tiene potencial.',
-        plan_accion: 'Plan de formación de líderes junior en Escuela Dominical.',
-        estado: EstadoCasoPastoral.EN_TUTORIA,
-        prioridad: PrioridadCasoPastoral.MEDIA,
-        responsable_nombre: 'Pr. Marcos Caluyo',
-        notas_seguimiento: [
-          {
-            fecha: '2026-08-20',
-            autor: 'Pr. Marcos Caluyo',
-            rol_autor: 'Pastor',
-            contenido: 'Inició como asistente en grupo de adolescentes.',
-            acuerdos: 'Preparar devocional para fin de mes.',
-          },
-        ],
-        created_at: new Date('2026-08-01'),
-      },
-      {
-        id: 5,
-        becario_id: 5,
-        becario: { nombre: 'Mariela Dayana Jimenez Chambi', carrera: 'Contaduría Pública', universidad: 'UMSA' },
-        origen: 'Formulario F-03 (Pastor)',
-        observacion_pastoral: 'No desempeña algún cargo de liderazgo.',
-        plan_accion: 'Incorporación en la tesorería o mayordomía auxiliar de la congregación.',
-        estado: EstadoCasoPastoral.PENDIENTE,
-        prioridad: PrioridadCasoPastoral.BAJA,
-        responsable_nombre: 'Coordinación Pastoral',
-        notas_seguimiento: [],
-        created_at: new Date('2026-08-01'),
-      },
-      {
-        id: 6,
-        becario_id: 6,
-        becario: { nombre: 'Mayherli Alejandra Loza Villalobos', carrera: 'Contaduría Pública', universidad: 'UMSA' },
-        origen: 'Formulario F-03 (Pastor)',
-        observacion_pastoral: 'No desempeña algún cargo; se encuentra en formación.',
-        plan_accion: 'Seguimiento en discipulado de liderazgo juvenil.',
-        estado: EstadoCasoPastoral.EN_TUTORIA,
-        prioridad: PrioridadCasoPastoral.BAJA,
-        responsable_nombre: 'Líder Débora Quispe',
-        notas_seguimiento: [],
-        created_at: new Date('2026-08-01'),
-      },
-      {
-        id: 7,
-        becario_id: 7,
-        becario: { nombre: 'Nilda Amalia Churata Paye', carrera: 'Educación Parvularia', universidad: 'UPEA' },
-        origen: 'Formulario F-03 (Pastor)',
-        observacion_pastoral: 'Asiste solo domingos; falta mejorar el compromiso e involucrarse más.',
-        plan_accion: 'Acompañamiento integral para conciliar horarios de estudio con actividades congregacionales.',
-        estado: EstadoCasoPastoral.PENDIENTE,
-        prioridad: PrioridadCasoPastoral.ALTA,
-        responsable_nombre: 'Pr. Samuel Amigos Central',
-        notas_seguimiento: [],
-        created_at: new Date('2026-08-01'),
-      },
-    ];
+    return [];
   }
 
   async crearCasoPastoral(dto: {
@@ -4074,7 +3655,7 @@ export class EvaluacionesServicio {
           });
           reg = await this.configuracion_repo.save(reg);
         }
-        if (reg && Array.isArray(reg.valor_json) && reg.valor_json.length > 0) {
+        if (reg && Array.isArray(reg.valor_json)) {
           this.catalogo_tareas_memoria = (reg.valor_json as TareaCatalogoLideres[])
             .map((t) => ({
               ...t,

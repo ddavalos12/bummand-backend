@@ -124,6 +124,7 @@ export class BecariosServicio {
       .leftJoinAndSelect('becario.supervisor', 'supervisor')
       .leftJoinAndSelect('becario.lugar_practica', 'lugar_practica')
       .leftJoinAndSelect('becario.iglesia', 'iglesia')
+      .leftJoinAndSelect('becario.horarios_apoyo', 'horarios_apoyo')
       .orderBy('becario.id', 'ASC');
 
     if (esRolMentor(usuario?.rol)) {
@@ -132,6 +133,7 @@ export class BecariosServicio {
 
     const lista = await query.getMany();
 
+    let resultado = lista;
     if (
       esRolMentor(usuario?.rol) &&
       (lista.length === 0 || lista.length >= 15) &&
@@ -144,11 +146,53 @@ export class BecariosServicio {
         this.usuarioRepositorio,
       );
       if (designados.length > 0) {
-        return designados;
+        resultado = designados;
       }
     }
 
-    return lista;
+    if (resultado.length > 0 && this.becarioRepositorio.manager) {
+      try {
+        const ahora = new Date();
+        const inicio_mes = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-01`;
+        const fin_mes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0).toISOString().split('T')[0];
+        const filas_horas: Array<{ becario_id: number; total_horas: string | number }> =
+          await this.becarioRepositorio.manager.query(
+            `SELECT becario_id, COALESCE(SUM(horas_trabajadas), 0) AS total_horas
+             FROM registros_asistencia
+             WHERE fecha >= $1 AND fecha <= $2
+             GROUP BY becario_id`,
+            [inicio_mes, fin_mes],
+          );
+        const mapa_horas = new Map<number, number>();
+        for (const f of filas_horas) {
+          mapa_horas.set(Number(f.becario_id), Number(Number(f.total_horas || 0).toFixed(2)));
+        }
+        for (const b of resultado) {
+          (b as Becario & { horas_mes_actual?: number }).horas_mes_actual = mapa_horas.get(b.id) ?? 0;
+        }
+      } catch {
+        for (const b of resultado) {
+          (b as Becario & { horas_mes_actual?: number }).horas_mes_actual = 0;
+        }
+      }
+    }
+
+    return resultado;
+  }
+
+  async listarDirectorioNombres(): Promise<Array<{ id: number; nombre: string }>> {
+    const lista = await this.becarioRepositorio
+      .createQueryBuilder('becario')
+      .leftJoinAndSelect('becario.usuario', 'usuario')
+      .orderBy('becario.nombre', 'ASC')
+      .getMany();
+
+    return lista
+      .map((b) => ({
+        id: b.id,
+        nombre: (b.nombre || b.usuario?.nombre || '').trim(),
+      }))
+      .filter((b) => b.nombre.length > 0);
   }
 
   async obtener(id: number, usuario: Usuario): Promise<Becario> {
@@ -597,8 +641,26 @@ export class BecariosServicio {
 
     if (datos.lugar_practica_id) {
       becario.lugar_practica_id = datos.lugar_practica_id;
-      await this.becarioRepositorio.save(becario);
     }
+
+    const claves_dias: Record<number, string> = {
+      0: 'domingo',
+      1: 'lunes',
+      2: 'martes',
+      3: 'miercoles',
+      4: 'jueves',
+      5: 'viernes',
+      6: 'sabado',
+    };
+    const nuevo_horario_json: Record<string, string> = {};
+    for (const d of datos.dias || []) {
+      const clave = claves_dias[d.dia_semana];
+      if (clave && d.activo !== false && d.hora_inicio && d.hora_fin) {
+        nuevo_horario_json[clave] = `${d.hora_inicio} - ${d.hora_fin}`;
+      }
+    }
+    becario.horario_semanal = nuevo_horario_json;
+    await this.becarioRepositorio.save(becario);
 
     if (!this.horarioRepositorio) return [];
 

@@ -68,7 +68,7 @@ export const ADMINISTRADORES_SEMILLA: AdministradorSemilla[] = [
   },
   {
     "nombre": "Daniel Davalos Quiñonez",
-    "correo": "daniel.davalos@bumand.bo",
+    "correo": "daniel234.davalos@gmail.com",
     "clave": "Bumand2026!",
     "cargo": "Administrador del Sistema BUMAND"
   }
@@ -349,7 +349,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "nombre": "Daniel Davalos Quiñonez",
     "ceti": 2,
     "celular": "78804045",
-    "correo": "daniel234.davalos@gmail.com",
+    "correo": "ddavalosq@fcpn.edu.bo",
     "fecha_nacimiento": "11/12/1995",
     "edad": 31,
     "direccion": "Calle Luis tapia #27 Z.",
@@ -973,112 +973,6 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
       "miercoles": "08:30 - 12:30"
     }
   }
-,
-{
-  "ci": "12423846",
-  "nombre": "Fernando Rene Yujra Quispe",
-  "correo": "fernando.yujra@diaconia.bo",
-  "clave": "Bumand2026!",
-  "universidad": "Universidad Mayor de San Andrés",
-  "carrera": "Ingeniería Civil",
-  "unidad": "Seguridad Física",
-  "institucion": "Diaconía FRIF-IFD",
-  "supervisor_correo": "angel.ali@bumand.bo",
-  "modalidad_carrera": "Semestral",
-  "tipo_beca": "650",
-  "comentario_academico": "reprobo 2 materias, materia de maquinarias aun no hay notas",
-  "comentario_iglesia": "Comentarios positivos"
-},
-{
-  "ci": "9927657",
-  "nombre": "Luis Santiago Enrriquez Conde",
-  "correo": "luis.enrriquez@diaconia.bo",
-  "clave": "Bumand2026!",
-  "universidad": "Universidad Mayor de San Andrés",
-  "carrera": "Ciencias de la Comunicación Social",
-  "unidad": "Marketing y Comunicación",
-  "institucion": "Diaconía FRIF-IFD",
-  "supervisor_correo": "max.reynoso@diaconia.bo",
-  "modalidad_carrera": "Anual",
-  "tipo_beca": "650",
-  "comentario_academico": "Aprobado",
-  "comentario_iglesia": "Debilidad, falta de tiempo persona muy proactiva con comentarios muy positivos"
-},
-{
-  "ci": "7077936",
-  "nombre": "Mario Catunta Laime",
-  "correo": "mario.catunta@diaconia.bo",
-  "clave": "Bumand2026!",
-  "universidad": "Universidad Pública de El Alto",
-  "carrera": "Economía",
-  "unidad": "Seguridad Física",
-  "institucion": "Diaconía FRIF-IFD",
-  "supervisor_correo": "angel.ali@bumand.bo",
-  "modalidad_carrera": "Mixta",
-  "tipo_beca": "250",
-  "comentario_academico": "Aprobado",
-  "comentario_iglesia": "Tiende a postergar responsabilidades y descuida otras áreas"
-},
-{
-  "ci": "6950093",
-  "nombre": "Jhoselin Quispe Morales",
-  "correo": "jhoselin.quispe@diaconia.bo",
-  "clave": "Bumand2026!",
-  "universidad": "Universidad Mayor de San Andrés",
-  "carrera": "Comunicación Social",
-  "unidad": "Subgerencia de Negocios y Marketing",
-  "institucion": "Diaconía FRIF-IFD",
-  "supervisor_correo": "alejandra.romay@diaconia.bo",
-  "modalidad_carrera": "Anual",
-  "tipo_beca": "650",
-  "comentario_academico": "Aprobado",
-  "comentario_iglesia": "Comentarios Positivos"
-},
-{
-  "ci": "10369104",
-  "nombre": "Monica Mamani Mamani",
-  "correo": "monica.mamani@diaconia.bo",
-  "clave": "Bumand2026!",
-  "universidad": "Universidad Mayor de San Andrés",
-  "carrera": "Lingüística e Idiomas",
-  "unidad": "Subgerencia Nacional RSDyA",
-  "institucion": "Diaconía FRIF-IFD",
-  "supervisor_correo": "anai.paye@diaconia.bo",
-  "modalidad_carrera": "Semestral",
-  "tipo_beca": "650",
-  "comentario_academico": "Aprobado",
-  "comentario_iglesia": "Comentarios muy positivos"
-},
-{
-  "ci": "10930509",
-  "nombre": "Cristhian Alejandro Soto Apaza",
-  "correo": "cristhian.soto@diaconia.bo",
-  "clave": "Bumand2026!",
-  "universidad": "Universidad Pública de El Alto",
-  "carrera": "Administración de Empresas",
-  "unidad": "Subgerencia Nacional de Administración",
-  "institucion": "Diaconía FRIF-IFD",
-  "supervisor_correo": "eilen.astorga@diaconia.bo",
-  "modalidad_carrera": "Anual",
-  "tipo_beca": "650",
-  "comentario_academico": "Egresado",
-  "comentario_iglesia": "Trabajar paciencia"
-},
-{
-  "ci": "10915872",
-  "nombre": "Ruth Alesandra Choque Huanca",
-  "correo": "ruth.choque@diaconia.bo",
-  "clave": "Bumand2026!",
-  "universidad": "Universidad Central Sede La Paz",
-  "carrera": "Ingeniería comercial",
-  "unidad": "Jefatura de Crédito Individual y Cartera Productiva",
-  "institucion": "Diaconía FRIF-IFD",
-  "supervisor_correo": "carlos.alanoca@diaconia.bo",
-  "modalidad_carrera": "Semestral",
-  "tipo_beca": "250",
-  "comentario_academico": "Aprobado",
-  "comentario_iglesia": "Comentarios positivos"
-}
 ];
 
 export const IGLESIAS_SEMILLA: IglesiaSemilla[] = [
