@@ -238,6 +238,36 @@ export class EvaluacionesControlador {
     );
   }
 
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('modulo-3/mi-qr')
+  @ApiOperation({
+    summary: 'Obtener QR identificador del becario para Evaluación del Mentor (Módulo 3)',
+    description: 'Retorna la URL firmada del QR identificador del becario y el estado sin exponer preguntas ni códigos OTP.',
+  })
+  obtenerMiQrModulo3(@UsuarioActual() usuario: Usuario) {
+    return this.evaluaciones_servicio.obtenerMiQrModulo3(usuario);
+  }
+
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Get('modulo-3/validar-qr')
+  @ApiOperation({
+    summary: 'Validar QR del becario y abrir evaluación exclusiva para Mentor/Supervisor',
+    description: 'Verifica la firma del QR, comprueba la asignación del supervisor autenticado y retorna los datos para evaluar.',
+  })
+  validarQrMentor(
+    @Query('becario_id', ParseIntPipe) becarioId: number,
+    @UsuarioActual() usuario: Usuario,
+    @Query('token') token?: string,
+    @Query('periodo_id') periodo_id?: number,
+  ) {
+    return this.evaluaciones_servicio.validarQrMentor(
+      becarioId,
+      token,
+      usuario,
+      periodo_id ? Number(periodo_id) : undefined,
+    );
+  }
+
   @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Get('modulo-3/becarios-asignados')
   @ApiOperation({
@@ -256,24 +286,35 @@ export class EvaluacionesControlador {
   @Get('modulo-3/becario/:becarioId')
   @ApiOperation({
     summary: 'Obtener evaluación y respuestas del Módulo 3 de un becario',
-    description: 'Retorna la evaluación previa del Módulo 3 y sus datos de formulario para edición y precarga.',
+    description: 'Retorna la evaluación previa del Módulo 3 al Mentor/Admin (al becario solo se le devuelve su estado).',
   })
   @ApiParam({ name: 'becarioId', description: 'ID del becario', type: Number })
   @ApiResponse({ status: 200, description: 'Evaluación y formulario del Módulo 3.' })
   obtenerEvaluacionModulo3Becario(
     @Param('becarioId', ParseIntPipe) becarioId: number,
     @Query('periodo_id') periodo_id?: number,
+    @UsuarioActual() usuario?: Usuario,
   ) {
-    return this.evaluaciones_servicio.obtenerEvaluacionModulo3Becario(becarioId, periodo_id ? Number(periodo_id) : undefined);
+    return usuario
+      ? this.evaluaciones_servicio.obtenerEvaluacionModulo3Becario(
+          becarioId,
+          periodo_id ? Number(periodo_id) : undefined,
+          usuario,
+        )
+      : this.evaluaciones_servicio.obtenerEvaluacionModulo3Becario(
+          becarioId,
+          periodo_id ? Number(periodo_id) : undefined,
+        );
   }
 
-  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
+  @Roles(Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Post('receptor/mentor-qr')
   @ApiOperation({
-    summary: 'Receptor de evaluación mentor / prácticas vía QR o perfil supervisor (Módulo 3)',
-    description: 'Procesa o actualiza la evaluación de prácticas/mentor validando modalidad y código de verificación.',
+    summary: 'Receptor exclusivo para Mentor/Supervisor de evaluación Módulo 3',
+    description: 'Registra o actualiza la evaluación de prácticas/mentor únicamente desde una sesión autenticada de Mentor o Administrador.',
   })
   @ApiResponse({ status: 201, description: 'Evaluación del mentor procesada con éxito.', type: Evaluacion })
+  @ApiResponse({ status: 403, description: 'Prohibido: los becarios no pueden llenar ni enviar la Evaluación del Mentor.' })
   procesarReceptorMentorQr(
     @Body() dto: ReceptorMentorQrDto,
     @UsuarioActual() usuario?: Usuario,

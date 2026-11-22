@@ -505,6 +505,53 @@ describe('EvaluacionesServicio', () => {
       expect((res.datos_formulario as any).modalidad_llenado).toBe('perfil_supervisor');
       expect((res.datos_formulario as any).codigo_verificacion).toBe('123456');
     });
+
+    it('debe rechazar con ForbiddenException si un BECARIO intenta enviar evaluación del Mentor', async () => {
+      const becario_user: Usuario = { id: 33, nombre: 'Becario', rol: Rol.BECARIO } as any;
+      await expect(
+        servicio.procesarReceptorMentorQr(
+          {
+            becario_id: 2,
+            periodo_id: 2,
+            calificaciones_1_18: [10],
+          } as any,
+          becario_user,
+        ),
+      ).rejects.toThrow('Los becarios no están autorizados');
+    });
+
+    it('debe ocultar datos_formulario al BECARIO en obtenerEvaluacionModulo3Becario', async () => {
+      const becario_user: Usuario = { id: 33, nombre: 'Becario', rol: Rol.BECARIO } as any;
+      evaluacion_repo.findOne.mockResolvedValue({
+        id: 10,
+        becario_id: 2,
+        modulo_id: 3,
+        estado: EstadoEvaluacion.COMPLETADO,
+        datos_formulario: { calificaciones_1_18: { 1: 10 } },
+      });
+
+      const res: any = await servicio.obtenerEvaluacionModulo3Becario(2, 2, becario_user);
+      expect(res.evaluado).toBe(true);
+      expect(res.datos_formulario).toBeNull();
+      expect(res.evaluacion).toBeNull();
+      expect(res.restringido_becario).toBe(true);
+    });
+
+    it('debe generar QR identificador firmado sin exponer código OTP para el BECARIO', async () => {
+      const becario_user: Usuario = { id: 33, nombre: 'Daniel Davalos', rol: Rol.BECARIO } as any;
+      becario_repo.findOne.mockResolvedValue({
+        id: 2,
+        usuario_id: 33,
+        nombre: 'Daniel Davalos',
+        supervisor: { nombre: 'Angel Ali' },
+      });
+      evaluacion_repo.findOne.mockResolvedValue(null);
+
+      const res: any = await servicio.obtenerMiQrModulo3(becario_user);
+      expect(res.becario_id).toBe(2);
+      expect(res.qr_url).toContain('/evaluar-mentor?becario_id=2&token=');
+      expect(res.codigo).toBeUndefined();
+    });
   });
 
   describe('TAREA-13: Subida y Revisión Directa de Documentos Académicos', () => {

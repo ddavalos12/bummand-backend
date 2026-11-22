@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
+import { createHmac } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Evaluacion, EstadoEvaluacion } from './entidades/evaluacion.entidad';
@@ -1700,6 +1701,26 @@ export class EvaluacionesServicio {
   }
 
   async procesarReceptorMentorQr(dto: ReceptorMentorQrDto, usuario?: Usuario): Promise<Evaluacion> {
+    if (usuario?.rol === Rol.BECARIO) {
+      throw new ForbiddenException(
+        'Los becarios no están autorizados a llenar ni enviar la Evaluación del Mentor.',
+      );
+    }
+
+    if (usuario && esRolMentor(usuario.rol) && this.becario_repo && typeof this.becario_repo.find === 'function') {
+      const designados = await obtenerBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        usuario.id,
+        this.usuario_repo,
+      );
+      if (designados.length > 0 && !designados.some((b) => b.id === dto.becario_id)) {
+        throw new ForbiddenException(
+          'Solo puede evaluar a los becarios asignados bajo su tutoría institucional.',
+        );
+      }
+    }
+
     let periodo_id = dto.periodo_id;
     if (!periodo_id && this.periodo_repo?.findOne) {
       if (dto.periodo) {
@@ -1715,8 +1736,9 @@ export class EvaluacionesServicio {
 
     let evaluador_id = 1;
     const modalidad_llenado =
-      dto.modalidad_llenado ||
-      (usuario && usuario.rol === Rol.SUPERVISOR ? 'perfil_supervisor' : 'celular_estudiante');
+      usuario && (usuario.rol === Rol.SUPERVISOR || usuario.rol === Rol.ADMINISTRADOR)
+        ? 'perfil_supervisor'
+        : dto.modalidad_llenado || 'perfil_supervisor';
 
     if (dto.codigo_verificacion && dto.codigo_verificacion.trim().length > 0) {
       const codigo_limpio = dto.codigo_verificacion.trim();
@@ -2839,9 +2861,8 @@ export class EvaluacionesServicio {
       fecha_envio: new Date().toISOString(),
     });
 
-    return {
+    const respuesta_base = {
       enviado: true,
-      codigo,
       expira_en_minutos: 10,
       becario_id: becario_id_clave,
       becario_nombre,
@@ -2850,6 +2871,15 @@ export class EvaluacionesServicio {
       supervisor_correo,
       expira_en_segundos: 600,
       mensaje: `Se envió una notificación con el código de 6 dígitos a la pantalla de su mentor específico (${supervisor_nombre}).`,
+    };
+
+    if (usuario_actual?.rol === Rol.BECARIO) {
+      return respuesta_base;
+    }
+
+    return {
+      ...respuesta_base,
+      codigo,
     };
   }
 
@@ -3486,7 +3516,122 @@ export class EvaluacionesServicio {
     return resultados;
   }
 
-  async obtenerEvaluacionModulo3Becario(becario_id: number, periodo_id?: number) {
+  private generarTokenQrMentor(becario_id: number): string {
+    const secreto = process.env.JWT_SECRET || 'bumand_qr_mentor_secret';
+    return createHmac('sha256', secreto)
+      .update(`bumand_mentor_m3:${becario_id}`)
+      .digest('hex')
+      .slice(0, 24);
+  }
+
+  async obtenerMiQrModulo3(usuario: Usuario) {
+    if (!this.becario_repo) {
+      throw new NotFoundException('Repositorio de becarios no disponible.');
+    }
+
+    let becario = await this.becario_repo.findOne({
+      where: { usuario_id: usuario.id },
+      relations: { usuario: true, supervisor: true },
+    });
+    if (!becario && usuario.rol !== Rol.BECARIO) {
+      becario = await this.becario_repo.findOne({
+        where: {},
+        relations: { usuario: true, supervisor: true },
+        order: { id: 'ASC' },
+      });
+    }
+    if (!becario) {
+      throw new NotFoundException('Expediente de becario no encontrado para este usuario.');
+    }
+
+    let periodo_activo_id = 2;
+    if (this.periodo_repo?.findOne) {
+      const periodo_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+      if (periodo_activo) periodo_activo_id = periodo_activo.id;
+    }
+
+    const evaluacion = await this.evaluacion_repo.findOne({
+      where: { becario_id: becario.id, modulo_id: 3, periodo_id: periodo_activo_id },
+    });
+
+    const token_qr = this.generarTokenQrMentor(becario.id);
+    const url_frontend = (process.env.FRONTEND_URL || 'https://bummand-frontend.vercel.app').replace(/\/+$/, '');
+    const qr_url = `${url_frontend}/evaluar-mentor?becario_id=${becario.id}&token=${token_qr}`;
+
+    return {
+      becario_id: becario.id,
+      nombre: becario.usuario?.nombre || becario.nombre || usuario.nombre,
+      supervisor_nombre: becario.supervisor?.nombre || 'Mentor asignado',
+      evaluado: !!evaluacion,
+      estado: evaluacion?.estado || EstadoEvaluacion.PENDIENTE,
+      fecha_evaluacion: evaluacion?.fecha_evaluacion || null,
+      token_qr,
+      qr_url,
+    };
+  }
+
+  async validarQrMentor(
+    becario_id: number,
+    token: string | undefined,
+    usuario: Usuario,
+    periodo_id?: number,
+  ) {
+    if (usuario.rol !== Rol.SUPERVISOR && usuario.rol !== Rol.ADMINISTRADOR) {
+      throw new ForbiddenException(
+        'Acceso exclusivo para Mentores/Supervisores o Administración.',
+      );
+    }
+
+    if (!this.becario_repo) {
+      throw new NotFoundException('Repositorio de becarios no disponible.');
+    }
+
+    const becario = await this.becario_repo.findOne({
+      where: { id: becario_id },
+      relations: { usuario: true, supervisor: true, lugar_practica: true },
+    });
+    if (!becario) {
+      throw new NotFoundException('Becario no encontrado.');
+    }
+
+    if (token && token.trim().length > 0) {
+      const token_esperado = this.generarTokenQrMentor(becario.id);
+      if (token.trim() !== token_esperado) {
+        throw new BadRequestException('El código QR escaneado es inválido o fue alterado.');
+      }
+    }
+
+    if (esRolMentor(usuario.rol)) {
+      const designados = await obtenerBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        usuario.id,
+        this.usuario_repo,
+      );
+      if (!designados.some((b) => b.id === becario.id)) {
+        throw new ForbiddenException(
+          'Este becario pertenece a otro Mentor/Supervisor. Solo puedes evaluar a tus becarios asignados.',
+        );
+      }
+    }
+
+    const detalle = await this.obtenerEvaluacionModulo3Becario(becario.id, periodo_id, usuario);
+
+    return {
+      becario_id: becario.id,
+      nombre: becario.usuario?.nombre || becario.nombre || 'Becario',
+      carrera: becario.carrera,
+      universidad: becario.universidad,
+      unidad: becario.unidad || becario.lugar_practica?.nombre || 'Oficina Central',
+      supervisor_nombre: becario.supervisor?.nombre || usuario.nombre,
+      evaluado: detalle.evaluado,
+      estado: detalle.evaluacion?.estado || EstadoEvaluacion.PENDIENTE,
+      evaluacion_id: detalle.evaluacion?.id || null,
+      datos_formulario: detalle.datos_formulario,
+    };
+  }
+
+  async obtenerEvaluacionModulo3Becario(becario_id: number, periodo_id?: number, usuario?: Usuario) {
     let periodo_activo_id = periodo_id;
     if (!periodo_activo_id && this.periodo_repo?.findOne) {
       const periodo_activo = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
@@ -3494,10 +3639,34 @@ export class EvaluacionesServicio {
     }
     if (!periodo_activo_id) periodo_activo_id = 2;
 
+    if (usuario && esRolMentor(usuario.rol) && this.becario_repo && typeof this.becario_repo.find === 'function') {
+      const designados = await obtenerBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        usuario.id,
+        this.usuario_repo,
+      );
+      if (designados.length > 0 && !designados.some((b) => b.id === becario_id)) {
+        throw new ForbiddenException('Este becario no está asignado a su supervisión.');
+      }
+    }
+
     const evaluacion = await this.evaluacion_repo.findOne({
       where: { becario_id, modulo_id: 3, periodo_id: periodo_activo_id },
       relations: { becario: true, evaluador: true, periodo: true },
     });
+
+    if (usuario?.rol === Rol.BECARIO) {
+      return {
+        evaluacion: null,
+        datos_formulario: null,
+        evaluado: !!evaluacion,
+        estado: evaluacion?.estado || EstadoEvaluacion.PENDIENTE,
+        fecha_evaluacion: evaluacion?.fecha_evaluacion || null,
+        modalidad_llenado: null,
+        restringido_becario: true,
+      };
+    }
 
     return {
       evaluacion,
