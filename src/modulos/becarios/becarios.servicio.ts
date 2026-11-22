@@ -348,26 +348,8 @@ export class BecariosServicio {
     dias_restantes: number;
     segundos_restantes: number;
   }> {
-    const COOLDOWN_CONFIRMACION_MS = 7 * 24 * 60 * 60 * 1000;
     const config = await this.obtenerConfiguracion();
-    const ahora_ms = Date.now();
-    let puede_solicitar = true;
-    let dias_restantes = 0;
-    let segundos_restantes = 0;
     const fecha_ultima = config?.fecha_ultima_orden_confirmacion ?? this.fecha_ultima_orden_confirmacion;
-
-    if (fecha_ultima) {
-      const ultima_ms = new Date(fecha_ultima).getTime();
-      const tiempo_transcurrido_ms = ahora_ms - ultima_ms;
-
-      if (tiempo_transcurrido_ms < COOLDOWN_CONFIRMACION_MS) {
-        puede_solicitar = false;
-        const restante_ms = COOLDOWN_CONFIRMACION_MS - tiempo_transcurrido_ms;
-        segundos_restantes = Math.ceil(restante_ms / 1000);
-        dias_restantes = Math.ceil(restante_ms / (24 * 60 * 60 * 1000));
-      }
-    }
-
     const confirmacion_activa = config
       ? Boolean(config.confirmacion_datos_activa)
       : this.confirmacion_datos_requerida;
@@ -375,9 +357,9 @@ export class BecariosServicio {
     return {
       confirmacion_activa,
       fecha_ultima_solicitud: fecha_ultima ? new Date(fecha_ultima).toISOString() : null,
-      puede_solicitar,
-      dias_restantes,
-      segundos_restantes,
+      puede_solicitar: true,
+      dias_restantes: 0,
+      segundos_restantes: 0,
     };
   }
 
@@ -388,15 +370,6 @@ export class BecariosServicio {
     puede_solicitar?: boolean;
     dias_restantes?: number;
   }> {
-    if (activa) {
-      const estado = await this.calcularEstadoOrdenGlobal();
-      if (!estado.puede_solicitar) {
-        throw new BadRequestException(
-          `No es posible emitir una nueva orden. Período de enfriamiento institucional activo: restan ${estado.dias_restantes} día(s).`,
-        );
-      }
-    }
-
     const ahora = new Date();
     this.confirmacion_datos_requerida = activa;
     if (activa) {
@@ -416,11 +389,26 @@ export class BecariosServicio {
     }
 
     if (activa) {
-      await this.becarioRepositorio
-        .createQueryBuilder()
-        .update(Becario)
-        .set({ datos_confirmados: false, fecha_ultima_confirmacion: null })
-        .execute();
+      if (typeof this.becarioRepositorio.createQueryBuilder === 'function') {
+        await this.becarioRepositorio
+          .createQueryBuilder()
+          .update(Becario)
+          .set({
+            datos_confirmados: false,
+            fecha_ultima_confirmacion: null,
+            ultimo_mes_datos_confirmados: null,
+          })
+          .execute();
+      } else {
+        await this.becarioRepositorio.update(
+          {},
+          {
+            datos_confirmados: false,
+            fecha_ultima_confirmacion: null,
+            ultimo_mes_datos_confirmados: null,
+          },
+        );
+      }
     }
 
     return {
@@ -429,8 +417,8 @@ export class BecariosServicio {
         : 'Orden de verificación de datos desactivada.',
       confirmacion_datos_requerida: activa,
       fecha_ultima_solicitud: ahora.toISOString(),
-      puede_solicitar: !activa,
-      dias_restantes: activa ? 7 : 0,
+      puede_solicitar: true,
+      dias_restantes: 0,
     };
   }
 
@@ -446,11 +434,14 @@ export class BecariosServicio {
     const ahora = new Date();
     const mes_actual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
 
-    // Ciclo mensual automático institucional: si el mes actual no ha sido confirmado por el becario, debe confirmar
     const confirmado_este_mes = becario?.ultimo_mes_datos_confirmados === mes_actual;
-    const datos_confirmados = becario ? (confirmado_este_mes || Boolean(becario.datos_confirmados && !becario.ultimo_mes_datos_confirmados)) : false;
+    const datos_confirmados = becario
+      ? Boolean(becario.datos_confirmados) && confirmado_este_mes
+      : false;
     const datos_validados = becario ? Boolean(becario.datos_validados) : false;
-    const debe_confirmar = becario ? !confirmado_este_mes : false;
+    const debe_confirmar = becario
+      ? (!becario.datos_confirmados || !confirmado_este_mes)
+      : false;
     const fecha_ultima = becario?.fecha_ultima_confirmacion;
 
     return {
