@@ -511,9 +511,72 @@ describe('AsistenciaServicio', () => {
       expect(resultado).toHaveLength(2);
       expect(asistencia_repo.find).toHaveBeenCalledWith({
         where: { becario_id: 7 },
-        relations: { becario: { usuario: true } },
+        relations: { becario: { usuario: true, supervisor: true } },
         order: { fecha: 'DESC', created_at: 'DESC' },
       });
+    });
+  });
+
+  describe('Escuela de Líderes 14:30 y Geocerca Rotativa', () => {
+    it('debe aplicar multa desde las 14:31 en Escuela de Líderes viernes', async () => {
+      jest.setSystemTime(new Date(2026, 9, 16, 14, 31, 0));
+
+      const becario_mock: Partial<Becario> = {
+        id: 21,
+        usuario_id: 21,
+        lugar_practica: {
+          id: 1,
+          nombre: 'Oficina Central Diaconía IFD - El Alto',
+          latitud: -16.500054,
+          longitud: -68.173455,
+          radio_tolerancia_m: 150,
+        } as LugarPractica,
+      };
+
+      becario_repo.findOne.mockResolvedValue(becario_mock);
+      asistencia_repo.findOne.mockResolvedValue(null);
+
+      const res = await servicio.registrarIngreso({
+        becario_id: 21,
+        tipo: TipoAsistencia.ESCUELA_LIDERES,
+        latitud: -16.500054,
+        longitud: -68.173455,
+      });
+
+      expect(res.registro.minutos_retraso).toBe(1);
+      expect(multa_repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          becario_id: 21,
+          minutos_retraso: 1,
+          monto_bs: 10,
+        }),
+      );
+    });
+
+    it('debe validar dentro_de_radio = true con GPS real para becarios en agencias rotativas', async () => {
+      const becario_rotativo: Partial<Becario> = {
+        id: 17,
+        usuario_id: 17,
+        lugar_practica: {
+          id: 2,
+          nombre: 'Agencias / Sucursales Rotativas Diaconía IFD',
+          latitud: -16.500054,
+          longitud: -68.173455,
+          radio_tolerancia_m: 150,
+        } as LugarPractica,
+      };
+
+      becario_repo.findOne.mockResolvedValue(becario_rotativo);
+      asistencia_repo.findOne.mockResolvedValue(null);
+
+      const res = await servicio.registrarIngreso({
+        becario_id: 17,
+        tipo: TipoAsistencia.PRACTICAS,
+        latitud: -16.5291,
+        longitud: -68.0959,
+      });
+
+      expect(res.registro.dentro_de_radio).toBe(true);
     });
   });
 });

@@ -26,6 +26,74 @@ import {
 const MARGEN_GPS_MAXIMO_M = 10;
 export const META_HORAS_SEMANAL = 9;
 export const META_HORAS_MENSUAL = 36;
+const ZONA_HORARIA_BOLIVIA = 'America/La_Paz';
+
+/**
+ * Calcula fecha y hora oficial en Bolivia (UTC-4) independientemente del servidor (ej. Vercel en UTC).
+ */
+function obtenerFechaHoraBolivia(base: Date = new Date()): {
+  anio: number;
+  mes: number;
+  dia: number;
+  dia_semana: number;
+  horas: number;
+  minutos: number;
+  segundos: number;
+  fecha_iso: string;
+  hora_hhmmss: string;
+} {
+  try {
+    const partes = new Intl.DateTimeFormat('en-CA', {
+      timeZone: ZONA_HORARIA_BOLIVIA,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(base);
+
+    const obtener = (tipo: string) =>
+      Number(partes.find((p) => p.type === tipo)?.value ?? 0);
+
+    const anio = obtener('year');
+    const mes = obtener('month');
+    const dia = obtener('day');
+    const horas_raw = obtener('hour');
+    const horas = horas_raw === 24 ? 0 : horas_raw;
+    const minutos = obtener('minute');
+    const segundos = obtener('second');
+    const fecha_iso = `${String(anio).padStart(4, '0')}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+    const hora_hhmmss = `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+    const dia_semana = new Date(Date.UTC(anio, mes - 1, dia, 12, 0, 0)).getUTCDay();
+
+    return {
+      anio,
+      mes,
+      dia,
+      dia_semana,
+      horas,
+      minutos,
+      segundos,
+      fecha_iso,
+      hora_hhmmss,
+    };
+  } catch {
+    const fecha_iso = base.toISOString().split('T')[0];
+    return {
+      anio: base.getFullYear(),
+      mes: base.getMonth() + 1,
+      dia: base.getDate(),
+      dia_semana: base.getDay(),
+      horas: base.getHours(),
+      minutos: base.getMinutes(),
+      segundos: base.getSeconds(),
+      fecha_iso,
+      hora_hhmmss: base.toTimeString().split(' ')[0],
+    };
+  }
+}
 
 export interface MovimientoExtractoAsistencia {
   id: number;
@@ -165,13 +233,15 @@ export class AsistenciaServicio {
     becario: Becario,
     ahora: Date = new Date(),
   ): { dentro: boolean; minutos_retraso: number; hora_prevista: string | null; advertencia?: string } {
+    const bo = obtenerFechaHoraBolivia(ahora);
+
     if (tipo === TipoAsistencia.ESCUELA_LIDERES) {
       const hora_prevista = '14:30';
-      const limite = new Date(ahora);
-      limite.setHours(14, 30, 0, 0);
+      const minutos_totales = bo.horas * 60 + bo.minutos;
+      const minutos_limite = 14 * 60 + 30;
 
-      if (ahora > limite) {
-        const diff_minutos = Math.round((ahora.getTime() - limite.getTime()) / 60000);
+      if (minutos_totales > minutos_limite) {
+        const diff_minutos = minutos_totales - minutos_limite;
         return {
           dentro: false,
           minutos_retraso: diff_minutos,
@@ -189,8 +259,7 @@ export class AsistenciaServicio {
     }
 
     if (tipo === TipoAsistencia.PRACTICAS) {
-      const dia_semana = ahora.getDay();
-      const horario_dia = this.obtenerHorarioDelDia(becario.horario_semanal, dia_semana);
+      const horario_dia = this.obtenerHorarioDelDia(becario.horario_semanal, bo.dia_semana);
 
       if (!horario_dia) {
         return {
@@ -218,10 +287,9 @@ export class AsistenciaServicio {
   }
 
   private verificarHorario(tipo: TipoAsistencia, fecha_hora: Date = new Date()): { dentro: boolean; advertencia?: string } {
-    const dia_semana = fecha_hora.getDay();
-    const horas = fecha_hora.getHours();
-    const minutos = fecha_hora.getMinutes();
-    const tiempo_decimal = horas + minutos / 60;
+    const bo = obtenerFechaHoraBolivia(fecha_hora);
+    const dia_semana = bo.dia_semana;
+    const tiempo_decimal = bo.horas + bo.minutos / 60;
 
     if (tipo === TipoAsistencia.ESCUELA_LIDERES) {
       const es_viernes = dia_semana === 5;
@@ -307,8 +375,8 @@ export class AsistenciaServicio {
     }
 
     const ahora = new Date();
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    const bo = obtenerFechaHoraBolivia(ahora);
+    const hoy = new Date(bo.anio, bo.mes - 1, bo.dia, 0, 0, 0, 0);
 
     const ingresoAbierto = await this.asistenciaRepositorio.findOne({
       where: { becario_id: becario.id, fecha: hoy, tipo, hora_salida: IsNull() },
@@ -336,7 +404,7 @@ export class AsistenciaServicio {
           });
         }
         if (!evento_encontrado) {
-          const hoyStr = ahora.toISOString().split('T')[0];
+          const hoyStr = bo.fecha_iso;
           const eventos_hoy = await this.eventoRepositorio.find({
             where: {
               tipo_evento: TipoEvento.SERVICIO_DIACONAL,
@@ -455,14 +523,33 @@ export class AsistenciaServicio {
       }
       if (lugar_objetivo) {
         nombre_recinto_objetivo = lugar_objetivo.nombre;
-        distancia_m = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(lugar_objetivo.latitud), Number(lugar_objetivo.longitud));
-        dentro_de_radio = dto.simulada !== true && distancia_m <= lugar_objetivo.radio_tolerancia_m + margen;
+        const nombre_lower = (lugar_objetivo.nombre || '').toLowerCase();
+        const es_rotativo =
+          lugar_objetivo.id === 2 ||
+          nombre_lower.includes('rotativa') ||
+          nombre_lower.includes('sucursales') ||
+          Number(lugar_objetivo.radio_tolerancia_m) === 0;
+        if (es_rotativo) {
+          distancia_m = 0;
+          dentro_de_radio = dto.simulada !== true;
+        } else {
+          distancia_m = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(lugar_objetivo.latitud), Number(lugar_objetivo.longitud));
+          dentro_de_radio = dto.simulada !== true && distancia_m <= lugar_objetivo.radio_tolerancia_m + margen;
+        }
       }
 
       // Soporte multisede y rotación de agencias Diaconía
       if (!dentro_de_radio && this.lugarRepositorio) {
         const sedes_institucionales = await this.lugarRepositorio.find();
         for (const sede of sedes_institucionales) {
+          const nombre_sede_lower = (sede.nombre || '').toLowerCase();
+          if (
+            sede.id === 2 ||
+            nombre_sede_lower.includes('rotativa') ||
+            nombre_sede_lower.includes('sucursales')
+          ) {
+            continue;
+          }
           const d = calcularDistanciaMetros(dto.latitud, dto.longitud, Number(sede.latitud), Number(sede.longitud));
           if (d <= sede.radio_tolerancia_m + margen && dto.simulada !== true) {
             nombre_recinto_objetivo = sede.nombre;
@@ -480,7 +567,7 @@ export class AsistenciaServicio {
       becario_id: becario.id,
       tipo,
       fecha: hoy,
-      hora_ingreso: ahora.toTimeString().split(' ')[0], // HH:MM:SS
+      hora_ingreso: bo.hora_hhmmss,
       lat_ingreso: dto.latitud,
       lng_ingreso: dto.longitud,
       bloque: dto.bloque || null,
@@ -495,8 +582,8 @@ export class AsistenciaServicio {
 
     await this.asistenciaRepositorio.save(registro);
 
-    // El motor de multas aplica EXCLUSIVAMENTE a la Escuela de Líderes de los días viernes
-    const es_viernes = ahora.getDay() === 5;
+    // El motor de multas aplica EXCLUSIVAMENTE a la Escuela de Líderes de los días viernes después de las 14:30 (hora Bolivia)
+    const es_viernes = bo.dia_semana === 5;
     const es_escuela_lideres = tipo === TipoAsistencia.ESCUELA_LIDERES;
     if (es_escuela_lideres && es_viernes) {
       // Verificar si el becario tiene una justificación/permiso aprobado para hoy
@@ -505,7 +592,7 @@ export class AsistenciaServicio {
         const justificaciones_hoy = await this.justificacionRepositorio.find({
           where: { becario_id: becario.id },
         });
-        const hoyStr = hoy.toISOString().split('T')[0];
+        const hoyStr = bo.fecha_iso;
         tiene_permiso_aprobado = justificaciones_hoy.some((j) => {
           const jFechaStr =
             j.fecha_incidencia instanceof Date
@@ -520,14 +607,12 @@ export class AsistenciaServicio {
       }
 
       if (!tiene_permiso_aprobado) {
-        const limite_tolerancia = new Date(ahora);
-        limite_tolerancia.setHours(14, 35, 0, 0);
+        const minutos_totales = bo.horas * 60 + bo.minutos;
+        const minutos_limite_1430 = 14 * 60 + 30;
 
-        if (ahora > limite_tolerancia) {
-          const limite_oficial = new Date(ahora);
-          limite_oficial.setHours(14, 30, 0, 0);
+        if (minutos_totales > minutos_limite_1430) {
           const minutos_retraso_multa = Math.max(
-            Math.round((ahora.getTime() - limite_oficial.getTime()) / 60000),
+            minutos_totales - minutos_limite_1430,
             1,
           );
           const { monto_bs, tramo } = this.calcularMultaEscuelaLideres(minutos_retraso_multa);
@@ -580,8 +665,8 @@ export class AsistenciaServicio {
 
   async registrarSalida(dto: CoordenadasDto): Promise<{ registro: RegistroAsistencia; mensaje: string }> {
     const tipo = dto.tipo || TipoAsistencia.PRACTICAS;
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    const bo_salida = obtenerFechaHoraBolivia(new Date());
+    const hoy = new Date(bo_salida.anio, bo_salida.mes - 1, bo_salida.dia, 0, 0, 0, 0);
 
     let becario = await this.becarioRepositorio.findOne({
       where: { usuario_id: dto.becario_id },
@@ -601,7 +686,7 @@ export class AsistenciaServicio {
       throw new NotFoundException('No existe un ingreso abierto hoy.');
     }
 
-    registro_abierto.hora_salida = new Date().toTimeString().split(' ')[0];
+    registro_abierto.hora_salida = bo_salida.hora_hhmmss;
     registro_abierto.lat_salida = dto.latitud;
     registro_abierto.lng_salida = dto.longitud;
     

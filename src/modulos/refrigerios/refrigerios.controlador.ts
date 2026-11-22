@@ -47,7 +47,7 @@ export class RefrigeriosControlador {
 
   @Post('asignar-dupla')
   @Post('sortear-dupla')
-  @Roles(Rol.ADMINISTRADOR)
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
   @ApiOperation({
     summary: 'Asignar o programar dupla de 2 becarios encargados para el refrigerio del viernes',
     description:
@@ -148,7 +148,7 @@ export class RefrigeriosControlador {
   }
 
   @Patch(':id/revisar-supervisor')
-  @Roles(Rol.ADMINISTRADOR)
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
   @ApiOperation({
     summary: 'Marcar rendición de refrigerio como revisada por Supervisor',
     description: 'Verifica los insumos y avanza el estado a revisado_supervisor para aprobación de Administración.',
@@ -208,10 +208,10 @@ export class RefrigeriosControlador {
   }
 
   @Delete(':id')
-  @Roles(Rol.ADMINISTRADOR)
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
   @ApiOperation({
     summary: 'Eliminar registro de refrigerio',
-    description: 'Remueve un registro de refrigerio del sistema institucional (Solo Administradores).',
+    description: 'Remueve un registro de refrigerio del sistema institucional (Administradores y Supervisores).',
   })
   @ApiParam({ name: 'id', description: 'Identificador del refrigerio', type: Number, example: 1 })
   @ApiResponse({ status: 200, description: 'Registro eliminado exitosamente.' })

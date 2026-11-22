@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -538,5 +539,40 @@ export class JustificacionesServicio {
         }
       }
     } catch {}
+  }
+
+  async eliminar(id: number, usuario?: Usuario): Promise<{ mensaje: string }> {
+    const justificacion = await this.justificacion_repo.findOne({
+      where: { id },
+      relations: { becario: true },
+    });
+    if (!justificacion) {
+      throw new NotFoundException(`Justificación con ID ${id} no encontrada`);
+    }
+
+    if (usuario?.rol === Rol.BECARIO) {
+      const es_dueno =
+        justificacion.becario_id === usuario.id ||
+        justificacion.becario?.usuario_id === usuario.id;
+      if (!es_dueno) {
+        throw new ForbiddenException('No tienes autorización para eliminar esta solicitud.');
+      }
+      if (justificacion.estado !== EstadoJustificacion.PENDIENTE) {
+        throw new BadRequestException('Solo puedes eliminar permisos que aún estén pendientes.');
+      }
+    } else if (esRolMentor(usuario?.rol) && usuario) {
+      const ids_permitidos = await obtenerIdsBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        usuario.id,
+      );
+      if (ids_permitidos.size > 0 && !ids_permitidos.has(justificacion.becario_id)) {
+        throw new ForbiddenException('Solo puedes eliminar permisos de tus becarios asignados.');
+      }
+    }
+
+    await this.justificacion_repo.remove(justificacion);
+    this.tiempoRealGateway?.notificarJustificacion({ accion: 'eliminada', id });
+    return { mensaje: `Justificación/permiso #${id} eliminado satisfactoriamente.` };
   }
 }

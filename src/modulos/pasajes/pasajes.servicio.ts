@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SolicitudPasajes, EstadoSolicitud } from './entidades/solicitud-pasaje.entidad';
@@ -435,7 +435,11 @@ export class PasajesServicio {
     return guardada;
   }
 
-  async eliminarRecorrido(id: number, usuario_id?: number): Promise<{ mensaje: string }> {
+  async eliminarRecorrido(
+    id: number,
+    usuario_id?: number,
+    usuario?: Usuario,
+  ): Promise<{ mensaje: string }> {
     const recorrido = await this.recorridoRepositorio.findOne({ where: { id } });
     if (!recorrido) {
       throw new NotFoundException(`Recorrido con ID ${id} no encontrado.`);
@@ -449,15 +453,40 @@ export class PasajesServicio {
       throw new NotFoundException('Solicitud asociada no encontrada.');
     }
 
-    if (usuario_id) {
-      const becario_id_real = await this.resolverBecarioId(usuario_id);
-      if (solicitud.becario_id !== becario_id_real && solicitud.becario_id !== usuario_id) {
-        throw new BadRequestException('No tiene autorización para eliminar recorridos de esta solicitud.');
-      }
-    }
+    const rol = usuario?.rol;
+    const es_admin = rol === Rol.ADMINISTRADOR;
+    const es_supervisor = esRolMentor(rol);
 
-    if (solicitud.estado !== EstadoSolicitud.BORRADOR && solicitud.estado !== EstadoSolicitud.RECHAZADO) {
-      throw new BadRequestException(`No se puede eliminar un recorrido de una solicitud en estado '${solicitud.estado}'.`);
+    if (es_admin) {
+      // El administrador puede eliminar cualquier tramo erróneo desde la web conectada
+    } else if (es_supervisor && usuario) {
+      if (this.becarioRepositorio) {
+        const ids_permitidos = await obtenerIdsBecariosDesignadosMentor(
+          this.becarioRepositorio,
+          usuario,
+          usuario.id,
+        );
+        if (ids_permitidos.size > 0 && !ids_permitidos.has(solicitud.becario_id)) {
+          throw new ForbiddenException('Solo puedes eliminar recorridos de tus becarios asignados.');
+        }
+      }
+      if (
+        solicitud.estado === EstadoSolicitud.APROBADO ||
+        solicitud.estado === EstadoSolicitud.APROBADO_ADMINISTRACION
+      ) {
+        throw new BadRequestException('No se puede modificar una planilla ya aprobada por Administración.');
+      }
+    } else {
+      if (usuario_id) {
+        const becario_id_real = await this.resolverBecarioId(usuario_id);
+        if (solicitud.becario_id !== becario_id_real && solicitud.becario_id !== usuario_id) {
+          throw new BadRequestException('No tiene autorización para eliminar recorridos de esta solicitud.');
+        }
+      }
+
+      if (solicitud.estado !== EstadoSolicitud.BORRADOR && solicitud.estado !== EstadoSolicitud.RECHAZADO) {
+        throw new BadRequestException(`No se puede eliminar un recorrido de una solicitud en estado '${solicitud.estado}'.`);
+      }
     }
 
     await this.recorridoRepositorio.remove(recorrido);
@@ -475,6 +504,45 @@ export class PasajesServicio {
 
     this.tiempoRealGateway?.notificarPasajes({ accion: 'recorrido_eliminado', recorrido_id: id, solicitud });
     return { mensaje: 'Recorrido eliminado exitosamente.' };
+  }
+
+  async eliminarSolicitud(id: number, usuario?: Usuario): Promise<{ mensaje: string }> {
+    const solicitud = await this.solicitudRepositorio.findOne({
+      where: { id },
+      relations: { recorridos: true, becario: true },
+    });
+    if (!solicitud) {
+      throw new NotFoundException(`Solicitud de pasajes #${id} no encontrada.`);
+    }
+
+    const rol = usuario?.rol;
+    if (rol === Rol.BECARIO && usuario) {
+      const becario_id_real = await this.resolverBecarioId(usuario.id);
+      if (solicitud.becario_id !== becario_id_real && solicitud.becario_id !== usuario.id) {
+        throw new ForbiddenException('No tienes autorización para eliminar esta solicitud.');
+      }
+      if (solicitud.estado !== EstadoSolicitud.BORRADOR && solicitud.estado !== EstadoSolicitud.RECHAZADO) {
+        throw new BadRequestException('Solo puedes eliminar solicitudes en estado borrador o rechazado.');
+      }
+    } else if (esRolMentor(rol) && usuario) {
+      if (this.becarioRepositorio) {
+        const ids_permitidos = await obtenerIdsBecariosDesignadosMentor(
+          this.becarioRepositorio,
+          usuario,
+          usuario.id,
+        );
+        if (ids_permitidos.size > 0 && !ids_permitidos.has(solicitud.becario_id)) {
+          throw new ForbiddenException('Solo puedes eliminar solicitudes de tus becarios asignados.');
+        }
+      }
+    }
+
+    if (solicitud.recorridos && solicitud.recorridos.length > 0) {
+      await this.recorridoRepositorio.remove(solicitud.recorridos);
+    }
+    await this.solicitudRepositorio.remove(solicitud);
+    this.tiempoRealGateway?.notificarPasajes({ accion: 'solicitud_eliminada', solicitud_id: id });
+    return { mensaje: `Solicitud de pasajes #${id} eliminada exitosamente.` };
   }
 
   async confirmarDatos(usuario_id: number, periodo?: string): Promise<{ mensaje: string; periodo?: string; confirmado_en: Date }> {

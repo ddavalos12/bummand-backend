@@ -172,11 +172,11 @@ export class PasajesControlador {
     return this.pasajesServicio.agregarRecorrido(dto);
   }
 
-  @Roles(Rol.BECARIO)
+  @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
   @Delete('recorridos/:id')
   @ApiOperation({
     summary: 'Eliminar tramo de transporte registrado',
-    description: 'Elimina un recorrido de una solicitud editable y recalcula automáticamente los totales de la planilla.',
+    description: 'Elimina un recorrido y recalcula automáticamente los totales de la planilla.',
   })
   @ApiParam({ name: 'id', description: 'Identificador del recorrido', type: Number, example: 1 })
   @ApiResponse({ status: 200, description: 'Recorrido eliminado exitosamente.' })
@@ -186,7 +186,7 @@ export class PasajesControlador {
     @Param('id', ParseIntPipe) id: number,
     @UsuarioActual() usuario: Usuario,
   ) {
-    return this.pasajesServicio.eliminarRecorrido(id, usuario.id);
+    return this.pasajesServicio.eliminarRecorrido(id, usuario.id, usuario);
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)
@@ -498,5 +498,20 @@ export class PasajesControlador {
     @UsuarioActual() usuario: Usuario,
   ): Promise<SolicitudPasajes> {
     return this.pasajesServicio.rechazarSolicitud(id, usuario.id, observaciones);
+  }
+
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'Eliminar solicitud mensual de pasajes y sus recorridos asociados',
+    description: 'Permite a Administración o Supervisores autorizados eliminar solicitudes erróneas o de prueba (y a becarios sus borradores), sincronizado con la APK.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador de la solicitud', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Solicitud de pasajes eliminada exitosamente.' })
+  eliminarSolicitud(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() usuario: Usuario,
+  ): Promise<{ mensaje: string }> {
+    return this.pasajesServicio.eliminarSolicitud(id, usuario);
   }
 }

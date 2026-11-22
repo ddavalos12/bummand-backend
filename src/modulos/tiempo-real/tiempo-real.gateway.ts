@@ -58,4 +58,8 @@ export class TiempoRealGateway
   notificarEvaluacion(datos_evaluacion: unknown) {
     this.emitirSeguro('evaluacion_actualizada', datos_evaluacion);
   }
+
+  notificarRefrigerio(datos_refrigerio: unknown) {
+    this.emitirSeguro('refrigerio_actualizado', datos_refrigerio);
+  }
 }

@@ -12,6 +12,7 @@ import { ConfirmarRecojoDto } from './dtos/confirmar-recojo.dto';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 import { NotificacionesServicio } from '../notificaciones/notificaciones.servicio';
+import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
 
 export const COSTO_RACION_POR_PERSONA_BS = 5.0;
 
@@ -99,14 +100,12 @@ export class RefrigeriosServicio implements OnModuleInit {
     private readonly usuario_repo?: Repository<Usuario>,
     @Optional()
     private readonly notificaciones_servicio?: NotificacionesServicio,
+    @Optional()
+    private readonly tiempo_real_gateway?: TiempoRealGateway,
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const omitir_semilla =
-      process.env.OMITIR_SEMILLA_INICIO === 'true' ||
-      (process.env.VERCEL === '1' &&
-        process.env.EJECUTAR_SEMILLA_EN_VERCEL !== 'true');
-    if (omitir_semilla) {
+    if (process.env.FORZAR_SEMILLA_REFRIGERIOS !== 'true') {
       return;
     }
     try {
@@ -296,6 +295,17 @@ export class RefrigeriosServicio implements OnModuleInit {
       if (admin) resp_id = admin.id;
     }
 
+    let enc_1_nombre = dto.becario_encargado_1_nombre?.trim() || null;
+    let enc_2_nombre = dto.becario_encargado_2_nombre?.trim() || null;
+    if ((!enc_1_nombre || !enc_2_nombre) && dto.becario_nombre?.includes(' y ')) {
+      const partes = dto.becario_nombre.split(' y ').map((p) => p.trim()).filter(Boolean);
+      if (!enc_1_nombre && partes[0]) enc_1_nombre = partes[0];
+      if (!enc_2_nombre && partes[1]) enc_2_nombre = partes[1];
+    }
+    if (!enc_1_nombre && dto.becario_nombre) {
+      enc_1_nombre = dto.becario_nombre.trim();
+    }
+
     const nuevo_refrigerio = this.refrigerio_repo.create({
       fecha: new Date(dto.fecha),
       evento_id: dto.evento_id || null,
@@ -311,15 +321,15 @@ export class RefrigeriosServicio implements OnModuleInit {
       responsable_entrega: dto.responsable_entrega || 'Coordinación General BUMAND',
       observaciones: obs,
       becario_encargado_1_id: dto.becario_encargado_1_id || dto.becario_id || null,
-      becario_encargado_1_nombre: dto.becario_encargado_1_nombre || dto.becario_nombre || null,
+      becario_encargado_1_nombre: enc_1_nombre,
       becario_encargado_2_id: dto.becario_encargado_2_id || null,
-      becario_encargado_2_nombre: dto.becario_encargado_2_nombre || null,
+      becario_encargado_2_nombre: enc_2_nombre,
       becario_id: dto.becario_encargado_1_id || dto.becario_id || null,
       becario_nombre:
         dto.becario_nombre ||
-        (dto.becario_encargado_1_nombre && dto.becario_encargado_2_nombre
-          ? `${dto.becario_encargado_1_nombre} y ${dto.becario_encargado_2_nombre}`
-          : dto.becario_encargado_1_nombre || null),
+        (enc_1_nombre && enc_2_nombre
+          ? `${enc_1_nombre} y ${enc_2_nombre}`
+          : enc_1_nombre || null),
       modalidad_preparacion: dto.modalidad_preparacion || 'cocina_diaconia',
       detalle_ingredientes: dto.detalle_ingredientes || null,
       becario_receptor_devolucion_id: dto.becario_receptor_devolucion_id || null,
@@ -328,7 +338,9 @@ export class RefrigeriosServicio implements OnModuleInit {
       firmas_conformidad: dto.firmas_conformidad || null,
     });
 
-    return this.refrigerio_repo.save(nuevo_refrigerio);
+    const guardado = await this.refrigerio_repo.save(nuevo_refrigerio);
+    this.tiempo_real_gateway?.notificarRefrigerio({ accion: 'creado', refrigerio: guardado });
+    return guardado;
   }
 
   async listar(filtros?: { fecha_inicio?: string; fecha_fin?: string }): Promise<Refrigerio[]> {
@@ -495,6 +507,7 @@ export class RefrigeriosServicio implements OnModuleInit {
   async eliminar(id: number): Promise<{ mensaje: string }> {
     const refrigerio = await this.obtenerPorId(id);
     await this.refrigerio_repo.remove(refrigerio);
+    this.tiempo_real_gateway?.notificarRefrigerio({ accion: 'eliminado', id });
     return { mensaje: `Refrigerio con ID ${id} eliminado satisfactoriamente` };
   }
 
@@ -557,13 +570,9 @@ export class RefrigeriosServicio implements OnModuleInit {
       }
 
       if (todos_becarios.length < 2) {
-        // Fallback para pruebas o catálogo inicial
-        todos_becarios = [
-          { id: 1, nombre: 'Nilda Amalia Churata Paye', usuario_id: 101 },
-          { id: 2, nombre: 'Joel Mamani Quispe', usuario_id: 102 },
-          { id: 3, nombre: 'Carlos Oscar Luna Lizarraga', usuario_id: 103 },
-          { id: 4, nombre: 'Adai Belen Huayta Cardozo', usuario_id: 104 },
-        ];
+        throw new BadRequestException(
+          'No existen suficientes becarios registrados en base de datos para asignar una dupla.',
+        );
       }
 
       // Obtener el historial de refrigerios previos para filtrar a los que ya participaron en la ronda actual
@@ -615,7 +624,7 @@ export class RefrigeriosServicio implements OnModuleInit {
       becario_encargado_2_id: becario_2.id,
       becario_encargado_2_nombre: becario_2.nombre,
       becario_id: becario_1.id,
-      becario_nombre: becario_1.nombre,
+      becario_nombre: `${becario_1.nombre} y ${becario_2.nombre}`,
       responsable_id: responsable_id || 1,
       responsable_entrega: 'Coordinación General BUMAND',
       observaciones: null,
@@ -623,6 +632,7 @@ export class RefrigeriosServicio implements OnModuleInit {
     });
 
     const guardado = await this.refrigerio_repo.save(nuevo_refrigerio);
+    this.tiempo_real_gateway?.notificarRefrigerio({ accion: 'sorteo', refrigerio: guardado });
 
     // Enviar notificaciones a ambos becarios de la dupla
     if (this.notificaciones_servicio) {

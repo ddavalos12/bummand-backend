@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -216,5 +217,21 @@ export class JustificacionesControlador {
     @UsuarioActual() usuario: Usuario,
   ): Promise<Justificacion> {
     return this.justificaciones_servicio.resolver(id, dto, usuario.id);
+  }
+
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'Eliminar solicitud de permiso o justificación',
+    description:
+      'Permite a Administración o Supervisores autorizados eliminar registros erróneos o de prueba (y a becarios eliminar sus solicitudes pendientes), sincronizado con la APK.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador de la justificación', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Justificación eliminada exitosamente.' })
+  eliminar(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() usuario: Usuario,
+  ): Promise<{ mensaje: string }> {
+    return this.justificaciones_servicio.eliminar(id, usuario);
   }
 }
