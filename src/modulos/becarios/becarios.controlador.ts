@@ -146,8 +146,11 @@ export class BecariosControlador {
     description: 'Permite al becario autenticado confirmar formalmente que sus datos de expediente se encuentran actualizados.',
   })
   @ApiResponse({ status: 200, description: 'Confirmación registrada con éxito.' })
-  confirmarDatosPropios(@UsuarioActual() usuario: Usuario) {
-    return this.becariosServicio.confirmarDatosPropios(usuario.id);
+  confirmarDatosPropios(
+    @UsuarioActual() usuario: Usuario,
+    @Body() cuerpo?: { celular?: string; direccion?: string },
+  ) {
+    return this.becariosServicio.confirmarDatosPropios(usuario.id, cuerpo);
   }
 
   @Put(':id/asignar-supervisor')

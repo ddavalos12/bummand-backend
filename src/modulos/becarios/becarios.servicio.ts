@@ -224,7 +224,13 @@ export class BecariosServicio {
   async obtenerPorUsuario(usuario_id: number): Promise<Becario | null> {
     return this.becarioRepositorio.findOne({
       where: { usuario: { id: usuario_id } },
-      relations: { usuario: true, supervisor: true, lugar_practica: true, iglesia: true },
+      relations: {
+        usuario: true,
+        supervisor: true,
+        lugar_practica: true,
+        iglesia: true,
+        horarios_apoyo: true,
+      },
     });
   }
 
@@ -471,7 +477,10 @@ export class BecariosServicio {
     return this.becarioRepositorio.save(becario);
   }
 
-  async confirmarDatosPropios(usuario_id: number): Promise<{ mensaje: string; becario: Becario }> {
+  async confirmarDatosPropios(
+    usuario_id: number,
+    datos_contacto?: { celular?: string; direccion?: string },
+  ): Promise<{ mensaje: string; becario: Becario }> {
     const becario = await this.becarioRepositorio.findOne({
       where: { usuario_id },
       relations: { usuario: true },
@@ -480,6 +489,13 @@ export class BecariosServicio {
 
     const ahora = new Date();
     const mes_actual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
+
+    if (datos_contacto?.celular && datos_contacto.celular.trim().length > 0) {
+      becario.celular = datos_contacto.celular.trim();
+    }
+    if (datos_contacto?.direccion && datos_contacto.direccion.trim().length > 0) {
+      becario.direccion = datos_contacto.direccion.trim();
+    }
 
     becario.datos_confirmados = true;
     becario.ultimo_mes_datos_confirmados = mes_actual;
