@@ -136,8 +136,8 @@ export const PARADAS_OFICIALES_DEFECTO: Partial<ParadaTransporte>[] = [
     es_nodo_principal: true,
   },
   {
-    nombre: 'Estación Teleférico Rojo (Central / 16 de Julio)',
-    zona: 'Zona Norte / 16 de Julio',
+    nombre: 'Estación Central Teleférico (Línea Roja / Naranja)',
+    zona: 'Zona Norte / Ex-Estación Central',
     ciudad: 'La Paz',
     latitud: -16.4910,
     longitud: -68.1430,
