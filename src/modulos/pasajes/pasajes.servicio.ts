@@ -549,6 +549,19 @@ export class PasajesServicio {
     const ahora = new Date();
     const becario_id_real = await this.resolverBecarioId(usuario_id);
 
+    if (this.becarioRepositorio) {
+      const becario = await this.becarioRepositorio.findOne({
+        where: [{ id: becario_id_real }, { usuario_id }],
+      });
+      if (becario) {
+        const mes_actual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
+        becario.datos_confirmados = true;
+        becario.ultimo_mes_datos_confirmados = mes_actual;
+        becario.fecha_ultima_confirmacion = ahora;
+        await this.becarioRepositorio.save(becario);
+      }
+    }
+
     if (periodo) {
       const solicitud = await this.solicitudRepositorio.findOne({
         where: [

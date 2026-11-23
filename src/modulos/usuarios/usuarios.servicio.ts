@@ -363,7 +363,7 @@ export class UsuariosServicio {
           direccion: becario.direccion ?? null,
           universidad: becario.universidad ?? null,
           carrera: becario.carrera ?? null,
-          semestre: (becario as any).semestre ?? null,
+          semestre: becario.modalidad_carrera ?? (becario as any).semestre ?? null,
           modalidad_pasajes: becario.modalidad_pasajes ?? null,
           horas_meta_mes: (becario as any).horas_meta_mes ?? 80,
           supervisor_id: becario.supervisor_id ?? null,
@@ -461,8 +461,14 @@ export class UsuariosServicio {
           modificado = true;
         }
 
-        if (dto.semestre !== undefined && 'semestre' in becario) {
-          (becario as any).semestre = dto.semestre.trim();
+        if (dto.semestre !== undefined) {
+          const semestre_limpio = dto.semestre.trim();
+          if ('modalidad_carrera' in becario) {
+            (becario as any).modalidad_carrera = semestre_limpio;
+          }
+          if ('semestre' in becario) {
+            (becario as any).semestre = semestre_limpio;
+          }
           modificado = true;
         }
 

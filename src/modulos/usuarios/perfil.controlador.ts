@@ -39,7 +39,13 @@ export class PerfilControlador {
     if (usuarioAutenticado.rol === Rol.BECARIO) {
       const becario = await this.becarioRepositorio.findOne({
         where: { usuario: { id: usuarioAutenticado.id } },
-        relations: { usuario: true, supervisor: true, lugar_practica: true, iglesia: true },
+        relations: {
+          usuario: true,
+          supervisor: true,
+          lugar_practica: true,
+          iglesia: true,
+          horarios_apoyo: true,
+        },
       });
       if (becario) {
         return {
@@ -47,15 +53,29 @@ export class PerfilControlador {
           becario_id: becario.id,
           usuario_id: usuarioAutenticado.id,
           ci: becario.ci,
-          nombre: usuario_db?.nombre || usuarioAutenticado.nombre,
+          nombre: usuario_db?.nombre || becario.nombre || usuarioAutenticado.nombre,
           correo: usuario_db?.correo || usuarioAutenticado.correo,
           correo_alternativo,
           correos_adicionales,
           rol: usuarioAutenticado.rol,
+          telefono: becario.celular ?? null,
+          celular: becario.celular ?? null,
+          direccion: becario.direccion ?? null,
+          lugar_expedicion: becario.lugar_expedicion ?? null,
+          modalidad_carrera: becario.modalidad_carrera ?? null,
+          semestre: becario.modalidad_carrera ?? null,
           carrera: becario.carrera,
           universidad: becario.universidad,
           institucion: becario.institucion,
           unidad: becario.unidad,
+          ubicacion: becario.ubicacion,
+          horario_semanal: becario.horario_semanal ?? null,
+          horarios_apoyo: becario.horarios_apoyo ?? [],
+          datos_confirmados: Boolean(becario.datos_confirmados),
+          ultimo_mes_datos_confirmados: becario.ultimo_mes_datos_confirmados ?? null,
+          url_carnet: becario.url_carnet ?? null,
+          url_kardex: becario.url_kardex ?? null,
+          iglesia_nombre: becario.iglesia?.nombre ?? null,
           lugarPractica: becario.lugar_practica,
           lugar_practica: becario.lugar_practica,
           iglesia: becario.iglesia,
@@ -101,6 +121,31 @@ export class PerfilControlador {
     if (typeof datos.nombre === 'string' && datos.nombre.trim() !== '') {
       usuarioAutenticado.nombre = datos.nombre.trim();
       await this.usuarioRepositorio.save(usuarioAutenticado);
+    }
+
+    if (usuarioAutenticado.rol === Rol.BECARIO) {
+      const becario = await this.becarioRepositorio.findOne({
+        where: { usuario: { id: usuarioAutenticado.id } },
+      });
+      if (becario) {
+        let modificado = false;
+        const tel = datos.celular ?? datos.telefono;
+        if (typeof tel === 'string' && tel.trim() !== '') {
+          becario.celular = tel.trim();
+          modificado = true;
+        }
+        if (typeof datos.direccion === 'string' && datos.direccion.trim() !== '') {
+          becario.direccion = datos.direccion.trim();
+          modificado = true;
+        }
+        if (typeof datos.nombre === 'string' && datos.nombre.trim() !== '') {
+          becario.nombre = datos.nombre.trim();
+          modificado = true;
+        }
+        if (modificado) {
+          await this.becarioRepositorio.save(becario);
+        }
+      }
     }
 
     if (datos.correo_alternativo !== undefined) {

@@ -28,6 +28,28 @@ export class AutenticacionServicio {
     private readonly usuarioRepositorio: Repository<Usuario>,
   ) {}
 
+  private construirResumenUsuario(usuario: Usuario, becario?: Becario | null) {
+    const ficha = becario ?? usuario.becario ?? null;
+    const base = {
+      id: usuario.id,
+      nombre: usuario.nombre,
+      correo: usuario.correo,
+      rol: usuario.rol,
+      becario_id: ficha ? ficha.id : null,
+    };
+    if (!ficha) return base;
+    return {
+      ...base,
+      ci: ficha.ci ?? null,
+      telefono: ficha.celular ?? null,
+      celular: ficha.celular ?? null,
+      direccion: ficha.direccion ?? null,
+      carrera: ficha.carrera ?? null,
+      universidad: ficha.universidad ?? null,
+      semestre: ficha.modalidad_carrera ?? null,
+    };
+  }
+
   async iniciarSesion(dto: InicioSesionDto) {
     const correo_buscado = (dto.correo || '').trim().toLowerCase();
     let usuario = await this.usuariosServicio.obtenerPorCorreoConRelaciones(dto.correo);
@@ -82,13 +104,7 @@ export class AutenticacionServicio {
     return {
       mensaje: 'Inicio de sesión exitoso',
       token: this.jwtService.sign(payload),
-      usuario: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        correo: usuario.correo,
-        rol: usuario.rol,
-        becario_id: usuario.becario ? usuario.becario.id : null,
-      },
+      usuario: this.construirResumenUsuario(usuario),
     };
   }
 
@@ -107,13 +123,7 @@ export class AutenticacionServicio {
     return {
       mensaje: 'Sesión renovada exitosamente',
       token: this.jwtService.sign(payload),
-      usuario: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        correo: usuario.correo,
-        rol: usuario.rol,
-        becario_id: usuario.becario ? usuario.becario.id : null,
-      },
+      usuario: this.construirResumenUsuario(usuario),
     };
   }
 
@@ -256,13 +266,7 @@ export class AutenticacionServicio {
     return {
       mensaje: 'Registro de becario exitoso y vinculado a la nómina institucional',
       token: this.jwtService.sign(payload),
-      usuario: {
-        id: usuario_guardado.id,
-        nombre: usuario_guardado.nombre,
-        correo: usuario_guardado.correo,
-        rol: usuario_guardado.rol,
-        becario_id: becario_coincidente.id,
-      },
+      usuario: this.construirResumenUsuario(usuario_guardado, becario_coincidente),
     };
   }
 
