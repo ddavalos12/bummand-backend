@@ -17,6 +17,12 @@ import {
   RegistroConsolidadoSemestral,
   RANGOS_APROBACION_OFICIALES,
 } from '../evaluaciones/constantes/consolidado-semestral-datos.constantes';
+import {
+  extraerFechaIsoSinDesfase,
+  NOMBRES_MESES_ESPANOL,
+  obtenerFechaHoraBolivia,
+  obtenerRangoMesBolivia,
+} from '../../utilidades/fecha-bolivia.utilidad';
 
 export type ClaveFirmanteInstitucional = 'ruth' | 'pamela' | 'samuel';
 
@@ -47,20 +53,7 @@ export const CATALOGO_FIRMANTES_INSTITUCIONALES: Record<
   },
 };
 
-export const MESES_ESPANOL: readonly string[] = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
-];
+export const MESES_ESPANOL: readonly string[] = NOMBRES_MESES_ESPANOL;
 
 export function separarNombresYApellidos(nombre_completo: string): {
   nombres: string;
@@ -768,12 +761,10 @@ export class PdfServicio {
     let fin_str = opciones.fecha_fin;
 
     if (!inicio_str || !fin_str) {
-      const dia_semana = fecha_actual.getDay();
-      const dif_lunes = dia_semana === 0 ? -6 : 1 - dia_semana;
-      const lunes = new Date(fecha_actual);
-      lunes.setDate(fecha_actual.getDate() + dif_lunes);
-      const domingo = new Date(lunes);
-      domingo.setDate(lunes.getDate() + 6);
+      const bo = obtenerFechaHoraBolivia(fecha_actual);
+      const dif_lunes = bo.dia_semana === 0 ? -6 : 1 - bo.dia_semana;
+      const lunes = new Date(Date.UTC(bo.anio, bo.mes - 1, bo.dia + dif_lunes, 12, 0, 0));
+      const domingo = new Date(Date.UTC(bo.anio, bo.mes - 1, bo.dia + dif_lunes + 6, 12, 0, 0));
       inicio_str = inicio_str || lunes.toISOString().split('T')[0];
       fin_str = fin_str || domingo.toISOString().split('T')[0];
     }
@@ -1154,12 +1145,12 @@ export class PdfServicio {
     fecha_fin: string;
     mes_nombre: string;
   } {
-    const fecha_ref = new Date();
-    let anio = fecha_ref.getFullYear();
-    let mes_num = fecha_ref.getMonth() + 1;
+    const fecha_bo = obtenerFechaHoraBolivia();
+    let anio = fecha_bo.anio;
+    let mes_num = fecha_bo.mes;
 
     if (mes) {
-      const match_iso = mes.match(/^(\d{4})-(\d{1,2})$/);
+      const match_iso = mes.trim().match(/^(\d{4})-(\d{1,2})$/);
       if (match_iso) {
         anio = parseInt(match_iso[1], 10);
         mes_num = parseInt(match_iso[2], 10);
@@ -1182,16 +1173,8 @@ export class PdfServicio {
       }
     }
 
-    const mes_dos_digitos = String(mes_num).padStart(2, '0');
-    const ultimo_dia = new Date(anio, mes_num, 0).getDate();
-    const fecha_inicio = `${anio}-${mes_dos_digitos}-01`;
-    const fecha_fin = `${anio}-${mes_dos_digitos}-${String(ultimo_dia).padStart(2, '0')}`;
-
-    const nombres_meses_es = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-    ];
-    const mes_nombre = `${nombres_meses_es[mes_num - 1]} ${anio}`;
+    const { fecha_inicio, fecha_fin } = obtenerRangoMesBolivia(anio, mes_num);
+    const mes_nombre = `${MESES_ESPANOL[mes_num - 1]} ${anio}`;
 
     return { anio, mes_num, fecha_inicio, fecha_fin, mes_nombre };
   }
@@ -1276,9 +1259,10 @@ export class PdfServicio {
     const nombres_dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
     let items_render = recorridos_reembolsables.map((r, idx) => {
-      const fecha_obj = r.fecha ? new Date(r.fecha) : new Date(fecha_inicio);
-      const dia_str = nombres_dias[fecha_obj.getDay()];
-      const fecha_fmt = fecha_obj.toISOString().split('T')[0];
+      const fecha_fmt = extraerFechaIsoSinDesfase(r.fecha) || fecha_inicio;
+      const [anio_r, mes_r, dia_r] = fecha_fmt.split('-').map(Number);
+      const fecha_utc = new Date(Date.UTC(anio_r, mes_r - 1, dia_r, 12, 0, 0));
+      const dia_str = nombres_dias[fecha_utc.getUTCDay()];
       const tarifa_num = Number(r.tarifa) || 0;
       const tramo_str =
         r.tramo === Tramo.VUELTA || String(r.tramo).toLowerCase() === 'vuelta' ? 'Vuelta' : 'Ida';
@@ -1783,9 +1767,10 @@ export class PdfServicio {
     const nombres_dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
     let items_render = asistencias_db.map((a, idx) => {
-      const fecha_obj = a.fecha ? new Date(a.fecha) : new Date(fecha_inicio);
-      const dia_str = nombres_dias[fecha_obj.getDay()];
-      const fecha_fmt = fecha_obj.toISOString().split('T')[0];
+      const fecha_fmt = extraerFechaIsoSinDesfase(a.fecha) || fecha_inicio;
+      const [anio_a, mes_a, dia_a] = fecha_fmt.split('-').map(Number);
+      const fecha_utc = new Date(Date.UTC(anio_a, mes_a - 1, dia_a, 12, 0, 0));
+      const dia_str = nombres_dias[fecha_utc.getUTCDay()];
       const tipo_str =
         a.tipo === TipoAsistencia.PRACTICAS
           ? 'Prácticas'
@@ -3168,7 +3153,10 @@ export class PdfServicio {
       );
 
       items_render = recorridos_reembolsables.map((r, idx) => {
-        const fecha_str = r.fecha ? new Date(r.fecha).toISOString().split('T')[0] : '2026-10-01';
+        const fecha_str =
+          extraerFechaIsoSinDesfase(r.fecha) ||
+          opciones.fecha_inicio ||
+          obtenerFechaHoraBolivia().fecha_iso;
         const tarifa_val = Number(r.tarifa) || 0;
         const devolucion_val = Number((tarifa_val * 0.8).toFixed(2));
         const becario_id = r.solicitud?.becario_id ?? r.solicitud?.becario?.id ?? null;
@@ -3536,9 +3524,10 @@ export class PdfServicio {
       const justificaciones_db = await qb.getMany();
 
       items_render = justificaciones_db.map((j, idx) => {
-        const fecha_str = j.fecha_incidencia
-          ? new Date(j.fecha_incidencia).toISOString().split('T')[0]
-          : '2026-10-15';
+        const fecha_str =
+          extraerFechaIsoSinDesfase(j.fecha_incidencia) ||
+          opciones.fecha_inicio ||
+          obtenerFechaHoraBolivia().fecha_iso;
         const nombre_completo = j.becario?.usuario?.nombre || 'Estudiante Becario';
         const ci_val = j.becario?.ci || 'S/C';
 
@@ -3763,7 +3752,10 @@ export class PdfServicio {
       const asistencias_db = await qb.getMany();
 
       items_render = asistencias_db.map((a, idx) => {
-        const fecha_str = a.fecha ? new Date(a.fecha).toISOString().split('T')[0] : '2026-10-01';
+        const fecha_str =
+          extraerFechaIsoSinDesfase(a.fecha) ||
+          opciones.fecha_inicio ||
+          obtenerFechaHoraBolivia().fecha_iso;
         const nombre_completo = a.becario?.usuario?.nombre || 'Estudiante Becario';
         const ci_val = a.becario?.ci || 'S/C';
         const sede_val = a.becario?.ubicacion || 'Sede Central';
@@ -4066,7 +4058,7 @@ export class PdfServicio {
       }
     }
 
-    return MESES_ESPANOL[new Date().getMonth()];
+    return MESES_ESPANOL[obtenerFechaHoraBolivia().mes - 1];
   }
 
   resolverRangoFechasPlanilla(opciones: {
@@ -4087,11 +4079,7 @@ export class PdfServicio {
       const anio = Number(coincidencia[1]);
       const mes_num = Number(coincidencia[2]);
       if (mes_num >= 1 && mes_num <= 12) {
-        const ultimo_dia = new Date(anio, mes_num, 0).getDate();
-        return {
-          fecha_inicio: `${coincidencia[1]}-${coincidencia[2]}-01`,
-          fecha_fin: `${coincidencia[1]}-${coincidencia[2]}-${String(ultimo_dia).padStart(2, '0')}`,
-        };
+        return obtenerRangoMesBolivia(anio, mes_num);
       }
     }
 
@@ -5040,7 +5028,10 @@ export class PdfServicio {
     const filas: FilaAsistenciaLideres[] = [];
 
     for (const r of datos.registros || []) {
-      const fecha_str = normalizarFecha(r.fecha) || datos.fecha_inicio || '2026-10-01';
+      const fecha_str =
+        normalizarFecha(r.fecha) ||
+        datos.fecha_inicio ||
+        obtenerFechaHoraBolivia().fecha_iso;
       const nombre = r.becario?.usuario?.nombre || `Becario #${r.becario_id}`;
       const ci = r.becario?.ci || 'S/C';
       const clave_bf = `${r.becario_id}|${fecha_str}`;

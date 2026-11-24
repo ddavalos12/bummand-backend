@@ -100,7 +100,7 @@ export class PdfControlador {
     const consolidado = await this.evaluaciones_servicio.obtenerConsolidadoSemestral(periodo);
     const buffer = await this.pdf_servicio.generarReporteEvaluacionSemestralPdf(consolidado.registros);
 
-    const periodo_limpio = (periodo || 'II_2025').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const periodo_limpio = (periodo || consolidado.periodo || 'II_2026').replace(/[^a-zA-Z0-9_-]/g, '_');
     const sufijo_rango = fecha_inicio && fecha_fin ? `_${fecha_inicio}_al_${fecha_fin}` : '';
     const nombre_archivo = `Evaluacion_Semestre_${periodo_limpio}${sufijo_rango}.pdf`;
 

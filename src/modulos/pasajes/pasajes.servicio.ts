@@ -22,6 +22,15 @@ import {
   esRolMentor,
   obtenerIdsBecariosDesignadosMentor,
 } from '../../utilidades/filtro-mentor.utilidad';
+import {
+  extraerFechaIsoSinDesfase,
+  NOMBRES_MESES_ESPANOL,
+  obtenerFechaHoraBolivia,
+  obtenerNombreMesAnioBolivia,
+  obtenerNombrePeriodoDesdeIso,
+  obtenerPeriodoActualBolivia,
+  obtenerRangoMesBolivia,
+} from '../../utilidades/fecha-bolivia.utilidad';
 
 export interface CalculoReembolsoPasajes {
   monto_total: number;
@@ -159,8 +168,9 @@ export class PasajesServicio {
   }
 
   async obtenerTarifasOficiales(fecha_referencia?: string | Date): Promise<TarifaTransporte[]> {
-    const fecha = fecha_referencia ? new Date(fecha_referencia) : new Date();
-    const fecha_str = !isNaN(fecha.getTime()) ? fecha.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    const fecha_str =
+      extraerFechaIsoSinDesfase(fecha_referencia) ||
+      obtenerFechaHoraBolivia().fecha_iso;
 
     if (this.tarifaRepositorio) {
       const encontradas = await this.tarifaRepositorio
@@ -340,9 +350,13 @@ export class PasajesServicio {
     });
 
     if (!solicitud) {
+      const fecha_iso_rec = extraerFechaIsoSinDesfase(dto.fecha);
+      const periodo_calculado = fecha_iso_rec
+        ? obtenerNombrePeriodoDesdeIso(fecha_iso_rec.slice(0, 7))
+        : obtenerNombreMesAnioBolivia();
       solicitud = this.solicitudRepositorio.create({
         becario_id: becario_id_real,
-        periodo: new Date(dto.fecha).toLocaleString('es-ES', { month: 'long', year: 'numeric' }),
+        periodo: periodo_calculado,
         estado: EstadoSolicitud.BORRADOR,
         monto_total: 0,
         monto_devolucion: 0,
@@ -421,7 +435,7 @@ export class PasajesServicio {
       throw new BadRequestException('No se puede enviar una solicitud de pasajes sin recorridos registrados.');
     }
 
-    const dia_del_mes = fecha_referencia.getDate();
+    const dia_del_mes = obtenerFechaHoraBolivia(fecha_referencia).dia;
     if (dia_del_mes < 24) {
       throw new BadRequestException(
         `Regla institucional BUMAND: El envío formal de la solicitud de pasajes solo está permitido a partir del día 24 de cada mes. Día actual: ${dia_del_mes}.`,
@@ -554,7 +568,7 @@ export class PasajesServicio {
         where: [{ id: becario_id_real }, { usuario_id }],
       });
       if (becario) {
-        const mes_actual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
+        const mes_actual = obtenerPeriodoActualBolivia(ahora);
         becario.datos_confirmados = true;
         becario.ultimo_mes_datos_confirmados = mes_actual;
         becario.fecha_ultima_confirmacion = ahora;
@@ -931,11 +945,10 @@ export class PasajesServicio {
     const conteo_paradas: Record<string, { nombre: string; frecuencia: number; tipo_transporte: string }> = {};
 
     const items = recorridos_db.map((r) => {
-      const fecha_obj = r.fecha ? new Date(r.fecha) : new Date();
-      const dia_str = nombres_dias[fecha_obj.getDay()];
-      const fecha_fmt = !isNaN(fecha_obj.getTime())
-        ? fecha_obj.toISOString().split('T')[0]
-        : String(r.fecha);
+      const fecha_fmt = extraerFechaIsoSinDesfase(r.fecha) || obtenerFechaHoraBolivia().fecha_iso;
+      const [anio_r, mes_r, dia_r] = fecha_fmt.split('-').map(Number);
+      const fecha_utc = new Date(Date.UTC(anio_r, mes_r - 1, dia_r, 12, 0, 0));
+      const dia_str = nombres_dias[fecha_utc.getUTCDay()];
       const tarifa_num = Number(r.tarifa) || 0;
       const tramo_str =
         r.tramo === Tramo.VUELTA || String(r.tramo).toLowerCase() === 'vuelta' ? 'vuelta' : 'ida';
@@ -1104,11 +1117,10 @@ export class PasajesServicio {
     const nombres_dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
     let items_render = recorridos_db.map((r) => {
-      const fecha_obj = r.fecha ? new Date(r.fecha) : new Date();
-      const dia_str = nombres_dias[fecha_obj.getDay()];
-      const fecha_fmt = !isNaN(fecha_obj.getTime())
-        ? fecha_obj.toISOString().split('T')[0]
-        : String(r.fecha);
+      const fecha_fmt = extraerFechaIsoSinDesfase(r.fecha) || obtenerFechaHoraBolivia().fecha_iso;
+      const [anio_r, mes_r, dia_r] = fecha_fmt.split('-').map(Number);
+      const fecha_utc = new Date(Date.UTC(anio_r, mes_r - 1, dia_r, 12, 0, 0));
+      const dia_str = nombres_dias[fecha_utc.getUTCDay()];
       const tarifa_num = Number(r.tarifa) || 0;
       const tramo_str =
         r.tramo === Tramo.VUELTA || String(r.tramo).toLowerCase() === 'vuelta' ? 'vuelta' : 'ida';
@@ -1161,10 +1173,11 @@ export class PasajesServicio {
 
     // Fallback con paradas auténticas y georreferenciadas La Paz - El Alto si no hay datos en BD
     if (items_render.length === 0) {
-      const hoy = new Date();
-      const anio_def = hoy.getFullYear();
-      const mes_def = String(hoy.getMonth() + 1).padStart(2, '0');
+      const fecha_bo = obtenerFechaHoraBolivia();
+      const anio_def = fecha_bo.anio;
+      const mes_def = String(fecha_bo.mes).padStart(2, '0');
       const mes_prefijo = `${anio_def}-${mes_def}`;
+      const periodo_def = `${NOMBRES_MESES_ESPANOL[fecha_bo.mes - 1]} ${anio_def}`;
 
       const catalogo_simulado = [
         {
@@ -1181,7 +1194,7 @@ export class PasajesServicio {
           tipo_actividad: 'Prácticas',
           apoyo_realizado: 'Conciliación de expedientes de cartera crediticia',
           tarifa: 3.50,
-          periodo: `Octubre ${anio_def}`,
+          periodo: periodo_def,
         },
         {
           id: 102,
@@ -1197,7 +1210,7 @@ export class PasajesServicio {
           tipo_actividad: 'Prácticas',
           apoyo_realizado: 'Retorno de turno vespertino institucional',
           tarifa: 3.50,
-          periodo: `Octubre ${anio_def}`,
+          periodo: periodo_def,
         },
         {
           id: 103,
@@ -1213,7 +1226,7 @@ export class PasajesServicio {
           tipo_actividad: 'Prácticas',
           apoyo_realizado: 'Digitalización y archivo de comprobantes contables',
           tarifa: 2.00,
-          periodo: `Octubre ${anio_def}`,
+          periodo: periodo_def,
         },
         {
           id: 104,
@@ -1229,7 +1242,7 @@ export class PasajesServicio {
           tipo_actividad: 'Prácticas',
           apoyo_realizado: 'Retorno de jornada de prácticas',
           tarifa: 2.00,
-          periodo: `Octubre ${anio_def}`,
+          periodo: periodo_def,
         },
         {
           id: 105,
@@ -1245,7 +1258,7 @@ export class PasajesServicio {
           tipo_actividad: 'Prácticas',
           apoyo_realizado: 'Apoyo operativo en ventanilla de servicios institucionales',
           tarifa: 3.00,
-          periodo: `Octubre ${anio_def}`,
+          periodo: periodo_def,
         },
         {
           id: 106,
@@ -1261,7 +1274,7 @@ export class PasajesServicio {
           tipo_actividad: 'Prácticas',
           apoyo_realizado: 'Retorno de jornada de prácticas en sede San Jorge',
           tarifa: 3.00,
-          periodo: `Octubre ${anio_def}`,
+          periodo: periodo_def,
         },
         {
           id: 107,
@@ -1277,7 +1290,7 @@ export class PasajesServicio {
           tipo_actividad: 'Prácticas',
           apoyo_realizado: 'Atención a usuarios y verificación de solicitudes',
           tarifa: 1.50,
-          periodo: `Octubre ${anio_def}`,
+          periodo: periodo_def,
         },
         {
           id: 108,
@@ -1293,7 +1306,7 @@ export class PasajesServicio {
           tipo_actividad: 'Prácticas',
           apoyo_realizado: 'Retorno de asignación en consultorio diaconal',
           tarifa: 1.50,
-          periodo: `Octubre ${anio_def}`,
+          periodo: periodo_def,
         },
         {
           id: 109,
@@ -1309,7 +1322,7 @@ export class PasajesServicio {
           tipo_actividad: 'Prácticas',
           apoyo_realizado: 'Revisión y clasificación documental de cartera institucional',
           tarifa: 2.60,
-          periodo: `Octubre ${anio_def}`,
+          periodo: periodo_def,
         },
         {
           id: 110,
@@ -1325,7 +1338,7 @@ export class PasajesServicio {
           tipo_actividad: 'Prácticas',
           apoyo_realizado: 'Retorno a residencia',
           tarifa: 2.60,
-          periodo: `Octubre ${anio_def}`,
+          periodo: periodo_def,
         },
         {
           id: 111,
@@ -1341,7 +1354,7 @@ export class PasajesServicio {
           tipo_actividad: 'Prácticas',
           apoyo_realizado: 'Procesamiento de datos en plataforma institucional',
           tarifa: 3.00,
-          periodo: `Octubre ${anio_def}`,
+          periodo: periodo_def,
         },
         {
           id: 112,
@@ -1357,7 +1370,7 @@ export class PasajesServicio {
           tipo_actividad: 'Prácticas',
           apoyo_realizado: 'Retorno de actividades asignadas',
           tarifa: 3.00,
-          periodo: `Octubre ${anio_def}`,
+          periodo: periodo_def,
         },
       ];
 
@@ -1510,11 +1523,10 @@ export class PasajesServicio {
         const anio = Number(match_iso[1]);
         const mes_num = Number(match_iso[2]);
         if (mes_num >= 1 && mes_num <= 12) {
-          const ultimo_dia = new Date(anio, mes_num, 0).getDate();
-          const mes_pad = String(mes_num).padStart(2, '0');
+          const rango = obtenerRangoMesBolivia(anio, mes_num);
           return {
-            inicio: `${anio}-${mes_pad}-01`,
-            fin: `${anio}-${mes_pad}-${String(ultimo_dia).padStart(2, '0')}`,
+            inicio: rango.fecha_inicio,
+            fin: rango.fecha_fin,
           };
         }
       }
@@ -1542,14 +1554,13 @@ export class PasajesServicio {
       const mes_encontrado = Object.entries(meses_mapa).find(([nombre]) =>
         normalizado.includes(nombre),
       );
-      if (match_anio && mes_encontrado) {
-        const anio = Number(match_anio[1]);
+      if (mes_encontrado) {
+        const anio = match_anio ? Number(match_anio[1]) : obtenerFechaHoraBolivia().anio;
         const mes_num = mes_encontrado[1];
-        const ultimo_dia = new Date(anio, mes_num, 0).getDate();
-        const mes_pad = String(mes_num).padStart(2, '0');
+        const rango = obtenerRangoMesBolivia(anio, mes_num);
         return {
-          inicio: `${anio}-${mes_pad}-01`,
-          fin: `${anio}-${mes_pad}-${String(ultimo_dia).padStart(2, '0')}`,
+          inicio: rango.fecha_inicio,
+          fin: rango.fecha_fin,
         };
       }
     }

@@ -9,6 +9,11 @@ import { Multa } from '../asistencia/entidades/multa.entidad';
 import { Justificacion, EstadoJustificacion } from '../justificaciones/entidades/justificacion.entidad';
 import { Usuario } from '../usuarios/entidades/usuario.entidad';
 import { obtenerBecariosDesignadosMentor } from '../../utilidades/filtro-mentor.utilidad';
+import {
+  extraerFechaIsoSinDesfase,
+  NOMBRES_MESES_CORTOS_ESPANOL,
+  obtenerFechaHoraBolivia,
+} from '../../utilidades/fecha-bolivia.utilidad';
 
 export interface MetricasGenerales {
   total_becarios_activos: number;
@@ -110,7 +115,7 @@ export interface SeguimientoSemanal {
   horas_compensadas_permiso?: number;
 }
 
-const NOMBRES_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const NOMBRES_MESES = NOMBRES_MESES_CORTOS_ESPANOL;
 const LIMITE_PRESUPUESTO_DEFECTO = 10000;
 
 @Injectable()
@@ -315,10 +320,11 @@ export class DashboardServicio {
       const horas = tiene_permiso && horas_base === 0 ? 4.0 : horas_base;
       total_horas_acumuladas += horas;
 
-      if (reg.fecha) {
-        const fecha = new Date(reg.fecha);
-        const mes_idx = fecha.getMonth();
-        horas_por_mes[mes_idx] = (horas_por_mes[mes_idx] || 0) + horas;
+      if (f_str) {
+        const mes_num = Number(f_str.slice(5, 7));
+        if (mes_num >= 1 && mes_num <= 12) {
+          horas_por_mes[mes_num - 1] = (horas_por_mes[mes_num - 1] || 0) + horas;
+        }
       }
 
       if (metricas_becario[reg.becario_id]) {
@@ -341,10 +347,9 @@ export class DashboardServicio {
         metricas_becario[b_id].a_tiempo += 1;
         metricas_becario[b_id].en_radio += 1;
         total_horas_acumuladas += 4.0;
-        const fecha = new Date(f_str);
-        if (!isNaN(fecha.getTime())) {
-          const mes_idx = fecha.getMonth();
-          horas_por_mes[mes_idx] = (horas_por_mes[mes_idx] || 0) + 4.0;
+        const mes_num = Number(f_str.slice(5, 7));
+        if (mes_num >= 1 && mes_num <= 12) {
+          horas_por_mes[mes_num - 1] = (horas_por_mes[mes_num - 1] || 0) + 4.0;
         }
       }
     }
@@ -478,19 +483,18 @@ export class DashboardServicio {
     fecha_referencia?: string | Date,
     usuario?: Usuario,
   ): Promise<SeguimientoSemanal> {
-    const base = fecha_referencia ? new Date(fecha_referencia) : new Date();
-    const fecha_valida = isNaN(base.getTime()) ? new Date() : base;
+    const fecha_ref_iso = extraerFechaIsoSinDesfase(fecha_referencia);
+    const bo = fecha_ref_iso
+      ? (() => {
+          const [anio, mes, dia] = fecha_ref_iso.split('-').map(Number);
+          const dt = new Date(Date.UTC(anio, mes - 1, dia, 12, 0, 0));
+          return { anio, mes, dia, dia_semana: dt.getUTCDay() };
+        })()
+      : obtenerFechaHoraBolivia();
 
-    const dia_semana = fecha_valida.getDay();
-    const dif_lunes = dia_semana === 0 ? -6 : 1 - dia_semana;
-
-    const fecha_lunes = new Date(fecha_valida);
-    fecha_lunes.setDate(fecha_valida.getDate() + dif_lunes);
-    fecha_lunes.setHours(0, 0, 0, 0);
-
-    const fecha_domingo = new Date(fecha_lunes);
-    fecha_domingo.setDate(fecha_lunes.getDate() + 6);
-    fecha_domingo.setHours(23, 59, 59, 999);
+    const dif_lunes = bo.dia_semana === 0 ? -6 : 1 - bo.dia_semana;
+    const fecha_lunes = new Date(Date.UTC(bo.anio, bo.mes - 1, bo.dia + dif_lunes, 12, 0, 0));
+    const fecha_domingo = new Date(Date.UTC(bo.anio, bo.mes - 1, bo.dia + dif_lunes + 6, 12, 0, 0));
 
     const inicio_str = fecha_lunes.toISOString().split('T')[0];
     const fin_str = fecha_domingo.toISOString().split('T')[0];

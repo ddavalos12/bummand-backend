@@ -43,6 +43,7 @@ import { ReceptorSocioeconomicaDto, RevisarSocioeconomicaDto } from './dtos/rece
 import { CrearCuestionarioDto } from './dtos/crear-cuestionario.dto';
 import { ActualizarCuestionarioDto } from './dtos/actualizar-cuestionario.dto';
 import { CrearPreguntaCuestionarioDto } from './dtos/crear-pregunta-cuestionario.dto';
+import { obtenerFechaHoraBolivia } from '../../utilidades/fecha-bolivia.utilidad';
 import { ActualizarPreguntaCuestionarioDto } from './dtos/actualizar-pregunta-cuestionario.dto';
 import { SolicitarCodigoTutorDto, VerificarCodigoTutorDto } from './dtos/verificacion-tutor.dto';
 import { GuardarNotasEstudianteDto, SubirDocumentoAcademicoDto } from './dtos/guardar-notas-estudiante.dto';
@@ -456,11 +457,14 @@ export class EvaluacionesServicio {
             if (todos_periodos && todos_periodos.length > 0) {
               periodo_activo_id = todos_periodos[0].id;
             } else if (typeof this.periodo_repo.create === 'function' && typeof this.periodo_repo.save === 'function') {
+              const bo = obtenerFechaHoraBolivia();
+              const es_primer_semestre = bo.mes <= 6;
+              const semestre_defecto = `${es_primer_semestre ? 'I' : 'II'}-${bo.anio}`;
               const creado = await this.periodo_repo.save(
                 this.periodo_repo.create({
-                  nombre: dto.periodo || 'II-2025',
-                  fecha_inicio: new Date('2025-07-01'),
-                  fecha_fin: new Date('2026-12-31'),
+                  nombre: dto.periodo || semestre_defecto,
+                  fecha_inicio: new Date(`${bo.anio}-${es_primer_semestre ? '01-01' : '07-01'}`),
+                  fecha_fin: new Date(`${bo.anio}-${es_primer_semestre ? '06-30' : '12-31'}`),
                   estado: EstadoPeriodo.ABIERTO,
                   peso_academica: 20,
                   peso_liderazgo: 20,
@@ -2751,7 +2755,9 @@ export class EvaluacionesServicio {
     rangos_aprobacion: RangoAprobacion[];
     registros: RegistroConsolidadoSemestral[];
   }> {
-    const periodo_nombre = periodo || 'II-2026';
+    const bo = obtenerFechaHoraBolivia();
+    const semestre_actual = `${bo.mes <= 6 ? 'I' : 'II'}-${bo.anio}`;
+    const periodo_nombre = periodo || semestre_actual;
     let becarios_bd: Becario[] = [];
     if (this.becario_repo?.find) {
       try {

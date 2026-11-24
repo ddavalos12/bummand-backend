@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { AsistenciaServicio } from './asistencia.servicio';
+import {
+  AsistenciaServicio,
+  NOMBRES_MESES_GESTION,
+  PERIODOS_GESTION_2026,
+} from './asistencia.servicio';
 import { RegistroAsistencia, TipoAsistencia, EstadoAprobacionAsistencia } from './entidades/registro-asistencia.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.entidad';
@@ -687,6 +691,76 @@ describe('AsistenciaServicio', () => {
       const mis_multas = await servicio.obtenerMisMultas(20);
       expect(mis_multas).toHaveLength(1);
       expect(mis_multas[0].id).toBe(1);
+    });
+  });
+
+  describe('Gestión 2026 completa (Diciembre 2026 y zona horaria Bolivia)', () => {
+    it('incluye 2026-12 y Diciembre 2026 en PERIODOS_GESTION_2026 y NOMBRES_MESES_GESTION', () => {
+      expect(PERIODOS_GESTION_2026).toContain('2026-12');
+      expect(NOMBRES_MESES_GESTION['2026-12']).toBe('Diciembre 2026');
+    });
+
+    it('calcula mes_actual en America/La_Paz incluso en borde de cambio de mes UTC', async () => {
+      jest.setSystemTime(new Date('2026-12-01T02:00:00.000Z')); // 2026-11-30 22:00 en La Paz
+      becario_repo.find.mockResolvedValue([
+        {
+          id: 7,
+          usuario_id: 20,
+          carrera: 'Sistemas',
+          usuario: { nombre: 'Becario Prueba' },
+          registros_asistencia: [
+            { id: 1, fecha: '2026-11-15', tipo: TipoAsistencia.PRACTICAS, horas_trabajadas: 4 },
+            { id: 2, fecha: '2026-12-02', tipo: TipoAsistencia.PRACTICAS, horas_trabajadas: 6 },
+          ],
+        },
+      ]);
+
+      const nov_bo = await servicio.obtenerHorasMensuales();
+      expect(nov_bo[0].mes_actual).toBe('2026-11');
+      expect(nov_bo[0].horas_mes_actual).toBe(4);
+
+      jest.setSystemTime(new Date('2026-12-01T12:00:00.000Z')); // 2026-12-01 08:00 en La Paz
+      const dic_bo = await servicio.obtenerHorasMensuales();
+      expect(dic_bo[0].mes_actual).toBe('2026-12');
+      expect(dic_bo[0].horas_mes_actual).toBe(6);
+    });
+
+    it('genera extracto de Diciembre 2026 y marca estado_meta dinámico según ciclo actual', async () => {
+      jest.setSystemTime(new Date('2026-12-10T14:00:00.000Z'));
+      becario_repo.findOne.mockResolvedValue({
+        id: 7,
+        usuario_id: 20,
+        lugar_practica: { nombre: 'Oficina Central' },
+      });
+      asistencia_repo.find.mockResolvedValue([
+        {
+          id: 1,
+          becario_id: 7,
+          fecha: '2026-11-10',
+          tipo: TipoAsistencia.PRACTICAS,
+          hora_ingreso: '08:00:00',
+          hora_salida: '12:00:00',
+          horas_trabajadas: 4,
+        },
+        {
+          id: 2,
+          becario_id: 7,
+          fecha: '2026-12-04',
+          tipo: TipoAsistencia.PRACTICAS,
+          hora_ingreso: '08:00:00',
+          hora_salida: '12:00:00',
+          horas_trabajadas: 4,
+        },
+      ]);
+
+      const resp = await servicio.obtenerExtractoMensual(7);
+      const ext_dic = resp.extractos.find((e) => e.periodo === '2026-12');
+      const ext_nov = resp.extractos.find((e) => e.periodo === '2026-11');
+
+      expect(ext_dic).toBeDefined();
+      expect(ext_dic?.mes_nombre).toBe('Diciembre 2026');
+      expect(ext_dic?.estado_meta).toBe('en_progreso');
+      expect(ext_nov?.estado_meta).toBe('en_riesgo');
     });
   });
 });

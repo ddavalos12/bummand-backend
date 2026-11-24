@@ -18,6 +18,11 @@ import {
 } from '../../utilidades/filtro-mentor.utilidad';
 import { ExcepcionBumand } from '../../nucleo/errores/excepcion-bumand';
 import { CODIGOS_ERROR } from '../../nucleo/errores/codigos-error.constante';
+import {
+  obtenerFechaHoraBolivia,
+  obtenerPeriodoActualBolivia,
+  obtenerRangoMesBolivia,
+} from '../../utilidades/fecha-bolivia.utilidad';
 
 @Injectable()
 export class BecariosServicio {
@@ -152,9 +157,11 @@ export class BecariosServicio {
 
     if (resultado.length > 0 && this.becarioRepositorio.manager) {
       try {
-        const ahora = new Date();
-        const inicio_mes = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-01`;
-        const fin_mes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0).toISOString().split('T')[0];
+        const bo = obtenerFechaHoraBolivia();
+        const { fecha_inicio: inicio_mes, fecha_fin: fin_mes } = obtenerRangoMesBolivia(
+          bo.anio,
+          bo.mes,
+        );
         const filas_horas: Array<{ becario_id: number; total_horas: string | number }> =
           await this.becarioRepositorio.manager.query(
             `SELECT becario_id, COALESCE(SUM(horas_trabajadas), 0) AS total_horas
@@ -437,8 +444,7 @@ export class BecariosServicio {
     mes_actual: string;
   }> {
     const becario = await this.becarioRepositorio.findOne({ where: { usuario_id } });
-    const ahora = new Date();
-    const mes_actual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
+    const mes_actual = obtenerPeriodoActualBolivia();
 
     const confirmado_este_mes = becario?.ultimo_mes_datos_confirmados === mes_actual;
     const datos_confirmados = becario
@@ -468,7 +474,7 @@ export class BecariosServicio {
     if (!becario) throw new NotFoundException('Becario no encontrado');
 
     const ahora = new Date();
-    const mes_actual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
+    const mes_actual = obtenerPeriodoActualBolivia(ahora);
 
     becario.datos_validados = true;
     becario.datos_confirmados = true;
@@ -488,7 +494,7 @@ export class BecariosServicio {
     if (!becario) throw new NotFoundException('Perfil de becario no encontrado');
 
     const ahora = new Date();
-    const mes_actual = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`;
+    const mes_actual = obtenerPeriodoActualBolivia(ahora);
 
     if (datos_contacto?.celular && datos_contacto.celular.trim().length > 0) {
       becario.celular = datos_contacto.celular.trim();

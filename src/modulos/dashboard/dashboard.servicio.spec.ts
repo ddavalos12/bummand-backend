@@ -195,5 +195,30 @@ describe('DashboardServicio', () => {
       expect(resultado.conteo.asistieron).toBe(2);
       expect(resultado.conteo.no_asistieron).toBe(1);
     });
+
+    it('asigna asistencias del 2026-12-01 al mes Dic sin desfase UTC y resuelve semana dinámica en America/La_Paz', async () => {
+      becario_repo.find.mockResolvedValue([
+        { id: 1, carrera: 'Sistemas', usuario: { nombre: 'Becario Diciembre' } },
+      ]);
+      asistencia_repo.find.mockResolvedValue([
+        {
+          becario_id: 1,
+          horas_trabajadas: 4.5,
+          fecha: new Date('2026-12-01'),
+          dentro_de_horario: true,
+          dentro_de_radio: true,
+        },
+      ]);
+      pasajes_repo.find.mockResolvedValue([]);
+      evaluacion_repo.count.mockResolvedValue(0);
+
+      const stats = await servicio.obtenerEstadisticas();
+      const dic = stats.tendencia_horas.find((t) => t.mes === 'Dic');
+      expect(dic?.horas).toBe(4.5);
+
+      const semana = await servicio.obtenerSeguimientoSemanal(undefined, '2026-10-12');
+      expect(semana.semana_inicio).toBe('2026-10-12');
+      expect(semana.semana_fin).toBe('2026-10-18');
+    });
   });
 });

@@ -29,78 +29,15 @@ import {
   obtenerBecariosDesignadosMentor,
   obtenerIdsBecariosDesignadosMentor,
 } from '../../utilidades/filtro-mentor.utilidad';
+import {
+  obtenerFechaHoraBolivia,
+  obtenerNombrePeriodoDesdeIso,
+  obtenerPeriodoActualBolivia,
+} from '../../utilidades/fecha-bolivia.utilidad';
 
 const MARGEN_GPS_MAXIMO_M = 10;
 export const META_HORAS_SEMANAL = 9;
 export const META_HORAS_MENSUAL = 36;
-const ZONA_HORARIA_BOLIVIA = 'America/La_Paz';
-
-/**
- * Calcula fecha y hora oficial en Bolivia (UTC-4) independientemente del servidor (ej. Vercel en UTC).
- */
-function obtenerFechaHoraBolivia(base: Date = new Date()): {
-  anio: number;
-  mes: number;
-  dia: number;
-  dia_semana: number;
-  horas: number;
-  minutos: number;
-  segundos: number;
-  fecha_iso: string;
-  hora_hhmmss: string;
-} {
-  try {
-    const partes = new Intl.DateTimeFormat('en-CA', {
-      timeZone: ZONA_HORARIA_BOLIVIA,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).formatToParts(base);
-
-    const obtener = (tipo: string) =>
-      Number(partes.find((p) => p.type === tipo)?.value ?? 0);
-
-    const anio = obtener('year');
-    const mes = obtener('month');
-    const dia = obtener('day');
-    const horas_raw = obtener('hour');
-    const horas = horas_raw === 24 ? 0 : horas_raw;
-    const minutos = obtener('minute');
-    const segundos = obtener('second');
-    const fecha_iso = `${String(anio).padStart(4, '0')}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-    const hora_hhmmss = `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
-    const dia_semana = new Date(Date.UTC(anio, mes - 1, dia, 12, 0, 0)).getUTCDay();
-
-    return {
-      anio,
-      mes,
-      dia,
-      dia_semana,
-      horas,
-      minutos,
-      segundos,
-      fecha_iso,
-      hora_hhmmss,
-    };
-  } catch {
-    const fecha_iso = base.toISOString().split('T')[0];
-    return {
-      anio: base.getFullYear(),
-      mes: base.getMonth() + 1,
-      dia: base.getDate(),
-      dia_semana: base.getDay(),
-      horas: base.getHours(),
-      minutos: base.getMinutes(),
-      segundos: base.getSeconds(),
-      fecha_iso,
-      hora_hhmmss: base.toTimeString().split(' ')[0],
-    };
-  }
-}
 
 export interface MovimientoExtractoAsistencia {
   id: number;
@@ -157,6 +94,7 @@ export const PERIODOS_GESTION_2026 = [
   '2026-09',
   '2026-10',
   '2026-11',
+  '2026-12',
 ];
 
 export const NOMBRES_MESES_GESTION: Record<string, string> = {
@@ -169,6 +107,7 @@ export const NOMBRES_MESES_GESTION: Record<string, string> = {
   '2026-09': 'Septiembre 2026',
   '2026-10': 'Octubre 2026',
   '2026-11': 'Noviembre 2026',
+  '2026-12': 'Diciembre 2026',
 };
 
 export const NOMBRES_DIAS_SEMANA = [
@@ -1087,10 +1026,7 @@ export class AsistenciaServicio {
       permisos_por_becario.set(j.becario_id, set_fechas);
     }
 
-    const ahora = new Date();
-    const anio_actual = ahora.getFullYear();
-    const mes_actual_num = String(ahora.getMonth() + 1).padStart(2, '0');
-    const clave_mes_actual = `${anio_actual}-${mes_actual_num}`;
+    const clave_mes_actual = obtenerPeriodoActualBolivia();
 
     return becarios.map((becario) => {
       const meses: Record<string, number> = {};
@@ -1425,9 +1361,18 @@ export class AsistenciaServicio {
     }
 
     const todos_los_extractos: ExtractoMensualAsistencia[] = [];
+    const clave_mes_actual = obtenerPeriodoActualBolivia();
+    const periodos_evaluar = Array.from(
+      new Set([
+        ...PERIODOS_GESTION_2026,
+        ...Object.keys(registros_por_mes),
+        ...Object.keys(permisos_por_mes),
+      ]),
+    ).sort((a, b) => a.localeCompare(b));
 
-    for (const periodo of PERIODOS_GESTION_2026) {
-      const mes_nombre = NOMBRES_MESES_GESTION[periodo] || periodo;
+    for (const periodo of periodos_evaluar) {
+      const mes_nombre =
+        NOMBRES_MESES_GESTION[periodo] || obtenerNombrePeriodoDesdeIso(periodo);
       const regs_mes = registros_por_mes[periodo] || [];
       const set_permisos_mes = permisos_por_mes[periodo] || new Set<string>();
       const fechas_registradas_mes = new Set<string>();
@@ -1550,10 +1495,10 @@ export class AsistenciaServicio {
       const porcentaje_cumplimiento = Math.round((horas_acumuladas / META_HORAS_MENSUAL) * 100);
 
       let estado_meta: 'cumplido' | 'en_progreso' | 'en_riesgo' = 'en_progreso';
-      if (periodo === '2026-11') {
-        estado_meta = 'en_progreso';
-      } else if (horas_acumuladas >= META_HORAS_MENSUAL) {
+      if (horas_acumuladas >= META_HORAS_MENSUAL) {
         estado_meta = 'cumplido';
+      } else if (periodo >= clave_mes_actual) {
+        estado_meta = 'en_progreso';
       } else {
         estado_meta = 'en_riesgo';
       }

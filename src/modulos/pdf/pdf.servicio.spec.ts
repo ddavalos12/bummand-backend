@@ -890,5 +890,27 @@ describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transport
         else process.env.PUPPETEER_EXECUTABLE_PATH = prev_exec;
       }
     });
+
+    it('parsearMes y resolverNombreMesPlanilla usan el mes dinámico en America/La_Paz cuando se omite parámetro', () => {
+      jest.useFakeTimers();
+      try {
+        jest.setSystemTime(new Date('2026-12-15T14:00:00.000Z'));
+        const parseado = servicio.parsearMes();
+        expect(parseado).toEqual({
+          anio: 2026,
+          mes_num: 12,
+          fecha_inicio: '2026-12-01',
+          fecha_fin: '2026-12-31',
+          mes_nombre: 'Diciembre 2026',
+        });
+        expect(servicio.resolverNombreMesPlanilla({})).toBe('Diciembre');
+
+        jest.setSystemTime(new Date('2026-12-01T02:00:00.000Z')); // 30 nov 22:00 en Bolivia
+        expect(servicio.parsearMes().mes_nombre).toBe('Noviembre 2026');
+        expect(servicio.resolverNombreMesPlanilla({})).toBe('Noviembre');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 });

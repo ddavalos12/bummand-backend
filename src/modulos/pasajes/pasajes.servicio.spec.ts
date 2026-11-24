@@ -772,5 +772,61 @@ describe('PasajesServicio', () => {
       expect(resultado_mentor.becarios[0].becario_id).toBe(10);
     });
   });
+
+  describe('Fechas dinámicas en America/La_Paz y Diciembre 2026', () => {
+    it('asigna periodo Diciembre 2026 al agregar recorrido en 2026-12-01 sin desfase UTC', async () => {
+      solicitud_repo.findOne.mockResolvedValue(null);
+      solicitud_repo.create.mockImplementation((d: any) => ({ ...d, id: 99 }));
+      solicitud_repo.save.mockImplementation((d: any) => Promise.resolve(d));
+      recorrido_repo.find.mockResolvedValue([{ tarifa: 3.0, tipo_actividad: 'practicas' }]);
+
+      await servicio.agregarRecorrido({
+        becario_id: 5,
+        fecha: '2026-12-01',
+        tramo: Tramo.IDA,
+        origen: 'Ceja',
+        destino: 'Centro',
+        tarifa: 3.0,
+      });
+
+      expect(solicitud_repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          periodo: 'Diciembre 2026',
+        }),
+      );
+    });
+
+    it('evalúa regla del día 24 según fecha oficial en America/La_Paz', async () => {
+      solicitud_repo.findOne.mockResolvedValue({
+        id: 1,
+        becario_id: 5,
+        estado: EstadoSolicitud.BORRADOR,
+        recorridos: [{ id: 1, tarifa: 2.5 }],
+      });
+
+      // 2026-12-24T03:00:00Z corresponde a 2026-12-23 23:00 en Bolivia
+      await expect(
+        servicio.enviarSolicitud(1, 5, new Date('2026-12-24T03:00:00.000Z')),
+      ).rejects.toThrow(BadRequestException);
+
+      // 2026-12-24T04:30:00Z corresponde a 2026-12-24 00:30 en Bolivia
+      const res = await servicio.enviarSolicitud(1, 5, new Date('2026-12-24T04:30:00.000Z'));
+      expect(res.estado).toBe(EstadoSolicitud.PENDIENTE);
+    });
+
+    it('genera periodo dinámico en historial de paradas fallback según mes actual de Bolivia', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-12-10T14:00:00.000Z'));
+      try {
+        recorrido_repo.createQueryBuilder().getMany.mockResolvedValueOnce([]);
+        const historial = await servicio.obtenerHistorialParadasEstudiante({ id_estudiante: 10 });
+        expect(historial.historial.length).toBeGreaterThan(0);
+        expect(historial.historial[0].fecha).toMatch(/^2026-12-/);
+        expect(historial.historial[0].periodo).toBe('Diciembre 2026');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
 });
 

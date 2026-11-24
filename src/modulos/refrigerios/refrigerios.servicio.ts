@@ -12,6 +12,7 @@ import { Becario } from '../becarios/entidades/becario.entidad';
 import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 import { NotificacionesServicio } from '../notificaciones/notificaciones.servicio';
 import { TiempoRealGateway } from '../tiempo-real/tiempo-real.gateway';
+import { obtenerFechaHoraBolivia } from '../../utilidades/fecha-bolivia.utilidad';
 
 export const COSTO_RACION_POR_PERSONA_BS = 5.0;
 
@@ -391,7 +392,7 @@ export class RefrigeriosServicio implements OnModuleInit {
     const fecha_hora_actual = dto.fecha_hora || new Date().toISOString();
     const hora_actual =
       dto.hora_recojo ||
-      new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
+      obtenerFechaHoraBolivia().hora_hhmmss.slice(0, 5);
 
     const nuevo_registro = {
       becario_id: becario_id || 1,
