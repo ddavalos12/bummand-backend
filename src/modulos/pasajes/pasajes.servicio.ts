@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { SolicitudPasajes, EstadoSolicitud } from './entidades/solicitud-pasaje.entidad';
 import { Recorrido, Tramo } from './entidades/recorrido.entidad';
 import { TarifaTransporte } from './entidades/tarifa-transporte.entidad';
-import { ParadaTransporte, PARADAS_OFICIALES_DEFECTO } from './entidades/parada-transporte.entidad';
+import { ParadaTransporte } from './entidades/parada-transporte.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { Multa } from '../asistencia/entidades/multa.entidad';
 import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
@@ -585,27 +585,11 @@ export class PasajesServicio {
     };
   }
 
-  private async obtenerMapaMultasVigentes(becario_ids?: number[]): Promise<Map<number, number>> {
-    const mapa = new Map<number, number>();
-    if (!this.multa_repositorio || typeof this.multa_repositorio.find !== 'function') {
-      return mapa;
-    }
-    try {
-      const multas = await this.multa_repositorio.find();
-      for (const m of multas || []) {
-        const monto = Number(m.monto_bs || 0);
-        if (monto <= 0) continue;
-        if (becario_ids && becario_ids.length > 0 && !becario_ids.includes(m.becario_id)) {
-          continue;
-        }
-        const acumulado = mapa.get(m.becario_id) || 0;
-        mapa.set(m.becario_id, Number((acumulado + monto).toFixed(2)));
-      }
-    } catch {}
-    return mapa;
+  private async obtenerMapaMultasVigentes(_becario_ids?: number[]): Promise<Map<number, number>> {
+    return new Map<number, number>();
   }
 
-  private mapearSolicitudConMultas(s: SolicitudPasajes, multas_bs: number): SolicitudPasajes {
+  private mapearSolicitudConMultas(s: SolicitudPasajes, _multas_bs: number): SolicitudPasajes {
     const recorridos_crudos = s.recorridos || [];
     const recorridos_reembolsables = recorridos_crudos.filter((r) =>
       esActividadReembolsablePasaje(r.tipo_actividad),
@@ -623,13 +607,11 @@ export class PasajesServicio {
     const monto_devolucion = calculo_reembolsable
       ? calculo_reembolsable.monto_devolucion
       : Number(s.monto_devolucion) || 0;
-    const multas_asistencia_bs = Number((Number(multas_bs) || 0).toFixed(2));
-    const multas_asistencia_centavos = Math.round(multas_asistencia_bs * 100);
+    const multas_asistencia_bs = 0;
+    const multas_asistencia_centavos = 0;
     const devolucion_centavos = Math.round(monto_devolucion * 100);
-    const monto_liquido_pagable_centavos = Math.max(0, devolucion_centavos - multas_asistencia_centavos);
-    const monto_liquido_pagable = Number(
-      Math.max(0, monto_devolucion - multas_asistencia_bs).toFixed(2),
-    );
+    const monto_liquido_pagable_centavos = devolucion_centavos;
+    const monto_liquido_pagable = Number(monto_devolucion.toFixed(2));
 
     return {
       ...s,
@@ -838,17 +820,6 @@ export class PasajesServicio {
       }
     }
 
-    // Fallback a catálogo en memoria si la BD aún no ha sido sembrada
-    if (paradas.length === 0) {
-      if (ciudad) {
-        paradas = (PARADAS_OFICIALES_DEFECTO as ParadaTransporte[]).filter(
-          (p) => p.ciudad?.toLowerCase() === ciudad.toLowerCase(),
-        );
-      } else {
-        paradas = PARADAS_OFICIALES_DEFECTO as ParadaTransporte[];
-      }
-    }
-
     if (latitud !== undefined && longitud !== undefined && !isNaN(Number(latitud)) && !isNaN(Number(longitud))) {
       const lat_num = Number(latitud);
       const lng_num = Number(longitud);
@@ -1036,19 +1007,11 @@ export class PasajesServicio {
 
   async sembrarParadas(): Promise<ParadaTransporte[]> {
     if (!this.paradaRepositorio) {
-      return PARADAS_OFICIALES_DEFECTO as ParadaTransporte[];
+      return [];
     }
-
-    const sembradas: ParadaTransporte[] = [];
-    for (const p of PARADAS_OFICIALES_DEFECTO) {
-      let existente = await this.paradaRepositorio.findOne({ where: { nombre: p.nombre } });
-      if (!existente) {
-        existente = this.paradaRepositorio.create(p);
-        existente = await this.paradaRepositorio.save(existente);
-      }
-      sembradas.push(existente);
-    }
-    return sembradas;
+    return this.paradaRepositorio.find({
+      order: { ciudad: 'ASC', nombre: 'ASC' },
+    });
   }
 
   async obtenerHistorialParadasEstudiante(parametros: {
@@ -1430,16 +1393,13 @@ export class PasajesServicio {
       if (item.origen) {
         const nom = item.origen.trim();
         if (!mapa_paradas[nom]) {
-          const match_def = PARADAS_OFICIALES_DEFECTO.find(
-            (p) => p.nombre?.toLowerCase() === nom.toLowerCase(),
-          );
           mapa_paradas[nom] = {
             nombre: nom,
             frecuencia: 0,
             como_origen: 0,
             como_destino: 0,
-            tipo_transporte: match_def?.tipo_transporte || item.medio_transporte || 'Transporte Urbano',
-            zona: match_def?.zona || (nom.includes('Alto') ? 'El Alto' : 'La Paz'),
+            tipo_transporte: item.medio_transporte || 'Transporte Urbano',
+            zona: nom.includes('Alto') ? 'El Alto' : 'La Paz',
           };
         }
         mapa_paradas[nom].frecuencia++;
@@ -1450,16 +1410,13 @@ export class PasajesServicio {
       if (item.destino) {
         const nom = item.destino.trim();
         if (!mapa_paradas[nom]) {
-          const match_def = PARADAS_OFICIALES_DEFECTO.find(
-            (p) => p.nombre?.toLowerCase() === nom.toLowerCase(),
-          );
           mapa_paradas[nom] = {
             nombre: nom,
             frecuencia: 0,
             como_origen: 0,
             como_destino: 0,
-            tipo_transporte: match_def?.tipo_transporte || item.medio_transporte || 'Transporte Urbano',
-            zona: match_def?.zona || (nom.includes('Alto') ? 'El Alto' : 'La Paz'),
+            tipo_transporte: item.medio_transporte || 'Transporte Urbano',
+            zona: nom.includes('Alto') ? 'El Alto' : 'La Paz',
           };
         }
         mapa_paradas[nom].frecuencia++;
@@ -1470,16 +1427,13 @@ export class PasajesServicio {
       for (const p of item.paradas_secuencia) {
         if (p !== item.origen && p !== item.destino) {
           if (!mapa_paradas[p]) {
-            const match_def = PARADAS_OFICIALES_DEFECTO.find(
-              (o) => o.nombre?.toLowerCase() === p.toLowerCase(),
-            );
             mapa_paradas[p] = {
               nombre: p,
               frecuencia: 0,
               como_origen: 0,
               como_destino: 0,
-              tipo_transporte: match_def?.tipo_transporte || item.medio_transporte || 'Parada Intermedia',
-              zona: match_def?.zona || 'Urbana',
+              tipo_transporte: item.medio_transporte || 'Parada Intermedia',
+              zona: 'Urbana',
             };
           }
           mapa_paradas[p].frecuencia++;
@@ -1492,19 +1446,10 @@ export class PasajesServicio {
     );
 
     const calculo = this.calcularReembolsoCentavos(tarifas_array);
-    const id_becario_multa = becario ? becario.id : becario_id_real;
-    const mapa_multas = await this.obtenerMapaMultasVigentes([id_becario_multa, parametros.id_estudiante]);
-    const multas_asistencia_bs = Number(
-      (mapa_multas.get(id_becario_multa) ?? mapa_multas.get(parametros.id_estudiante) ?? 0).toFixed(2),
-    );
-    const multas_asistencia_centavos = Math.round(multas_asistencia_bs * 100);
-    const monto_liquido_pagable_centavos = Math.max(
-      0,
-      calculo.devolucion_centavos - multas_asistencia_centavos,
-    );
-    const monto_liquido_pagable = Number(
-      Math.max(0, calculo.monto_devolucion - multas_asistencia_bs).toFixed(2),
-    );
+    const multas_asistencia_bs = 0;
+    const multas_asistencia_centavos = 0;
+    const monto_liquido_pagable_centavos = calculo.devolucion_centavos;
+    const monto_liquido_pagable = calculo.monto_devolucion;
 
     let dias_filtrados = 0;
     if (parametros.fecha_inicio && parametros.fecha_fin) {
@@ -1631,10 +1576,7 @@ export class PasajesServicio {
     descontar_multas?: boolean | string;
     usuario_autenticado?: Usuario;
   }): Promise<ResultadoCalculoPagoPasajes> {
-    const descontar_multas =
-      parametros.descontar_multas === undefined
-        ? true
-        : String(parametros.descontar_multas).toLowerCase() !== 'false';
+    const descontar_multas = false;
 
     const rango = this.resolverRangoFechasCalculoPago(
       parametros.periodo,
@@ -1852,57 +1794,7 @@ export class PasajesServicio {
       { total_centavos: number; detalle: DetalleMultaPagoPasaje[] }
     >();
 
-    if (
-      this.multa_repositorio &&
-      typeof this.multa_repositorio.find === 'function'
-    ) {
-      try {
-        const multas_db = await this.multa_repositorio.find();
-        for (const m of multas_db || []) {
-          const monto_num = Number(m.monto_bs || 0);
-          if (monto_num <= 0) continue;
-
-          const id_bec = Number(m.becario_id);
-          if (!id_bec) continue;
-
-          if (becario_id_filtro && id_bec !== becario_id_filtro) {
-            continue;
-          }
-          if (
-            ids_mentor_permitidos &&
-            ids_mentor_permitidos.size > 0 &&
-            !ids_mentor_permitidos.has(id_bec)
-          ) {
-            continue;
-          }
-
-          const fecha_multa = this.extraerFechaIso(
-            m.fecha_aplicacion || m.created_at,
-          );
-          if (rango.inicio || rango.fin) {
-            if (fecha_multa) {
-              if (rango.inicio && fecha_multa < rango.inicio) continue;
-              if (rango.fin && fecha_multa > rango.fin) continue;
-            }
-          }
-
-          const centavos_multa = Math.round(monto_num * 100);
-          let acum = multas_por_becario.get(id_bec);
-          if (!acum) {
-            acum = { total_centavos: 0, detalle: [] };
-            multas_por_becario.set(id_bec, acum);
-          }
-          acum.total_centavos += centavos_multa;
-          acum.detalle.push({
-            id: Number(m.id || 0),
-            fecha_aplicacion: fecha_multa,
-            minutos_retraso: Number(m.minutos_retraso || 0),
-            monto_bs: centavos_multa / 100,
-            motivo: m.motivo || 'Multa de asistencia',
-          });
-        }
-      } catch {}
-    }
+    // Las multas aplican exclusivamente a Escuela de Líderes y nunca se descuentan de pasajes de Prácticas o Acciones de Servicio.
 
     let total_100_centavos = 0;
     let total_80_centavos = 0;

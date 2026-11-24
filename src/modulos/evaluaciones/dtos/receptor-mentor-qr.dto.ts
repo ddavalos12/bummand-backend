@@ -142,6 +142,14 @@ export class ReceptorMentorQrDto {
   codigo_verificacion?: string;
 
   @ApiPropertyOptional({
+    example: 'eyJiZWNhcmlvX2lkIjoxfQ.firma',
+    description: 'Token HMAC firmado y con expiración emitido para el QR del becario',
+  })
+  @IsOptional()
+  @IsString()
+  token?: string;
+
+  @ApiPropertyOptional({
     example: 'Excelente desempeño y disposición al servicio durante el periodo.',
     description: 'Observaciones cualitativas generales del mentor',
   })

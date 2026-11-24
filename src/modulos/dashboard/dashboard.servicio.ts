@@ -1,7 +1,7 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { RegistroAsistencia } from '../asistencia/entidades/registro-asistencia.entidad';
+import { RegistroAsistencia, TipoAsistencia } from '../asistencia/entidades/registro-asistencia.entidad';
 import { SolicitudPasajes, EstadoSolicitud } from '../pasajes/entidades/solicitud-pasaje.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { Evaluacion, EstadoEvaluacion } from '../evaluaciones/entidades/evaluacion.entidad';
@@ -152,7 +152,7 @@ export class DashboardServicio {
       this.pasajes_repo.find(),
       this.evaluacion_repo.count({ where: { estado: EstadoEvaluacion.PENDIENTE } }),
       this.multa_repo && typeof this.multa_repo.find === 'function'
-        ? this.multa_repo.find()
+        ? this.multa_repo.find({ relations: { asistencia: true } })
         : Promise.resolve([]),
       this.justificacion_repo && typeof this.justificacion_repo.find === 'function'
         ? this.justificacion_repo.find()
@@ -228,8 +228,30 @@ export class DashboardServicio {
       permisos_por_becario.set(j.becario_id, set_fechas);
     }
 
+    const tipo_por_asistencia = new Map<number, TipoAsistencia>();
+    for (const a of todas_asistencias) {
+      if (a.id && a.tipo) {
+        tipo_por_asistencia.set(a.id, a.tipo);
+      }
+    }
+
     const multas_filtradas = todas_multas.filter((m) => {
       if (!m.es_institucional) return false;
+      const tipo_asist =
+        m.asistencia?.tipo ??
+        (m.asistencia_id ? tipo_por_asistencia.get(m.asistencia_id) : undefined);
+      if (tipo_asist && tipo_asist !== TipoAsistencia.ESCUELA_LIDERES) {
+        return false;
+      }
+      if (!tipo_asist) {
+        const motivo = (m.motivo || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+        if (motivo.includes('practica') || motivo.includes('acciones de servicio')) {
+          return false;
+        }
+      }
       if (supervisor_id && !set_becarios_permitidos.has(m.becario_id)) return false;
       if (!m.fecha_aplicacion) return true;
       const f = new Date(m.fecha_aplicacion);

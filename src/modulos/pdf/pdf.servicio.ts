@@ -2904,18 +2904,11 @@ export class PdfServicio {
       : 'Periodo de Evaluación Integral';
 
     const codigo_auditoria = `CONT-RSD-${Date.now().toString().slice(-6)}`;
-    const aplicar_descuento_multas = datos.descontar_multas !== false;
-    const multas_bs = aplicar_descuento_multas ? Number(datos.total_multas_bs || 0) : 0;
+    const aplicar_descuento_multas = false;
+    const multas_bs = 0;
     const total_pasajes_bruto_80 = Number(datos.total_monto_pasajes || 0);
-    const liquido_pagable = aplicar_descuento_multas
-      ? Number(
-          datos.monto_liquido_pagable ??
-            Math.max(0, total_pasajes_bruto_80 - multas_bs),
-        )
-      : total_pasajes_bruto_80;
-    const subtitulo_multas = aplicar_descuento_multas
-      ? 'Incluye descuento de multas de asistencia'
-      : 'Excluye descuento de multas de asistencia';
+    const liquido_pagable = total_pasajes_bruto_80;
+    const subtitulo_multas = 'Excluye descuento de multas de asistencia';
 
     return `
       <!DOCTYPE html>
@@ -3041,15 +3034,12 @@ export class PdfServicio {
     fecha_fin?: string;
     descontar_multas?: boolean | string;
   }): Promise<{ bufer: Buffer; nombre_archivo: string }> {
-    const aplicar_descuento_multas =
-      filtros.descontar_multas === undefined
-        ? true
-        : String(filtros.descontar_multas).toLowerCase() !== 'false';
+    const aplicar_descuento_multas = false;
     let total_asistencias = 0;
     let total_horas = 0;
     let total_solicitudes_pasajes = 0;
     let total_monto_pasajes = 0;
-    let total_multas_bs = 0;
+    const total_multas_bs = 0;
     let total_refrigerios = 0;
     let total_monto_refrigerios = 0;
 
@@ -3082,30 +3072,7 @@ export class PdfServicio {
       );
     }
 
-    if (aplicar_descuento_multas && this.multa_repo && typeof this.multa_repo.find === 'function') {
-      try {
-        const multas = await this.multa_repo.find();
-        total_multas_bs = (multas || []).reduce((acc, m) => {
-          const monto = Math.max(0, Number(m.monto_bs || 0));
-          if (monto <= 0) return acc;
-          if (filtros.fecha_inicio || filtros.fecha_fin) {
-            const fecha_ref = m.fecha_aplicacion || m.created_at;
-            const fecha_valida = fecha_ref ? new Date(fecha_ref) : null;
-            if (fecha_valida && !isNaN(fecha_valida.getTime())) {
-              const fecha_str = fecha_valida.toISOString().slice(0, 10);
-              if (filtros.fecha_inicio && fecha_str < filtros.fecha_inicio) return acc;
-              if (filtros.fecha_fin && fecha_str > filtros.fecha_fin) return acc;
-            }
-          }
-          return acc + monto;
-        }, 0);
-        total_multas_bs = Number(total_multas_bs.toFixed(2));
-      } catch {}
-    }
-
-    const monto_liquido_pagable = aplicar_descuento_multas
-      ? Math.max(0, Number((total_monto_pasajes - total_multas_bs).toFixed(2)))
-      : Number(total_monto_pasajes.toFixed(2));
+    const monto_liquido_pagable = Number(total_monto_pasajes.toFixed(2));
 
     if (this.refrigerio_repo) {
       const qb = this.refrigerio_repo.createQueryBuilder('ref');
@@ -3151,10 +3118,7 @@ export class PdfServicio {
     fecha_fin?: string;
     descontar_multas?: boolean | string;
   }): Promise<{ bufer: Buffer; nombre_archivo: string }> {
-    const aplicar_descuento_multas =
-      opciones.descontar_multas === undefined
-        ? true
-        : String(opciones.descontar_multas).toLowerCase() !== 'false';
+    const aplicar_descuento_multas = false;
     const UMBRAL_CONSOLIDADO_TRAMOS = 400;
     const fecha_actual = new Date();
     const rango_texto =
@@ -3233,50 +3197,14 @@ export class PdfServicio {
       });
     }
 
-    let total_multas_bs = 0;
+    const total_multas_bs = 0;
     const mapa_multas_becario_mes = new Map<string, number>();
     const mapa_multas_becario_sin_mes = new Map<number, number>();
-    if (aplicar_descuento_multas && this.multa_repo && typeof this.multa_repo.find === 'function') {
-      try {
-        const multas = await this.multa_repo.find();
-        for (const m of multas || []) {
-          const monto = Math.max(0, Number(m.monto_bs || 0));
-          if (monto <= 0) continue;
-          const fecha_ref = m.fecha_aplicacion || m.created_at;
-          const fecha_valida = fecha_ref ? new Date(fecha_ref) : null;
-          if ((opciones.fecha_inicio || opciones.fecha_fin) && fecha_valida && !isNaN(fecha_valida.getTime())) {
-            const fecha_str = fecha_valida.toISOString().slice(0, 10);
-            if (opciones.fecha_inicio && fecha_str < opciones.fecha_inicio) continue;
-            if (opciones.fecha_fin && fecha_str > opciones.fecha_fin) continue;
-          }
-          total_multas_bs = Number((total_multas_bs + monto).toFixed(2));
-          if (m.becario_id) {
-            const id_bec = Number(m.becario_id);
-            if (fecha_valida && !isNaN(fecha_valida.getTime())) {
-              const clave_mes = `${id_bec}|${fecha_valida.toISOString().slice(0, 7)}`;
-              mapa_multas_becario_mes.set(
-                clave_mes,
-                Number(((mapa_multas_becario_mes.get(clave_mes) || 0) + monto).toFixed(2)),
-              );
-            } else {
-              mapa_multas_becario_sin_mes.set(
-                id_bec,
-                Number(((mapa_multas_becario_sin_mes.get(id_bec) || 0) + monto).toFixed(2)),
-              );
-            }
-          }
-        }
-      } catch {}
-    }
 
     const total_bruto = Number(items_render.reduce((acc, r) => acc + r.tarifa, 0).toFixed(2));
     const total_devolucion = Number(items_render.reduce((acc, r) => acc + r.reembolso_80, 0).toFixed(2));
-    const monto_liquido_pagable = aplicar_descuento_multas
-      ? Math.max(0, Number((total_devolucion - total_multas_bs).toFixed(2)))
-      : total_devolucion;
-    const subtitulo_multas = aplicar_descuento_multas
-      ? 'Incluye descuento de multas'
-      : 'Excluye descuento de multas';
+    const monto_liquido_pagable = total_devolucion;
+    const subtitulo_multas = 'Excluye descuento de multas';
     const total_tramos = items_render.length;
     const becarios_unicos = new Set(items_render.map((r) => r.becario_nombre)).size;
     const es_consolidado = total_tramos > UMBRAL_CONSOLIDADO_TRAMOS;
@@ -4501,9 +4429,7 @@ export class PdfServicio {
     const incluir_firma =
       opciones.con_firma === true ||
       String(opciones.con_firma).toLowerCase() === 'true';
-    const aplicar_descuento_multas =
-      opciones.descontar_multas === true ||
-      String(opciones.descontar_multas).toLowerCase() === 'true';
+    const aplicar_descuento_multas = false;
     const [firma_1, firma_2] = this.resolverFirmantesInstitucionales(
       opciones.firmante_1,
       opciones.firmante_2,
@@ -4931,9 +4857,7 @@ export class PdfServicio {
     firmante_2?: string;
   }): Promise<{ bufer: Buffer; nombre_archivo: string }> {
     const rango = this.resolverRangoFechasPlanilla(opciones);
-    const aplicar_descuento_multas =
-      opciones.descontar_multas === true ||
-      String(opciones.descontar_multas).toLowerCase() === 'true';
+    const aplicar_descuento_multas = false;
 
     let becarios: Becario[] = [];
     if (this.becario_repo && typeof this.becario_repo.find === 'function') {
@@ -4999,45 +4923,7 @@ export class PdfServicio {
       solicitudes = await qb_sol.getMany();
     }
 
-    let multas: Multa[] = [];
-    if (aplicar_descuento_multas && this.multa_repo) {
-      try {
-        if (typeof this.multa_repo.createQueryBuilder === 'function') {
-          const qb_multas = this.multa_repo.createQueryBuilder('m');
-          if (rango.fecha_inicio && rango.fecha_fin) {
-            qb_multas.where(
-              'm.fecha_aplicacion >= :inicio AND m.fecha_aplicacion <= :fin',
-              {
-                inicio: `${rango.fecha_inicio} 00:00:00`,
-                fin: `${rango.fecha_fin} 23:59:59`,
-              },
-            );
-          } else if (rango.fecha_inicio) {
-            qb_multas.where('m.fecha_aplicacion >= :inicio', {
-              inicio: `${rango.fecha_inicio} 00:00:00`,
-            });
-          } else if (rango.fecha_fin) {
-            qb_multas.where('m.fecha_aplicacion <= :fin', {
-              fin: `${rango.fecha_fin} 23:59:59`,
-            });
-          }
-          multas = await qb_multas.getMany();
-        } else if (typeof this.multa_repo.find === 'function') {
-          const todas_multas = await this.multa_repo.find();
-          multas = (todas_multas || []).filter((m) => {
-            if (!rango.fecha_inicio && !rango.fecha_fin) return true;
-            const fecha_ref = m.fecha_aplicacion || m.created_at;
-            if (!fecha_ref) return true;
-            const fecha_valida = new Date(fecha_ref);
-            if (isNaN(fecha_valida.getTime())) return true;
-            const fecha_str = fecha_valida.toISOString().slice(0, 10);
-            if (rango.fecha_inicio && fecha_str < rango.fecha_inicio) return false;
-            if (rango.fecha_fin && fecha_str > rango.fecha_fin) return false;
-            return true;
-          });
-        }
-      } catch {}
-    }
+    const multas: Multa[] = [];
 
     const html = this.generarDonacionTransporteHtml({
       ...opciones,

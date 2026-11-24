@@ -1,5 +1,11 @@
+import { createHmac } from 'crypto';
 import { Test, TestingModule } from '@nestjs/testing';
-import { ValidationPipe } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  InternalServerErrorException,
+  ValidationPipe,
+} from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EvaluacionesServicio, PESOS_PONDERADOS_MODULOS } from './evaluaciones.servicio';
 import { Evaluacion, EstadoEvaluacion } from './entidades/evaluacion.entidad';
@@ -29,6 +35,7 @@ describe('EvaluacionesServicio', () => {
   let configuracion_repo: any;
 
   beforeEach(async () => {
+    process.env.JWT_SECRET = 'test_jwt_secret_bumand';
     evaluacion_repo = {
       create: jest.fn().mockImplementation((datos) => ({ ...datos, id: 1 })),
       save: jest.fn().mockImplementation((datos) => Promise.resolve({ ...datos })),
@@ -377,9 +384,12 @@ describe('EvaluacionesServicio', () => {
       evaluacion_repo.findOne.mockResolvedValue(null);
       evaluacion_repo.save.mockImplementation((d: any) => Promise.resolve({ ...d, id: 99 }));
 
+      const token = (servicio as any).generarTokenQrMentor(1, 2);
+
       const resultado = await servicio.procesarReceptorMentorQr({
         becario_id: 1,
-        token_qr: 'token_prueba',
+        periodo_id: 2,
+        token,
         nombre_mentor: 'David Limachi',
         unidad_agencia: 'Iglesia Central',
         semestre_gestion: 'II-2025',
@@ -389,7 +399,7 @@ describe('EvaluacionesServicio', () => {
           p20_areas_mejora: 'Gestión del tiempo',
           p21_comentario_general: 'Recomendado',
         },
-      });
+      } as any);
 
       expect(resultado).toBeDefined();
       expect(resultado.id).toBe(99);
@@ -476,6 +486,7 @@ describe('EvaluacionesServicio', () => {
       periodo_repo.findOne.mockResolvedValue({ id: 2, estado: EstadoPeriodo.ABIERTO });
       evaluador_repo.findOne.mockResolvedValue({ id: 5, nombre: 'Angel Ali', tipo: 'supervisor' });
       evaluacion_repo.findOne.mockResolvedValue(null);
+      becario_repo.find.mockResolvedValue([{ id: 1, supervisor_id: 10 }]);
       evaluacion_repo.create.mockImplementation((d: any) => ({ ...d, id: 75 }));
       evaluacion_repo.save.mockImplementation((d: any) => Promise.resolve({ ...d, id: 75 }));
 
@@ -486,10 +497,13 @@ describe('EvaluacionesServicio', () => {
         rol: Rol.SUPERVISOR,
       } as any;
 
+      const token = (servicio as any).generarTokenQrMentor(1, 2);
+
       const res = await servicio.procesarReceptorMentorQr(
         {
           becario_id: 1,
           periodo_id: 2,
+          token,
           modalidad_llenado: 'perfil_supervisor',
           codigo_verificacion: '123456',
           calificaciones_1_18: [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
@@ -847,6 +861,220 @@ describe('EvaluacionesServicio', () => {
       ]);
       expect(tarea_4!.lectura_pdf_url).toBe('/uploads/escuela-lideres/lectura-04.pdf');
       expect(tarea_4!.enlace_lectura).toBe('https://ejemplo.org/video-04');
+    });
+  });
+
+  describe('Seguridad QR Mentor, Estado F-03, Resolución ID/Periodo y Prevención de Duplicados', () => {
+    it('rechaza validarQrMentor y procesarReceptorMentorQr cuando falta token, está alterado, expirado o es de otro becario', async () => {
+      const supervisor: Usuario = {
+        id: 10,
+        nombre: 'Angel Ali',
+        correo: 'angel.ali@bumand.bo',
+        rol: Rol.SUPERVISOR,
+      } as any;
+      becario_repo.findOne.mockResolvedValue({ id: 1, nombre: 'Becario 1', supervisor_id: 10 });
+      becario_repo.find.mockResolvedValue([{ id: 1, supervisor_id: 10 }]);
+      periodo_repo.findOne.mockResolvedValue({ id: 2, estado: EstadoPeriodo.ABIERTO });
+
+      await expect(servicio.validarQrMentor(1, undefined, supervisor, 2)).rejects.toThrow(
+        ForbiddenException,
+      );
+      await expect(servicio.validarQrMentor(1, 'token_invalido', supervisor, 2)).rejects.toThrow(
+        ForbiddenException,
+      );
+
+      const token_otro_becario = (servicio as any).generarTokenQrMentor(99, 2);
+      await expect(
+        servicio.validarQrMentor(1, token_otro_becario, supervisor, 2),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        servicio.procesarReceptorMentorQr(
+          { becario_id: 1, periodo_id: 2, calificaciones_1_18: [10] },
+          supervisor,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      const payload_exp = Buffer.from(
+        JSON.stringify({
+          becario_id: 1,
+          periodo_id: 2,
+          tipo: 'mentor_qr',
+          exp: Math.floor(Date.now() / 1000) - 60,
+        }),
+      ).toString('base64url');
+      const firma_exp = createHmac('sha256', process.env.JWT_SECRET as string)
+        .update(payload_exp)
+        .digest('base64url');
+      await expect(
+        servicio.procesarReceptorMentorQr(
+          {
+            becario_id: 1,
+            periodo_id: 2,
+            token: `${payload_exp}.${firma_exp}`,
+            calificaciones_1_18: [10],
+          },
+          supervisor,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('impide bypass cuando un SUPERVISOR tiene 0 becarios designados en procesarReceptorMentorQr y obtenerEvaluacionModulo3Becario', async () => {
+      const supervisor_sin_asignados: Usuario = {
+        id: 77,
+        nombre: 'Otro Supervisor',
+        correo: 'otro@bumand.bo',
+        rol: Rol.SUPERVISOR,
+      } as any;
+      becario_repo.find.mockResolvedValue([]);
+      periodo_repo.findOne.mockResolvedValue({ id: 2, estado: EstadoPeriodo.ABIERTO });
+      const token = (servicio as any).generarTokenQrMentor(1, 2);
+
+      await expect(
+        servicio.procesarReceptorMentorQr(
+          { becario_id: 1, periodo_id: 2, token, calificaciones_1_18: [10] },
+          supervisor_sin_asignados,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        servicio.obtenerEvaluacionModulo3Becario(1, 2, supervisor_sin_asignados),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('falla de forma segura con InternalServerErrorException si JWT_SECRET está ausente al generar QR', () => {
+      const previo = process.env.JWT_SECRET;
+      delete process.env.JWT_SECRET;
+      try {
+        expect(() => (servicio as any).generarTokenQrMentor(1, 2)).toThrow(
+          InternalServerErrorException,
+        );
+      } finally {
+        process.env.JWT_SECRET = previo;
+      }
+    });
+
+    it('resuelve usuario_id -> becario.id y periodo activo ABIERTO cuando periodo_id <= 0 en calcularCalificacionTotal', async () => {
+      becario_repo.findOne.mockResolvedValue({ id: 8, usuario_id: 25 });
+      periodo_repo.findOne.mockResolvedValue({ id: 2, nombre: 'II-2026', estado: EstadoPeriodo.ABIERTO });
+      evaluacion_repo.find.mockResolvedValue([
+        { modulo_id: 1, puntaje: 18, estado: EstadoEvaluacion.EN_REVISION_ADMINISTRACION },
+      ]);
+
+      const resultado = await servicio.calcularCalificacionTotal(25, 0);
+      expect(evaluacion_repo.find).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { becario_id: 8, periodo_id: 2 } }),
+      );
+      expect(resultado.detalles[0].estado).toBe(EstadoEvaluacion.EN_REVISION_ADMINISTRACION);
+    });
+
+    it('guarda EN_REVISION_ADMINISTRACION en registrarFormularioF03 sin convalidación y bloquea reenvíos duplicados con ConflictException (409)', async () => {
+      becario_repo.findOne.mockResolvedValue({ id: 8, usuario_id: 25 });
+      periodo_repo.findOne.mockResolvedValue({ id: 2, estado: EstadoPeriodo.ABIERTO });
+      modulo_repo.find.mockResolvedValue([{ id: 1, orden: 1 }]);
+      evaluador_repo.findOne.mockResolvedValue({ id: 3, tipo: 'pastor' });
+      evaluacion_repo.findOne.mockResolvedValueOnce(null);
+      evaluacion_pastor_repo.findOne.mockResolvedValue(null);
+
+      const primera = await servicio.registrarFormularioF03(0, {
+        becario_id: 8,
+        pastor_nombre: 'Pastor Local',
+        iglesia_nombre: 'Iglesia Central',
+        convalidado: false,
+        estado: 'en_revision',
+      } as any);
+      expect((primera as any).estado).toBe('en_revision');
+      expect(evaluacion_repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ estado: EstadoEvaluacion.EN_REVISION_ADMINISTRACION }),
+      );
+
+      evaluacion_repo.findOne.mockResolvedValueOnce({
+        id: 10,
+        becario_id: 8,
+        modulo_id: 1,
+        periodo_id: 2,
+        estado: EstadoEvaluacion.EN_REVISION_ADMINISTRACION,
+      });
+      await expect(
+        servicio.registrarFormularioF03(0, {
+          becario_id: 8,
+          pastor_nombre: 'Pastor Local',
+          iglesia_nombre: 'Iglesia Central',
+          convalidado: false,
+        } as any),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('bloquea envíos duplicados con ConflictException en socioeconómica, académica, mentor QR y permite subir el 2do documento académico antes de completar', async () => {
+      evaluacion_repo.findOne.mockResolvedValue({
+        id: 55,
+        becario_id: 1,
+        periodo_id: 2,
+        estado: EstadoEvaluacion.COMPLETADO,
+      });
+
+      await expect(
+        servicio.procesarReceptorSocioeconomica({
+          becario_id: 1,
+          periodo_id: 2,
+          respuestas: { 1: 'A' },
+        }),
+      ).rejects.toThrow(ConflictException);
+
+      await expect(
+        servicio.procesarReceptorAcademica({
+          becario_id: 1,
+          periodo_id: 2,
+          promedio_academico: 85,
+        } as any),
+      ).rejects.toThrow(ConflictException);
+
+      const token = (servicio as any).generarTokenQrMentor(1, 2);
+      await expect(
+        servicio.procesarReceptorMentorQr({
+          becario_id: 1,
+          periodo_id: 2,
+          token,
+          calificaciones_1_18: [10],
+        }),
+      ).rejects.toThrow(ConflictException);
+
+      const becario_user: Usuario = { id: 25, rol: Rol.BECARIO } as any;
+      becario_repo.findOne.mockResolvedValue({ id: 1, usuario_id: 25 });
+      evaluacion_repo.findOne.mockResolvedValueOnce({
+        id: 66,
+        becario_id: 1,
+        periodo_id: 2,
+        modulo_id: 2,
+        estado: EstadoEvaluacion.EN_REVISION_ADMINISTRACION,
+        archivo_record_academico: '/uploads/academicos/record.pdf',
+        archivo_historial_academico: null,
+        datos_formulario: {},
+      });
+
+      const segunda_subida = await servicio.subirDocumentoAcademico(
+        { becario_id: 1, periodo_id: 2, tipo_documento: 'historial_academico' } as any,
+        { originalname: 'historial.pdf', filename: 'historial.pdf', size: 1024 },
+        becario_user,
+      );
+      expect(segunda_subida.archivo_historial_academico).toBe('/uploads/academicos/historial.pdf');
+
+      evaluacion_repo.findOne.mockResolvedValueOnce({
+        id: 66,
+        becario_id: 1,
+        periodo_id: 2,
+        modulo_id: 2,
+        estado: EstadoEvaluacion.EN_REVISION_ADMINISTRACION,
+        archivo_record_academico: '/uploads/academicos/record.pdf',
+        archivo_historial_academico: '/uploads/academicos/historial.pdf',
+      });
+      await expect(
+        servicio.subirDocumentoAcademico(
+          { becario_id: 1, periodo_id: 2, tipo_documento: 'historial_academico' } as any,
+          { originalname: 'historial2.pdf', filename: 'historial2.pdf', size: 1024 },
+          becario_user,
+        ),
+      ).rejects.toThrow(ConflictException);
     });
   });
 });

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import type { Browser, HTTPRequest, LaunchOptions } from 'puppeteer-core';
+import { generarPdfRespaldoDesdeHtml } from './generador-pdf-respaldo.utilidad';
 
 export type ModoNavegadorPdf = 'cloud' | 'local';
 
@@ -22,6 +23,8 @@ interface ModuloPuppeteerCore {
 
 interface ModuloSparticuzChromium {
   args?: string[];
+  headless?: boolean | 'shell';
+  setGraphicsMode?: boolean;
   executablePath: (input?: string) => Promise<string>;
 }
 
@@ -103,73 +106,81 @@ export class NavegadorPdfServicio {
     const modo_actual = this.obtenerModoActual();
     const bloquear_externos = this.debeBloquearRecursosExternos(modo_actual);
 
-    return this.ejecutarConNavegador(async (navegador) => {
-      const pagina = await navegador.newPage();
-      try {
-        if (typeof pagina.setDefaultTimeout === 'function') {
-          pagina.setDefaultTimeout(tiempo_limite);
-        }
+    try {
+      return await this.ejecutarConNavegador(async (navegador) => {
+        const pagina = await navegador.newPage();
+        try {
+          if (typeof pagina.setDefaultTimeout === 'function') {
+            pagina.setDefaultTimeout(tiempo_limite);
+          }
 
-        if (
-          bloquear_externos &&
-          typeof pagina.setRequestInterception === 'function' &&
-          typeof pagina.on === 'function'
-        ) {
-          await pagina.setRequestInterception(true);
-          pagina.on('request', (solicitud: HTTPRequest) => {
-            const url_solicitud = solicitud.url() || '';
-            const tipo_recurso = solicitud.resourceType();
+          if (
+            bloquear_externos &&
+            typeof pagina.setRequestInterception === 'function' &&
+            typeof pagina.on === 'function'
+          ) {
+            await pagina.setRequestInterception(true);
+            pagina.on('request', (solicitud: HTTPRequest) => {
+              const url_solicitud = solicitud.url() || '';
+              const tipo_recurso = solicitud.resourceType();
 
-            if (
-              url_solicitud.startsWith('data:') ||
-              url_solicitud.startsWith('about:') ||
-              tipo_recurso === 'document'
-            ) {
+              if (
+                url_solicitud.startsWith('data:') ||
+                url_solicitud.startsWith('about:') ||
+                tipo_recurso === 'document'
+              ) {
+                void solicitud.continue().catch(() => {});
+                return;
+              }
+
+              const es_http_externo =
+                url_solicitud.startsWith('http://') ||
+                url_solicitud.startsWith('https://');
+
+              if (
+                es_http_externo &&
+                TIPOS_RECURSOS_BLOQUEABLES.has(tipo_recurso)
+              ) {
+                void solicitud.abort().catch(() => {});
+                return;
+              }
+
               void solicitud.continue().catch(() => {});
-              return;
-            }
+            });
+          }
 
-            const es_http_externo =
-              url_solicitud.startsWith('http://') ||
-              url_solicitud.startsWith('https://');
-
-            if (
-              es_http_externo &&
-              TIPOS_RECURSOS_BLOQUEABLES.has(tipo_recurso)
-            ) {
-              void solicitud.abort().catch(() => {});
-              return;
-            }
-
-            void solicitud.continue().catch(() => {});
+          await pagina.setContent(html, {
+            waitUntil: 'domcontentloaded',
+            timeout: tiempo_limite,
           });
+
+          const bufer = await pagina.pdf({
+            format: opciones?.format ?? 'A4',
+            landscape: opciones?.landscape ?? false,
+            printBackground: true,
+            margin: opciones?.margin ?? {
+              top: '15mm',
+              right: '15mm',
+              bottom: '15mm',
+              left: '15mm',
+            },
+            timeout: tiempo_limite,
+          });
+
+          return Buffer.from(bufer);
+        } finally {
+          if (typeof pagina.close === 'function') {
+            await pagina.close().catch(() => {});
+          }
         }
-
-        await pagina.setContent(html, {
-          waitUntil: 'domcontentloaded',
-          timeout: tiempo_limite,
-        });
-
-        const bufer = await pagina.pdf({
-          format: opciones?.format ?? 'A4',
-          landscape: opciones?.landscape ?? false,
-          printBackground: true,
-          margin: opciones?.margin ?? {
-            top: '15mm',
-            right: '15mm',
-            bottom: '15mm',
-            left: '15mm',
-          },
-          timeout: tiempo_limite,
-        });
-
-        return Buffer.from(bufer);
-      } finally {
-        if (typeof pagina.close === 'function') {
-          await pagina.close().catch(() => {});
-        }
-      }
-    });
+      });
+    } catch (error) {
+      const mensaje = error instanceof Error ? error.message : String(error);
+      this.registrador.warn(
+        `Fallo en Chromium (${modo_actual}), usando generador PDF de respaldo en servidor: ${mensaje}`,
+      );
+      return generarPdfRespaldoDesdeHtml(html, opciones);
+    }
   }
 
   private debeBloquearRecursosExternos(modo: ModoNavegadorPdf): boolean {
@@ -227,6 +238,9 @@ export class NavegadorPdfServicio {
   private async lanzarNavegadorCloud(): Promise<Browser> {
     const cliente_puppeteer = this.obtenerClientePuppeteerCore();
     const cliente_chromium = await this.obtenerClienteChromium();
+    if (typeof cliente_chromium.setGraphicsMode === 'boolean') {
+      cliente_chromium.setGraphicsMode = false;
+    }
 
     const ruta_override = (process.env.PUPPETEER_EXECUTABLE_PATH || '').trim();
     let ruta_ejecutable: string;
@@ -253,7 +267,7 @@ export class NavegadorPdfServicio {
     return cliente_puppeteer.launch({
       args: argumentos_deduplicados,
       executablePath: ruta_ejecutable,
-      headless: true,
+      headless: cliente_chromium.headless ?? true,
     });
   }
 

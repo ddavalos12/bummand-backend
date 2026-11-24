@@ -164,19 +164,37 @@ describe('PasajesServicio', () => {
     });
   });
 
-  describe('Catálogo geodésico de paradas frecuentes', () => {
-    it('debe retornar paradas oficiales de transporte urbano', async () => {
+  describe('Catálogo de paradas sin catálogo predefinido', () => {
+    it('debe retornar [] cuando no existen paradas personalizadas en BD (sin fallback predefinido)', async () => {
       const paradas = await servicio.obtenerParadas();
-      expect(paradas.length).toBeGreaterThan(0);
-      expect(paradas.some((p) => p.nombre?.includes('Ceja'))).toBe(true);
+      expect(paradas).toEqual([]);
+      expect(await servicio.sembrarParadas()).toEqual([]);
     });
 
-    it('debe permitir filtrar paradas por ciudad', async () => {
-      const paradas_el_alto = await servicio.obtenerParadas('El Alto');
-      expect(paradas_el_alto.every((p) => p.ciudad === 'El Alto')).toBe(true);
+    it('debe retornar y filtrar únicamente paradas personalizadas guardadas en BD', async () => {
+      const parada_repo_mock = {
+        find: jest.fn().mockImplementation(({ where }: any) => {
+          const filas = [
+            { id: 1, nombre: 'Parada Personalizada LP', ciudad: 'La Paz', latitud: -16.5, longitud: -68.13 },
+            { id: 2, nombre: 'Parada Personalizada EA', ciudad: 'El Alto', latitud: -16.51, longitud: -68.16 },
+          ];
+          return Promise.resolve(where?.ciudad ? filas.filter((f) => f.ciudad === where.ciudad) : filas);
+        }),
+      };
+      const servicio_con_paradas = new PasajesServicio(
+        solicitud_repo,
+        recorrido_repo,
+        undefined,
+        parada_repo_mock as any,
+      );
 
-      const paradas_la_paz = await servicio.obtenerParadas('La Paz');
-      expect(paradas_la_paz.every((p) => p.ciudad === 'La Paz')).toBe(true);
+      const paradas_el_alto = await servicio_con_paradas.obtenerParadas('El Alto');
+      expect(paradas_el_alto).toHaveLength(1);
+      expect(paradas_el_alto[0].ciudad).toBe('El Alto');
+
+      const paradas_la_paz = await servicio_con_paradas.obtenerParadas('La Paz');
+      expect(paradas_la_paz).toHaveLength(1);
+      expect(paradas_la_paz[0].ciudad).toBe('La Paz');
     });
   });
 
@@ -531,7 +549,7 @@ describe('PasajesServicio', () => {
     });
   });
 
-  describe('Cálculo de pago de pasajes descontando multas (calcularPagoPasajesConMultas)', () => {
+  describe('Cálculo de pago de pasajes de Prácticas sin descuento de multas (calcularPagoPasajesConMultas)', () => {
     let servicio_con_multas: PasajesServicio;
     let solicitud_repo_m: any;
     let recorrido_repo_m: any;
@@ -541,9 +559,19 @@ describe('PasajesServicio', () => {
     beforeEach(async () => {
       solicitud_repo_m = {
         find: jest.fn(),
+        findOne: jest.fn(),
+      };
+      const qb_rec_m: any = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
       };
       recorrido_repo_m = {
         find: jest.fn(),
+        createQueryBuilder: jest.fn().mockReturnValue(qb_rec_m),
       };
       becario_repo_m = {
         find: jest.fn().mockResolvedValue([]),
@@ -566,7 +594,7 @@ describe('PasajesServicio', () => {
       servicio_con_multas = modulo.get<PasajesServicio>(PasajesServicio);
     });
 
-    it('calcula en centavos exactos con descontar_multas=true y descontar_multas=false filtrando por periodo YYYY-MM', async () => {
+    it('mantiene multas_asistencia_bs en 0 y líquido igual al 80% en pasajes de Prácticas incluso si existen multas de Escuela de Líderes', async () => {
       solicitud_repo_m.find.mockResolvedValue([
         {
           id: 1,
@@ -614,14 +642,6 @@ describe('PasajesServicio', () => {
           motivo: 'Retraso 20 min Escuela de Líderes',
         },
         {
-          id: 102,
-          becario_id: 10,
-          fecha_aplicacion: new Date('2026-09-15T14:50:00Z'),
-          minutos_retraso: 15,
-          monto_bs: 15,
-          motivo: 'Multa de mes anterior (fuera de periodo)',
-        },
-        {
           id: 103,
           becario_id: 20,
           fecha_aplicacion: new Date('2026-10-16T15:15:00Z'),
@@ -631,61 +651,86 @@ describe('PasajesServicio', () => {
         },
       ]);
 
-      const con_descuento = await servicio_con_multas.calcularPagoPasajesConMultas({
+      const por_defecto = await servicio_con_multas.calcularPagoPasajesConMultas({
         periodo: '2026-10',
-        descontar_multas: 'true',
       });
 
-      expect(con_descuento.resumen).toEqual({
-        descontar_multas: true,
-        total_becarios: 2,
-        total_100_bs: 120,
-        total_80_bs: 96,
-        total_multas_bs: 50,
-        total_descuento_aplicado_bs: 50,
-        total_liquido_pagable_bs: 60,
-      });
-
-      const bec1 = con_descuento.becarios.find((b) => b.becario_id === 10)!;
-      expect(bec1.monto_total_100_bs).toBe(100);
-      expect(bec1.monto_reconocido_80_bs).toBe(80);
-      expect(bec1.multas_asistencia_bs).toBe(20);
-      expect(bec1.descuento_multas_aplicado_bs).toBe(20);
-      expect(bec1.monto_liquido_pagable_bs).toBe(60);
-      expect(bec1.cantidad_multas).toBe(1);
-      expect(bec1.detalle_multas[0]).toEqual(
-        expect.objectContaining({
-          id: 101,
-          fecha_aplicacion: '2026-10-09',
-          minutos_retraso: 20,
-          monto_bs: 20,
-        }),
-      );
-
-      const bec2 = con_descuento.becarios.find((b) => b.becario_id === 20)!;
-      expect(bec2.monto_reconocido_80_bs).toBe(16);
-      expect(bec2.multas_asistencia_bs).toBe(30);
-      expect(bec2.descuento_multas_aplicado_bs).toBe(30);
-      expect(bec2.monto_liquido_pagable_bs).toBe(0);
-
-      const sin_descuento = await servicio_con_multas.calcularPagoPasajesConMultas({
-        periodo: '2026-10',
-        descontar_multas: 'false',
-      });
-
-      expect(sin_descuento.resumen).toEqual({
+      expect(por_defecto.filtros.descontar_multas).toBe(false);
+      expect(por_defecto.resumen).toEqual({
         descontar_multas: false,
         total_becarios: 2,
         total_100_bs: 120,
         total_80_bs: 96,
-        total_multas_bs: 50,
+        total_multas_bs: 0,
         total_descuento_aplicado_bs: 0,
         total_liquido_pagable_bs: 96,
       });
-      expect(sin_descuento.becarios[0].descuento_multas_aplicado_bs).toBe(0);
-      expect(sin_descuento.becarios[0].monto_liquido_pagable_bs).toBe(80);
-      expect(sin_descuento.becarios[1].descuento_multas_aplicado_bs).toBe(0);
-      expect(sin_descuento.becarios[1].monto_liquido_pagable_bs).toBe(16);
+
+      const bec1 = por_defecto.becarios.find((b) => b.becario_id === 10)!;
+      expect(bec1.monto_total_100_bs).toBe(100);
+      expect(bec1.monto_reconocido_80_bs).toBe(80);
+      expect(bec1.multas_asistencia_bs).toBe(0);
+      expect(bec1.descuento_multas_aplicado_bs).toBe(0);
+      expect(bec1.monto_liquido_pagable_bs).toBe(80);
+      expect(bec1.cantidad_multas).toBe(0);
+      expect(bec1.detalle_multas).toEqual([]);
+
+      const bec2 = por_defecto.becarios.find((b) => b.becario_id === 20)!;
+      expect(bec2.monto_reconocido_80_bs).toBe(16);
+      expect(bec2.multas_asistencia_bs).toBe(0);
+      expect(bec2.descuento_multas_aplicado_bs).toBe(0);
+      expect(bec2.monto_liquido_pagable_bs).toBe(16);
+
+      const incluso_con_true = await servicio_con_multas.calcularPagoPasajesConMultas({
+        periodo: '2026-10',
+        descontar_multas: 'true',
+      });
+      expect(incluso_con_true.resumen.descontar_multas).toBe(false);
+      expect(incluso_con_true.resumen.total_multas_bs).toBe(0);
+      expect(incluso_con_true.resumen.total_liquido_pagable_bs).toBe(96);
+    });
+
+    it('no descuenta multas en obtenerTodas, obtenerPorId ni obtenerHistorialParadasEstudiante para Prácticas', async () => {
+      multa_repo_m.find.mockResolvedValue([
+        { id: 1, becario_id: 10, monto_bs: 40, motivo: 'Retraso Escuela de Líderes' },
+      ]);
+      const solicitud_practicas = {
+        id: 1,
+        becario_id: 10,
+        monto_total: 100,
+        monto_devolucion: 80,
+        recorridos: [{ id: 1, tarifa: 100, tipo_actividad: 'practicas' }],
+      };
+      solicitud_repo_m.find.mockResolvedValue([solicitud_practicas]);
+      solicitud_repo_m.findOne.mockResolvedValue(solicitud_practicas);
+      recorrido_repo_m.createQueryBuilder().getMany.mockResolvedValueOnce([
+        {
+          id: 50,
+          solicitud_id: 1,
+          fecha: '2026-10-05',
+          tramo: Tramo.IDA,
+          origen: 'Villa Adela',
+          destino: 'Sede Central',
+          tipo_actividad: 'practicas',
+          tarifa: 100,
+          solicitud: { periodo: 'Octubre 2026' },
+        },
+      ]);
+
+      const todas = await servicio_con_multas.obtenerTodas();
+      expect((todas[0] as any).multas_asistencia_bs).toBe(0);
+      expect((todas[0] as any).monto_liquido_pagable).toBe(80);
+
+      const una = await servicio_con_multas.obtenerPorId(1);
+      expect((una as any).multas_asistencia_bs).toBe(0);
+      expect((una as any).monto_liquido_pagable).toBe(80);
+
+      const historial = await servicio_con_multas.obtenerHistorialParadasEstudiante({
+        id_estudiante: 10,
+      });
+      expect(historial.resumen.devolucion_80_bs).toBe(80);
+      expect(historial.resumen.multas_asistencia_bs).toBe(0);
+      expect(historial.resumen.monto_liquido_pagable).toBe(80);
     });
 
     it('restringe los resultados al propio becario cuando el rol es BECARIO y a los designados cuando es SUPERVISOR', async () => {

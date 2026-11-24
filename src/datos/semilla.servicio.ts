@@ -9,7 +9,7 @@ import { ModuloEvaluacion } from '../modulos/evaluaciones/entidades/modulo-evalu
 import { PeriodoEvaluacion, EstadoPeriodo } from '../modulos/evaluaciones/entidades/periodo-evaluacion.entidad';
 import { Evaluador, TipoEvaluador } from '../modulos/evaluaciones/entidades/evaluador.entidad';
 import { TarifaTransporte } from '../modulos/pasajes/entidades/tarifa-transporte.entidad';
-import { ParadaTransporte, PARADAS_OFICIALES_DEFECTO } from '../modulos/pasajes/entidades/parada-transporte.entidad';
+import { ParadaTransporte } from '../modulos/pasajes/entidades/parada-transporte.entidad';
 import { Evento, TipoEvento, EstadoEvento } from '../modulos/eventos/entidades/evento.entidad';
 import { HorarioApoyo } from '../modulos/becarios/entidades/horario-apoyo.entidad';
 import { AsignacionPractica } from '../modulos/becarios/entidades/asignacion-practica.entidad';
@@ -530,16 +530,6 @@ export class SemillaServicio implements OnModuleInit {
         ];
         for (const t of tarifas_oficiales) {
           await this.tarifa_repo.save(this.tarifa_repo.create({ ...t, activo: true }));
-        }
-      }
-    }
-
-    // 6. Paradas oficiales
-    if (this.parada_repo) {
-      for (const p of PARADAS_OFICIALES_DEFECTO) {
-        const existe_parada = await this.parada_repo.findOne({ where: { nombre: p.nombre } });
-        if (!existe_parada) {
-          await this.parada_repo.save(this.parada_repo.create(p));
         }
       }
     }
@@ -1134,9 +1124,12 @@ export class SemillaServicio implements OnModuleInit {
             const hora_ingreso = esViernes ? '09:00:00' : '13:00:00';
             const hora_salida = esViernes ? '14:00:00' : '16:30:00';
             const horas_trabajadas = esViernes ? 5.0 : 3.5;
-            const conRetraso = (f.fechaStr === '2026-09-18' && b.id % 2 === 0) || (f.fechaStr === '2026-10-09' && b.id % 3 === 0);
+            const conRetraso =
+              esViernes &&
+              ((f.fechaStr === '2026-09-18' && b.id % 2 === 0) ||
+                (f.fechaStr === '2026-10-09' && b.id % 3 === 0));
             const minutos_retraso = conRetraso ? 15 : 0;
-            const hora_ingreso_real = conRetraso ? (esViernes ? '09:15:00' : '13:15:00') : hora_ingreso;
+            const hora_ingreso_real = conRetraso ? '09:15:00' : hora_ingreso;
 
             const resAsist = await this.dataSource.query(`
               INSERT INTO registros_asistencia (
@@ -1170,7 +1163,7 @@ export class SemillaServicio implements OnModuleInit {
               `${f.fechaStr}T${hora_ingreso_real}Z`,
             ]);
 
-            if (conRetraso) {
+            if (esViernes && conRetraso) {
               const asistenciaId = resAsist[0].id;
               await this.dataSource.query(`
                 INSERT INTO multas (
@@ -1185,7 +1178,7 @@ export class SemillaServicio implements OnModuleInit {
                 asistenciaId,
                 minutos_retraso,
                 20.00,
-                `Retraso de ${minutos_retraso} minutos en ingreso a ${esViernes ? 'Escuela de Líderes' : 'Prácticas'}`,
+                `Retraso de ${minutos_retraso} minutos en ingreso a Escuela de Líderes`,
                 `${f.fechaStr}T${hora_ingreso_real}Z`,
               ]);
             }

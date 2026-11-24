@@ -26,7 +26,6 @@ import {
 } from './refrigerios.servicio';
 import { CrearRefrigerioDto } from './dtos/crear-refrigerio.dto';
 import { ActualizarRefrigerioDto } from './dtos/actualizar-refrigerio.dto';
-import { SortearDuplaDto } from './dtos/sortear-dupla.dto';
 import { RendirRefrigerioDto } from './dtos/rendir-refrigerio.dto';
 import { RevisarSupervisorDto } from './dtos/revisar-supervisor.dto';
 import { AprobarAdministracionDto } from './dtos/aprobar-administracion.dto';
@@ -44,22 +43,6 @@ import { UsuarioActual } from '../autenticacion/usuario-actual.decorador';
 @UseGuards(JwtGuardia, RolesGuardia)
 export class RefrigeriosControlador {
   constructor(private readonly refrigerios_servicio: RefrigeriosServicio) {}
-
-  @Post('asignar-dupla')
-  @Post('sortear-dupla')
-  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
-  @ApiOperation({
-    summary: 'Asignar o programar dupla de 2 becarios encargados para el refrigerio del viernes',
-    description:
-      'Registra formalmente a los dos becarios designados por la Directiva para la entrega del refrigerio institucional.',
-  })
-  @ApiResponse({ status: 201, description: 'Dupla asignada y refrigerio programado.', type: Refrigerio })
-  sortearDupla(
-    @Body() dto: SortearDuplaDto,
-    @UsuarioActual() usuario?: Usuario,
-  ): Promise<Refrigerio> {
-    return this.refrigerios_servicio.sortearDupla(dto, usuario?.id);
-  }
 
   @Get('mi-turno')
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)

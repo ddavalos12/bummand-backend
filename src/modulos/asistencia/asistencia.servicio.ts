@@ -742,12 +742,28 @@ export class AsistenciaServicio {
     };
   }
 
+  private esMultaEscuelaLideres(multa: Multa): boolean {
+    if (multa.asistencia?.tipo) {
+      return multa.asistencia.tipo === TipoAsistencia.ESCUELA_LIDERES;
+    }
+    const motivo = (multa.motivo || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    if (motivo.includes('practica') || motivo.includes('acciones de servicio')) {
+      return false;
+    }
+    return true;
+  }
+
   async obtenerMultas(usuario?: Usuario, supervisor_id?: number): Promise<Multa[]> {
     if (!this.multaRepositorio) return [];
     let multas = await this.multaRepositorio.find({
       relations: { becario: { usuario: true, supervisor: true }, asistencia: true },
       order: { fecha_aplicacion: 'DESC' },
     });
+
+    multas = multas.filter((m) => this.esMultaEscuelaLideres(m));
 
     if (esRolMentor(usuario?.rol) || supervisor_id) {
       const ids_permitidos = await obtenerIdsBecariosDesignadosMentor(
@@ -770,11 +786,12 @@ export class AsistenciaServicio {
     if (!this.multaRepositorio) return [];
     const becario = await this.becarioRepositorio.findOne({ where: { usuario_id } });
     if (!becario) return [];
-    return this.multaRepositorio.find({
+    const multas = await this.multaRepositorio.find({
       where: { becario_id: becario.id },
       relations: { asistencia: true },
       order: { fecha_aplicacion: 'DESC' },
     });
+    return multas.filter((m) => this.esMultaEscuelaLideres(m));
   }
 
   async registrarAsistenciaManual(

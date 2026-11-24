@@ -651,4 +651,42 @@ describe('AsistenciaServicio', () => {
       expect(res.id).toBe(16);
     });
   });
+
+  describe('Filtrado exclusivo de multas para Escuela de Líderes', () => {
+    it('obtenerMultas y obtenerMisMultas solo retornan multas de Escuela de Líderes y excluyen Prácticas', async () => {
+      const multas_mixtas = [
+        {
+          id: 1,
+          becario_id: 7,
+          monto_bs: 20,
+          motivo: 'Retraso de 15 min en Escuela de Líderes',
+          asistencia: { id: 100, tipo: TipoAsistencia.ESCUELA_LIDERES },
+        },
+        {
+          id: 2,
+          becario_id: 7,
+          monto_bs: 20,
+          motivo: 'Retraso de 15 min en Prácticas',
+          asistencia: { id: 101, tipo: TipoAsistencia.PRACTICAS },
+        },
+        {
+          id: 3,
+          becario_id: 7,
+          monto_bs: 15,
+          motivo: 'Retraso en Prácticas sin relación',
+          asistencia: null,
+        },
+      ];
+
+      multa_repo.find.mockResolvedValue(multas_mixtas);
+      const todas = await servicio.obtenerMultas();
+      expect(todas).toHaveLength(1);
+      expect(todas[0].id).toBe(1);
+
+      becario_repo.findOne.mockResolvedValue({ id: 7, usuario_id: 20 });
+      const mis_multas = await servicio.obtenerMisMultas(20);
+      expect(mis_multas).toHaveLength(1);
+      expect(mis_multas[0].id).toBe(1);
+    });
+  });
 });

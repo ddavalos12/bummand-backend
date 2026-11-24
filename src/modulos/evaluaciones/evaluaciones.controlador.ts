@@ -318,10 +318,13 @@ export class EvaluacionesControlador {
   procesarReceptorMentorQr(
     @Body() dto: ReceptorMentorQrDto,
     @UsuarioActual() usuario?: Usuario,
+    @Query('token') token_query?: string,
   ): Promise<Evaluacion> {
+    const dto_con_token =
+      !dto.token && token_query ? { ...dto, token: token_query } : dto;
     return usuario
-      ? this.evaluaciones_servicio.procesarReceptorMentorQr(dto, usuario)
-      : this.evaluaciones_servicio.procesarReceptorMentorQr(dto);
+      ? this.evaluaciones_servicio.procesarReceptorMentorQr(dto_con_token, usuario)
+      : this.evaluaciones_servicio.procesarReceptorMentorQr(dto_con_token);
   }
 
   @Roles(Rol.BECARIO, Rol.SUPERVISOR, Rol.ADMINISTRADOR)

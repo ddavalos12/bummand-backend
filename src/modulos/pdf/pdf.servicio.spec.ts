@@ -552,7 +552,8 @@ describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transport
       expect(html).toContain('Julio 2026');
       expect(html).toContain('Bs 1430.00');
       expect(html).toContain('Bs 1144.00');
-      expect(html).toContain('Bs 1124.00');
+      expect(html).not.toContain('Bs 1124.00');
+      expect(multa_repo_mock.find).not.toHaveBeenCalled();
       const tbody_match = html.match(/<tbody>([\s\S]*?)<\/tbody>/);
       expect(tbody_match).not.toBeNull();
       const filas_tbody = (tbody_match![1].match(/<tr>/g) || []).length;
@@ -684,7 +685,7 @@ describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transport
       );
     });
 
-    it('generarDonacionTransporteHtml y generarDonacionTransportePdf descuentan multas cuando descontar_multas=true y preservan BKL-23 cuando es false', async () => {
+    it('generarDonacionTransporteHtml y generarDonacionTransportePdf no descuentan multas en pasajes de Prácticas incluso si descontar_multas=true', async () => {
       const becarios_mock = [
         { id: 1, nombre: 'Juan Carlos Aruquipa Mamani' },
         { id: 2, nombre: 'Maria Belen Condori Quispe' },
@@ -718,7 +719,7 @@ describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transport
         },
       ];
 
-      const html_con_descuento = servicio.generarDonacionTransporteHtml({
+      const html_sin_descuento = servicio.generarDonacionTransporteHtml({
         mes: '2026-11',
         con_firma: 'false',
         descontar_multas: true,
@@ -727,18 +728,12 @@ describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transport
         multas: multas_mock as never,
       });
 
-      expect(html_con_descuento).toContain('80% Reconocido Bs.');
-      expect(html_con_descuento).toContain('(-) Multas Bs.');
-      expect(html_con_descuento).toContain('Líquido Pagable Bs.');
-      expect(html_con_descuento).toContain('80,00');
-      expect(html_con_descuento).toContain('20,00');
-      expect(html_con_descuento).toContain('60,00');
-      expect(html_con_descuento).toContain('16,00');
-      expect(html_con_descuento).toContain('30,00');
-      expect(html_con_descuento).toContain('0,00');
-      expect(html_con_descuento).toContain('96,00');
-      expect(html_con_descuento).toContain('50,00');
-      expect(html_con_descuento).toContain('descuento reglamentario por multas de asistencia');
+      expect(html_sin_descuento).toContain('Total Gral por c/u Bs.');
+      expect(html_sin_descuento).not.toContain('(-) Multas Bs.');
+      expect(html_sin_descuento).toContain('80,00');
+      expect(html_sin_descuento).toContain('16,00');
+      expect(html_sin_descuento).toContain('96,00');
+      expect(html_sin_descuento).not.toContain('descuento reglamentario por multas de asistencia');
 
       const qb_recorridos = crearConstructorConsultaMock(recorridos_mock);
       const qb_multas = crearConstructorConsultaMock(multas_mock);
@@ -768,13 +763,13 @@ describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transport
         descontar_multas: 'true',
       });
 
-      expect(multa_repo_mock.createQueryBuilder).toHaveBeenCalledTimes(1);
+      expect(multa_repo_mock.createQueryBuilder).not.toHaveBeenCalled();
       expect(resultado_con.nombre_archivo).toBe(
-        'Donacion_Transporte_BUMAND_Noviembre_SinFirma_ConDescuentoMultas.pdf',
+        'Donacion_Transporte_BUMAND_Noviembre_SinFirma.pdf',
       );
-      expect(espia_pdf.mock.calls[0][0]).toContain('Líquido Pagable Bs.');
+      expect(espia_pdf.mock.calls[0][0]).toContain('Total Gral por c/u Bs.');
+      expect(espia_pdf.mock.calls[0][0]).not.toContain('(-) Multas Bs.');
 
-      multa_repo_mock.createQueryBuilder.mockClear();
       const resultado_sin = await servicio_pdf.generarDonacionTransportePdf({
         mes: '2026-11',
         con_firma: 'false',
@@ -788,7 +783,7 @@ describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transport
       expect(espia_pdf.mock.calls[1][0]).not.toContain('(-) Multas Bs.');
     });
 
-    it('generarPasajesGeneralPdf y generarConsolidadoAuditoriaPdf excluyen descuento de multas cuando descontar_multas=false', async () => {
+    it('generarPasajesGeneralPdf y generarConsolidadoAuditoriaPdf excluyen descuento de multas por defecto y con descontar_multas=false', async () => {
       const recorridos_mock = [
         {
           id: 1,
@@ -847,6 +842,23 @@ describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transport
       expect(html_consolidado_sin).toContain('Excluye descuento de multas de asistencia');
       expect(html_consolidado_sin).toContain('- Bs 0.00');
       expect(html_consolidado_sin).toContain('Bs 80.00');
+    });
+
+    it('NavegadorPdfServicio usa generador PDF de respaldo cuando Chromium falla en serverless', async () => {
+      const navegador_pdf = new NavegadorPdfServicio();
+      jest
+        .spyOn(navegador_pdf, 'ejecutarConNavegador')
+        .mockRejectedValue(new Error('Chromium no disponible en Vercel'));
+
+      const bufer = await navegador_pdf.generarPdfDesdeHtml(
+        '<html><body><h1>Planilla Donación Transporte BUMAN-D</h1><table><tr><th>Becario</th><th>Monto</th></tr><tr><td>Isaías Daniel Herrera Mamani</td><td>Bs 9.60</td></tr></table></body></html>',
+      );
+
+      expect(Buffer.isBuffer(bufer)).toBe(true);
+      const texto_pdf = bufer.toString('latin1');
+      expect(texto_pdf.startsWith('%PDF-1.4')).toBe(true);
+      expect(texto_pdf).toContain('Planilla Donaci');
+      expect(texto_pdf).toContain('Herrera Mamani');
     });
   });
 });

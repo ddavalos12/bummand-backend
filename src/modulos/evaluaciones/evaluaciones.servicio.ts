@@ -1,5 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
-import { createHmac } from 'crypto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+  ConflictException,
+  InternalServerErrorException,
+  Optional,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Evaluacion, EstadoEvaluacion } from './entidades/evaluacion.entidad';
@@ -198,7 +207,40 @@ export class EvaluacionesServicio {
     private readonly notificaciones_servicio?: NotificacionesServicio,
     @Optional()
     private readonly tiempo_real_gateway?: TiempoRealGateway,
+    @Optional()
+    private readonly config_servicio?: ConfigService,
   ) {}
+
+  private esEvaluacionYaEnviada(estado?: EstadoEvaluacion | string | null): boolean {
+    return Boolean(
+      estado &&
+        estado !== EstadoEvaluacion.PENDIENTE &&
+        estado !== EstadoEvaluacion.BORRADOR &&
+        estado !== EstadoEvaluacion.OBSERVADO,
+    );
+  }
+
+  private async resolverBecarioIdParaConsulta(becario_o_usuario_id: number): Promise<number> {
+    if (this.becario_repo?.findOne && becario_o_usuario_id) {
+      const becario = await this.becario_repo.findOne({
+        where: [{ id: becario_o_usuario_id }, { usuario_id: becario_o_usuario_id }],
+      });
+      if (becario) return becario.id;
+    }
+    return becario_o_usuario_id;
+  }
+
+  private async resolverPeriodoIdReal(periodo_id?: number): Promise<number> {
+    if (this.periodo_repo?.findOne) {
+      if (periodo_id && periodo_id > 0) {
+        const encontrado = await this.periodo_repo.findOne({ where: { id: periodo_id } });
+        if (encontrado) return encontrado.id;
+      }
+      const abierto = await this.periodo_repo.findOne({ where: { estado: EstadoPeriodo.ABIERTO } });
+      if (abierto) return abierto.id;
+    }
+    return periodo_id && periodo_id > 0 ? periodo_id : 2;
+  }
 
   calcularCalificacionPonderadaDirecta(
     puntajes_por_modulo: Record<number, number>,
@@ -236,16 +278,19 @@ export class EvaluacionesServicio {
     becario_id: number,
     periodo_id: number,
   ): Promise<ResultadoCalificacionTotal> {
+    const becario_id_real = await this.resolverBecarioIdParaConsulta(becario_id);
+    const periodo_id_real = await this.resolverPeriodoIdReal(periodo_id);
+
     const [evaluaciones, periodo] = await Promise.all([
       this.evaluacion_repo.find({
-        where: { becario_id, periodo_id },
+        where: { becario_id: becario_id_real, periodo_id: periodo_id_real },
         relations: {
           modulo: true,
           evaluador: true,
           detalle_pastor: true,
         },
       }),
-      this.periodo_repo.findOne({ where: { id: periodo_id } }),
+      this.periodo_repo.findOne({ where: { id: periodo_id_real } }),
     ]);
 
     const pesos_dinamicos: Record<number, number> = {
@@ -534,6 +579,10 @@ export class EvaluacionesServicio {
           where: { becario_id: becario.id, modulo_id: modulo_1_id, periodo_id: periodo_activo_id },
         });
 
+        if (evaluacion && this.esEvaluacionYaEnviada(evaluacion.estado)) {
+          throw new ConflictException('El formulario ya fue enviado en este periodo');
+        }
+
         if (!evaluacion) {
           const evaluador_id = await resolverEvaluadorPastorId();
           evaluacion = this.evaluacion_repo.create({
@@ -541,7 +590,7 @@ export class EvaluacionesServicio {
             modulo_id: modulo_1_id,
             periodo_id: periodo_activo_id,
             evaluador_id,
-            estado: EstadoEvaluacion.COMPLETADO,
+            estado: EstadoEvaluacion.EN_REVISION_ADMINISTRACION,
             fecha_evaluacion: new Date(),
           });
           evaluacion = await this.evaluacion_repo.save(evaluacion);
@@ -667,7 +716,7 @@ export class EvaluacionesServicio {
     }
     evaluacion.estado = es_convalidado
       ? EstadoEvaluacion.COMPLETADO
-      : EstadoEvaluacion.PENDIENTE;
+      : EstadoEvaluacion.EN_REVISION_ADMINISTRACION;
 
     if (dto.observaciones !== undefined) {
       evaluacion.observaciones = dto.observaciones;
@@ -1133,8 +1182,9 @@ export class EvaluacionesServicio {
   }
 
   async obtenerPorBecario(becario_id: number): Promise<Evaluacion[]> {
+    const becario_id_real = await this.resolverBecarioIdParaConsulta(becario_id);
     return this.evaluacion_repo.find({
-      where: { becario_id },
+      where: { becario_id: becario_id_real },
       relations: {
         modulo: true,
         periodo: true,
@@ -1221,6 +1271,10 @@ export class EvaluacionesServicio {
       where: { becario_id: dto.becario_id, periodo_id: dto.periodo_id, modulo_id: 2 },
     });
 
+    if (evaluacion && this.esEvaluacionYaEnviada(evaluacion.estado)) {
+      throw new ConflictException('El formulario ya fue enviado en este periodo');
+    }
+
     if (!evaluacion) {
       evaluacion = this.evaluacion_repo.create({
         becario_id: dto.becario_id,
@@ -1260,6 +1314,13 @@ export class EvaluacionesServicio {
 
     if (!becario && this.becario_repo) {
       throw new NotFoundException(`No se encontró el becario con ID ${dto.becario_id}`);
+    }
+
+    const evaluacion_existente_mod2 = await this.evaluacion_repo.findOne({
+      where: { becario_id: dto.becario_id, periodo_id: dto.periodo_id, modulo_id: 2 },
+    });
+    if (evaluacion_existente_mod2 && this.esEvaluacionYaEnviada(evaluacion_existente_mod2.estado)) {
+      throw new ConflictException('El formulario ya fue enviado en este periodo');
     }
 
     if (this.documento_semestral_repo) {
@@ -1348,6 +1409,10 @@ export class EvaluacionesServicio {
     let evaluacion = await this.evaluacion_repo.findOne({
       where: { becario_id: dto.becario_id, periodo_id: dto.periodo_id, modulo_id: 2 },
     });
+
+    if (evaluacion && this.esEvaluacionYaEnviada(evaluacion.estado)) {
+      throw new ConflictException('El formulario ya fue enviado en este periodo');
+    }
 
     const datos_formulario = {
       materias: dto.materias.map((m, idx) => ({
@@ -1707,20 +1772,6 @@ export class EvaluacionesServicio {
       );
     }
 
-    if (usuario && esRolMentor(usuario.rol) && this.becario_repo && typeof this.becario_repo.find === 'function') {
-      const designados = await obtenerBecariosDesignadosMentor(
-        this.becario_repo,
-        usuario,
-        usuario.id,
-        this.usuario_repo,
-      );
-      if (designados.length > 0 && !designados.some((b) => b.id === dto.becario_id)) {
-        throw new ForbiddenException(
-          'Solo puede evaluar a los becarios asignados bajo su tutoría institucional.',
-        );
-      }
-    }
-
     let periodo_id = dto.periodo_id;
     if (!periodo_id && this.periodo_repo?.findOne) {
       if (dto.periodo) {
@@ -1733,6 +1784,22 @@ export class EvaluacionesServicio {
       }
     }
     if (!periodo_id) periodo_id = 2;
+
+    this.verificarTokenQrMentor(dto.token, dto.becario_id, periodo_id);
+
+    if (usuario && esRolMentor(usuario.rol) && this.becario_repo && typeof this.becario_repo.find === 'function') {
+      const designados = await obtenerBecariosDesignadosMentor(
+        this.becario_repo,
+        usuario,
+        usuario.id,
+        this.usuario_repo,
+      );
+      if (!designados.some((b) => b.id === dto.becario_id)) {
+        throw new ForbiddenException(
+          'Solo puede evaluar a los becarios asignados bajo su tutoría institucional.',
+        );
+      }
+    }
 
     let evaluador_id = 1;
     const modalidad_llenado =
@@ -1826,6 +1893,10 @@ export class EvaluacionesServicio {
     let evaluacion = await this.evaluacion_repo.findOne({
       where: { becario_id: dto.becario_id, periodo_id, modulo_id: 3 },
     });
+
+    if (evaluacion && this.esEvaluacionYaEnviada(evaluacion.estado)) {
+      throw new ConflictException('El formulario ya fue enviado en este periodo');
+    }
 
     const datos_previos = (evaluacion?.datos_formulario as Record<string, any>) || {};
 
@@ -2007,6 +2078,10 @@ export class EvaluacionesServicio {
     let evaluacion = await this.evaluacion_repo.findOne({
       where: { becario_id: becario_id_real, periodo_id, modulo_id: 5 },
     });
+
+    if (evaluacion && this.esEvaluacionYaEnviada(evaluacion.estado)) {
+      throw new ConflictException('El formulario ya fue enviado en este periodo');
+    }
 
     if (!evaluacion) {
       evaluacion = this.evaluacion_repo.create({
@@ -3510,18 +3585,103 @@ export class EvaluacionesServicio {
         datos_formulario: datos_form,
         modalidad_llenado: datos_form?.modalidad_llenado || null,
         fecha_evaluacion: evaluacion?.fecha_evaluacion || null,
+        token_qr: this.generarTokenQrMentor(b.id, periodo_activo_id),
       });
     }
 
     return resultados;
   }
 
-  private generarTokenQrMentor(becario_id: number): string {
-    const secreto = process.env.JWT_SECRET || 'bumand_qr_mentor_secret';
-    return createHmac('sha256', secreto)
-      .update(`bumand_mentor_m3:${becario_id}`)
-      .digest('hex')
-      .slice(0, 24);
+  private obtenerSecretoQrMentor(): string {
+    const secreto =
+      this.config_servicio?.get<string>('JWT_SECRET')?.trim() ||
+      process.env.JWT_SECRET?.trim();
+    if (!secreto) {
+      throw new InternalServerErrorException(
+        'Configuración de seguridad JWT_SECRET ausente para tokens QR.',
+      );
+    }
+    return secreto;
+  }
+
+  private generarTokenQrMentor(becario_id: number, periodo_id = 2): string {
+    const secreto = this.obtenerSecretoQrMentor();
+    const exp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
+    const payload = {
+      becario_id,
+      periodo_id,
+      tipo: 'mentor_qr',
+      exp,
+    };
+    const payload_b64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+    const firma_b64 = createHmac('sha256', secreto)
+      .update(payload_b64)
+      .digest('base64url');
+    return `${payload_b64}.${firma_b64}`;
+  }
+
+  private verificarTokenQrMentor(
+    token: string | undefined,
+    becario_id: number,
+    periodo_id?: number,
+  ): { becario_id: number; periodo_id: number; tipo: string; exp: number } {
+    if (!token || token.trim().length === 0) {
+      throw new ForbiddenException('El token de verificación QR es obligatorio.');
+    }
+
+    const partes = token.trim().split('.');
+    if (partes.length !== 2 || !partes[0] || !partes[1]) {
+      throw new ForbiddenException('El código QR escaneado es inválido o fue alterado.');
+    }
+
+    const [payload_b64, firma_recibida] = partes;
+    const secreto = this.obtenerSecretoQrMentor();
+    const firma_esperada = createHmac('sha256', secreto)
+      .update(payload_b64)
+      .digest('base64url');
+
+    const buf_recibida = Buffer.from(firma_recibida, 'utf8');
+    const buf_esperada = Buffer.from(firma_esperada, 'utf8');
+    if (
+      buf_recibida.length !== buf_esperada.length ||
+      !timingSafeEqual(buf_recibida, buf_esperada)
+    ) {
+      throw new ForbiddenException('El código QR escaneado es inválido o fue alterado.');
+    }
+
+    let payload: { becario_id?: number; periodo_id?: number; tipo?: string; exp?: number };
+    try {
+      payload = JSON.parse(Buffer.from(payload_b64, 'base64url').toString('utf8'));
+    } catch {
+      throw new ForbiddenException('El código QR escaneado es inválido o fue alterado.');
+    }
+
+    if (payload?.tipo !== 'mentor_qr' || typeof payload?.exp !== 'number') {
+      throw new ForbiddenException('El código QR escaneado es inválido o fue alterado.');
+    }
+
+    if (payload.exp <= Math.floor(Date.now() / 1000)) {
+      throw new ForbiddenException('El código QR ha expirado. Solicita un nuevo código QR.');
+    }
+
+    if (Number(payload.becario_id) !== Number(becario_id)) {
+      throw new ForbiddenException('El código QR no corresponde al becario indicado.');
+    }
+
+    if (
+      periodo_id !== undefined &&
+      payload.periodo_id !== undefined &&
+      Number(payload.periodo_id) !== Number(periodo_id)
+    ) {
+      throw new ForbiddenException('El código QR pertenece a otro periodo de evaluación.');
+    }
+
+    return {
+      becario_id: Number(payload.becario_id),
+      periodo_id: Number(payload.periodo_id ?? 2),
+      tipo: payload.tipo,
+      exp: payload.exp,
+    };
   }
 
   async obtenerMiQrModulo3(usuario: Usuario) {
@@ -3554,7 +3714,7 @@ export class EvaluacionesServicio {
       where: { becario_id: becario.id, modulo_id: 3, periodo_id: periodo_activo_id },
     });
 
-    const token_qr = this.generarTokenQrMentor(becario.id);
+    const token_qr = this.generarTokenQrMentor(becario.id, periodo_activo_id);
     const url_frontend = (process.env.FRONTEND_URL || 'https://bummand-frontend.vercel.app').replace(/\/+$/, '');
     const qr_url = `${url_frontend}/evaluar-mentor?becario_id=${becario.id}&token=${token_qr}`;
 
@@ -3594,12 +3754,7 @@ export class EvaluacionesServicio {
       throw new NotFoundException('Becario no encontrado.');
     }
 
-    if (token && token.trim().length > 0) {
-      const token_esperado = this.generarTokenQrMentor(becario.id);
-      if (token.trim() !== token_esperado) {
-        throw new BadRequestException('El código QR escaneado es inválido o fue alterado.');
-      }
-    }
+    this.verificarTokenQrMentor(token, becario.id, periodo_id);
 
     if (esRolMentor(usuario.rol)) {
       const designados = await obtenerBecariosDesignadosMentor(
@@ -3646,7 +3801,7 @@ export class EvaluacionesServicio {
         usuario.id,
         this.usuario_repo,
       );
-      if (designados.length > 0 && !designados.some((b) => b.id === becario_id)) {
+      if (!designados.some((b) => b.id === becario_id)) {
         throw new ForbiddenException('Este becario no está asignado a su supervisión.');
       }
     }
@@ -3731,6 +3886,22 @@ export class EvaluacionesServicio {
     let evaluacion = await this.evaluacion_repo.findOne({
       where: { becario_id, periodo_id: dto.periodo_id, modulo_id: 2 },
     });
+
+    if (evaluacion) {
+      const ya_finalizada =
+        evaluacion.estado === EstadoEvaluacion.COMPLETADO ||
+        evaluacion.estado === EstadoEvaluacion.PRE_EVALUADO;
+      const ambos_documentos_subidos = Boolean(
+        evaluacion.archivo_record_academico && evaluacion.archivo_historial_academico,
+      );
+      const mismo_documento_repetido =
+        (dto.tipo_documento === 'record_academico' && Boolean(evaluacion.archivo_record_academico)) ||
+        (dto.tipo_documento === 'historial_academico' && Boolean(evaluacion.archivo_historial_academico));
+
+      if (ya_finalizada || (this.esEvaluacionYaEnviada(evaluacion.estado) && (ambos_documentos_subidos || mismo_documento_repetido))) {
+        throw new ConflictException('El formulario ya fue enviado en este periodo');
+      }
+    }
 
     const datos_previos = (evaluacion?.datos_formulario as Record<string, any>) || {};
     const metadata_documento = {

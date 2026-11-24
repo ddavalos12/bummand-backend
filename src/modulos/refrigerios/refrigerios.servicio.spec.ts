@@ -77,61 +77,6 @@ describe('RefrigeriosServicio', () => {
     });
   });
 
-  describe('Sorteo y Asignación de Duplas (TAREA-15)', () => {
-    it('debe sortear aleatoriamente 2 becarios distintos cuando no se especifican IDs', async () => {
-      refrigerio_repo.find.mockResolvedValue([]);
-
-      const resultado = await servicio.sortearDupla(
-        { fecha: '2026-10-30', cantidad_raciones: 23, presupuesto_referencial_bs: 138.0 },
-        1,
-      );
-
-      expect(resultado).toBeDefined();
-      expect(refrigerio_repo.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          cantidad_raciones: 23,
-          presupuesto_referencial_bs: 138.0,
-          modalidad_preparacion: 'cocina_diaconia',
-          estado_reposicion: 'sorteado_programado',
-          porcentaje_devolucion: 100.0,
-        }),
-      );
-      expect(notificaciones_servicio.crear).toHaveBeenCalled();
-    });
-
-    it('debe asignar la dupla manualmente si se especifican los IDs', async () => {
-      becario_repo.findOne
-        .mockResolvedValueOnce({ id: 1, nombre: 'Nilda Churata', usuario_id: 11 })
-        .mockResolvedValueOnce({ id: 2, nombre: 'Joel Mamani', usuario_id: 12 });
-
-      const resultado = await servicio.sortearDupla(
-        {
-          fecha: '2026-10-30',
-          becario_encargado_1_id: 1,
-          becario_encargado_2_id: 2,
-        },
-        1,
-      );
-
-      expect(resultado).toBeDefined();
-      expect(refrigerio_repo.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          becario_encargado_1_id: 1,
-          becario_encargado_2_id: 2,
-        }),
-      );
-    });
-
-    it('debe rechazar si se intenta asignar al mismo becario dos veces', async () => {
-      await expect(
-        servicio.sortearDupla(
-          { fecha: '2026-10-30', becario_encargado_1_id: 1, becario_encargado_2_id: 1 },
-          1,
-        ),
-      ).rejects.toThrow(BadRequestException);
-    });
-  });
-
   describe('Rendición y Estados del Refrigerio (TAREA-15)', () => {
     it('debe registrar la rendición con modalidad, ingredientes y 100% de devolución', async () => {
       const refrigerio_existente = {
