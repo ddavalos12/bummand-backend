@@ -1107,6 +1107,7 @@ export class AsistenciaServicio {
     dto: RectificarAsistenciaDto,
     usuario_id?: number,
   ): Promise<RegistroAsistencia> {
+    this.validarIdEnteroPg(id);
     const registro = await this.asistenciaRepositorio.findOne({
       where: { id },
       relations: { becario: { usuario: true } },
@@ -1189,6 +1190,7 @@ export class AsistenciaServicio {
     dto: RevisarSupervisorAsistenciaDto,
     supervisor_id: number,
   ): Promise<RegistroAsistencia> {
+    this.validarIdEnteroPg(id);
     const registro = await this.asistenciaRepositorio.findOne({
       where: { id },
       relations: { becario: true },
@@ -1217,6 +1219,7 @@ export class AsistenciaServicio {
     dto: AprobarAdminAsistenciaDto,
     admin_id: number,
   ): Promise<RegistroAsistencia> {
+    this.validarIdEnteroPg(id);
     const registro = await this.asistenciaRepositorio.findOne({
       where: { id },
       relations: { becario: true },
@@ -1557,10 +1560,17 @@ export class AsistenciaServicio {
     };
   }
 
+  private validarIdEnteroPg(id: number): void {
+    if (!Number.isSafeInteger(id) || id < 1 || id > 2147483647) {
+      throw new BadRequestException('Identificador de asistencia inválido');
+    }
+  }
+
   async eliminar(
     id: number,
     usuario?: Usuario,
   ): Promise<{ mensaje: string; id: number }> {
+    this.validarIdEnteroPg(id);
     const registro = await this.asistenciaRepositorio.findOne({
       where: { id },
       relations: { becario: true },

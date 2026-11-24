@@ -1,7 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Reflector } from '@nestjs/core';
+import { ForbiddenException } from '@nestjs/common';
 import { PdfControlador } from './pdf.controlador';
 import { PdfServicio } from './pdf.servicio';
 import { EvaluacionesServicio } from '../evaluaciones/evaluaciones.servicio';
+import { ROLES_KEY } from '../autenticacion/roles.decorador';
+import { RolesGuardia } from '../autenticacion/roles.guardia';
+import { Rol } from '../usuarios/entidades/usuario.entidad';
 
 describe('PdfControlador', () => {
   let controller: PdfControlador;
@@ -180,5 +185,29 @@ describe('PdfControlador', () => {
       }),
     );
     expect(respuesta_mock.end).toHaveBeenCalled();
+  });
+
+  it('restringe donacion-refrigerio y donacion-transporte exclusivamente a Rol.ADMINISTRADOR (bloquea Mentores)', () => {
+    const reflector = new Reflector();
+    const guardia = new RolesGuardia(reflector);
+
+    for (const metodo of [controller.generarDonacionRefrigerio, controller.generarDonacionTransporte]) {
+      const roles = reflector.getAllAndOverride<Rol[]>(ROLES_KEY, [metodo, PdfControlador]);
+      expect(roles).toEqual([Rol.ADMINISTRADOR]);
+
+      const crearContexto = (rol: Rol | string) =>
+        ({
+          getHandler: () => metodo,
+          getClass: () => PdfControlador,
+          switchToHttp: () => ({
+            getRequest: () => ({ usuario: { id: 1, rol } }),
+          }),
+        }) as any;
+
+      expect(guardia.canActivate(crearContexto(Rol.ADMINISTRADOR))).toBe(true);
+      expect(() => guardia.canActivate(crearContexto(Rol.SUPERVISOR))).toThrow(ForbiddenException);
+      expect(() => guardia.canActivate(crearContexto('mentor'))).toThrow(ForbiddenException);
+      expect(() => guardia.canActivate(crearContexto(Rol.BECARIO))).toThrow(ForbiddenException);
+    }
   });
 });

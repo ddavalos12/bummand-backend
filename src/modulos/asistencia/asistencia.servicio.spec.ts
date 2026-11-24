@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   AsistenciaServicio,
@@ -618,6 +618,15 @@ describe('AsistenciaServicio', () => {
       await expect(
         servicio.eliminar(999, { id: 1, rol: Rol.ADMINISTRADOR } as Usuario),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('debe lanzar BadRequestException para un id fuera de rango int32 sin consultar PostgreSQL', async () => {
+      await expect(
+        servicio.eliminar(1795543800000, { id: 1, rol: Rol.ADMINISTRADOR } as Usuario),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(asistencia_repo.findOne).not.toHaveBeenCalled();
+      expect(asistencia_repo.remove).not.toHaveBeenCalled();
     });
 
     it('debe lanzar ForbiddenException si un supervisor intenta eliminar un registro de un becario no asignado', async () => {

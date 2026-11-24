@@ -92,14 +92,6 @@ export const SUPERVISORES_SEMILLA: SupervisorSemilla[] = [
     "telefono": "71982341"
   },
   {
-    "nombre": "Rodrigo Solorzano San Martin",
-    "correo": "rodrigo.solorzano@diaconia.bo",
-    "clave": "Bumand2026!",
-    "unidad": "Productos y Canales / SGN de Captaciones",
-    "cargo": "Responsable de Productos y Canales Financieros",
-    "telefono": "72091823"
-  },
-  {
     "nombre": "Elsa Quinteros Aquino",
     "correo": "elsa.quinteros@diaconia.bo",
     "clave": "Bumand2026!",
@@ -330,7 +322,7 @@ export const BECARIOS_SEMILLA: BecarioSemilla[] = [
     "iglesia_nombre": "Sinai Los Andes",
     "clave": "Bumand2026!",
     "institucion": "Diaconía FRIF-IFD",
-    "supervisor_correo": "rodrigo.solorzano@diaconia.bo",
+    "supervisor_correo": "cheryl.zegarra@diaconia.bo",
     "horario_semanal": {
       "lunes": "13:00 - 16:30",
       "miercoles": "13:00 - 16:30",

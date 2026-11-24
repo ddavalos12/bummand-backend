@@ -4,6 +4,9 @@ import type { Response } from 'express';
 import { PdfServicio } from './pdf.servicio';
 import { EvaluacionesServicio } from '../evaluaciones/evaluaciones.servicio';
 import { JwtGuardia } from '../autenticacion/jwt.guardia';
+import { RolesGuardia } from '../autenticacion/roles.guardia';
+import { Roles } from '../autenticacion/roles.decorador';
+import { Rol } from '../usuarios/entidades/usuario.entidad';
 
 @ApiTags('PDF')
 @ApiBearerAuth('JWT-auth')
@@ -448,6 +451,8 @@ export class PdfControlador {
   }
 
   @Get('donacion-refrigerio')
+  @UseGuards(JwtGuardia, RolesGuardia)
+  @Roles(Rol.ADMINISTRADOR)
   @ApiOperation({
     summary: 'Generar planilla oficial PDF de Donación para Refrigerio BUMAN-D',
     description:
@@ -489,6 +494,8 @@ export class PdfControlador {
   }
 
   @Get('donacion-transporte')
+  @UseGuards(JwtGuardia, RolesGuardia)
+  @Roles(Rol.ADMINISTRADOR)
   @ApiOperation({
     summary: 'Generar planilla oficial PDF de Donación para Transporte BUMAN-D',
     description:
