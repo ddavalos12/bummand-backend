@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, ParseIntPipe, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, ParseIntPipe, UseGuards, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { AsistenciaServicio } from './asistencia.servicio';
 import { RegistroAsistencia } from './entidades/registro-asistencia.entidad';
@@ -286,5 +286,23 @@ export class AsistenciaControlador {
       supervisor_id: supervisor_id ? Number(supervisor_id) : undefined,
       limite: limite ? Number(limite) : undefined,
     });
+  }
+
+  @Delete(':id')
+  @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR)
+  @ApiOperation({
+    summary: 'Eliminar registro de asistencia',
+    description:
+      'Permite a Administración o Supervisores autorizados eliminar registros de asistencia erróneos o de prueba.',
+  })
+  @ApiParam({ name: 'id', description: 'Identificador del registro de asistencia', type: Number, example: 1 })
+  @ApiResponse({ status: 200, description: 'Registro de asistencia eliminado correctamente.' })
+  @ApiResponse({ status: 403, description: 'No autorizado para eliminar registros de este becario.' })
+  @ApiResponse({ status: 404, description: 'Registro de asistencia no encontrado.' })
+  eliminar(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActual() usuario: Usuario,
+  ): Promise<{ mensaje: string; id: number }> {
+    return this.asistenciaServicio.eliminar(id, usuario);
   }
 }

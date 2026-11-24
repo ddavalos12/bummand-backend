@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AsistenciaServicio } from './asistencia.servicio';
 import { RegistroAsistencia, TipoAsistencia, EstadoAprobacionAsistencia } from './entidades/registro-asistencia.entidad';
@@ -7,6 +8,7 @@ import { LugarPractica } from '../lugares-practica/entidades/lugar-practica.enti
 import { Multa } from './entidades/multa.entidad';
 import { Justificacion, EstadoJustificacion } from '../justificaciones/entidades/justificacion.entidad';
 import { Evento, TipoEvento, EstadoEvento } from '../eventos/entidades/evento.entidad';
+import { Rol, Usuario } from '../usuarios/entidades/usuario.entidad';
 
 describe('AsistenciaServicio', () => {
   let servicio: AsistenciaServicio;
@@ -25,10 +27,12 @@ describe('AsistenciaServicio', () => {
       create: jest.fn().mockImplementation((d) => ({ ...d, id: 1 })),
       save: jest.fn().mockImplementation((d) => Promise.resolve({ ...d })),
       find: jest.fn(),
+      remove: jest.fn().mockResolvedValue(undefined),
     };
 
     becario_repo = {
       findOne: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
     };
 
     lugar_repo = {
@@ -41,6 +45,7 @@ describe('AsistenciaServicio', () => {
       create: jest.fn().mockImplementation((d) => ({ ...d, id: 99 })),
       save: jest.fn().mockImplementation((d) => Promise.resolve({ ...d })),
       find: jest.fn(),
+      delete: jest.fn().mockResolvedValue({ affected: 0 }),
     };
 
     notificaciones_servicio = {
@@ -577,6 +582,73 @@ describe('AsistenciaServicio', () => {
       });
 
       expect(res.registro.dentro_de_radio).toBe(true);
+    });
+  });
+
+  describe('Eliminación de registros de asistencia (DELETE /asistencia/:id)', () => {
+    it('debe permitir al administrador eliminar un registro y sus multas asociadas', async () => {
+      const registro_mock = {
+        id: 12,
+        becario_id: 2,
+        becario: { id: 2, supervisor_id: 4 },
+      };
+      asistencia_repo.findOne.mockResolvedValue(registro_mock);
+
+      const res = await servicio.eliminar(12, { id: 1, rol: Rol.ADMINISTRADOR } as Usuario);
+
+      expect(asistencia_repo.findOne).toHaveBeenCalledWith({
+        where: { id: 12 },
+        relations: { becario: true },
+      });
+      expect(multa_repo.delete).toHaveBeenCalledWith({ asistencia_id: 12 });
+      expect(asistencia_repo.remove).toHaveBeenCalledWith(registro_mock);
+      expect(res).toEqual({
+        mensaje: 'Registro de asistencia eliminado correctamente',
+        id: 12,
+      });
+    });
+
+    it('debe lanzar NotFoundException si el registro de asistencia no existe', async () => {
+      asistencia_repo.findOne.mockResolvedValue(null);
+
+      await expect(
+        servicio.eliminar(999, { id: 1, rol: Rol.ADMINISTRADOR } as Usuario),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('debe lanzar ForbiddenException si un supervisor intenta eliminar un registro de un becario no asignado', async () => {
+      asistencia_repo.findOne.mockResolvedValue({
+        id: 15,
+        becario_id: 99,
+        becario: { id: 99, supervisor_id: 13 },
+      });
+      becario_repo.find.mockResolvedValue([
+        { id: 2, supervisor_id: 4 },
+        { id: 99, supervisor_id: 13 },
+      ]);
+
+      await expect(
+        servicio.eliminar(15, { id: 4, rol: Rol.SUPERVISOR } as Usuario),
+      ).rejects.toThrow(ForbiddenException);
+      expect(asistencia_repo.remove).not.toHaveBeenCalled();
+    });
+
+    it('debe permitir al supervisor eliminar un registro de su becario asignado', async () => {
+      const registro_mock = {
+        id: 16,
+        becario_id: 2,
+        becario: { id: 2, supervisor_id: 4 },
+      };
+      asistencia_repo.findOne.mockResolvedValue(registro_mock);
+      becario_repo.find.mockResolvedValue([
+        { id: 2, supervisor_id: 4 },
+        { id: 99, supervisor_id: 13 },
+      ]);
+
+      const res = await servicio.eliminar(16, { id: 4, rol: Rol.SUPERVISOR } as Usuario);
+
+      expect(asistencia_repo.remove).toHaveBeenCalledWith(registro_mock);
+      expect(res.id).toBe(16);
     });
   });
 });

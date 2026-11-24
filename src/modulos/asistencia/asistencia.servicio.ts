@@ -1,4 +1,11 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+  ForbiddenException,
+  Optional,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { RegistroAsistencia, TipoAsistencia, EstadoAprobacionAsistencia } from './entidades/registro-asistencia.entidad';
@@ -1585,6 +1592,49 @@ export class AsistenciaServicio {
       horas_compensadas_permiso: total_horas_compensadas_gestion,
       extracto_actual: extractos_filtrados[0] || null,
       extractos: extractos_filtrados,
+    };
+  }
+
+  async eliminar(
+    id: number,
+    usuario?: Usuario,
+  ): Promise<{ mensaje: string; id: number }> {
+    const registro = await this.asistenciaRepositorio.findOne({
+      where: { id },
+      relations: { becario: true },
+    });
+    if (!registro) {
+      throw new NotFoundException(`Registro de asistencia #${id} no encontrado`);
+    }
+
+    if (usuario && esRolMentor(usuario.rol) && usuario.rol !== Rol.ADMINISTRADOR) {
+      const ids_permitidos = await obtenerIdsBecariosDesignadosMentor(
+        this.becarioRepositorio,
+        usuario,
+        usuario.id,
+      );
+      const pertenece_directo = registro.becario?.supervisor_id === usuario.id;
+      if (
+        (ids_permitidos.size > 0 && !ids_permitidos.has(registro.becario_id)) ||
+        (ids_permitidos.size === 0 && !pertenece_directo)
+      ) {
+        throw new ForbiddenException(
+          'Solo puedes eliminar registros de asistencia de tus becarios asignados.',
+        );
+      }
+    }
+
+    if (this.multaRepositorio && typeof this.multaRepositorio.delete === 'function') {
+      await this.multaRepositorio.delete({ asistencia_id: id });
+    }
+
+    await this.asistenciaRepositorio.remove(registro);
+
+    this.tiempoRealGateway?.notificarAsistencia({ accion: 'eliminada', id });
+
+    return {
+      mensaje: 'Registro de asistencia eliminado correctamente',
+      id,
     };
   }
 }
