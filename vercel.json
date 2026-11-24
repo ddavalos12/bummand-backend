@@ -6,7 +6,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 60,
-      "includeFiles": "{dist/**,node_modules/@sparticuz/chromium/**}"
+      "includeFiles": "{dist/**,node_modules/@sparticuz/chromium/**,node_modules/tar-fs/**,node_modules/tar-stream/**,node_modules/pump/**}"
     }
   },
   "rewrites": [

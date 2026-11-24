@@ -1,7 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import * as fs from 'fs';
 import type { Browser, HTTPRequest, LaunchOptions } from 'puppeteer-core';
-import { generarPdfRespaldoDesdeHtml } from './generador-pdf-respaldo.utilidad';
 
 export type ModoNavegadorPdf = 'cloud' | 'local';
 
@@ -176,10 +175,13 @@ export class NavegadorPdfServicio {
       });
     } catch (error) {
       const mensaje = error instanceof Error ? error.message : String(error);
-      this.registrador.warn(
-        `Fallo en Chromium (${modo_actual}), usando generador PDF de respaldo en servidor: ${mensaje}`,
+      this.registrador.error(
+        `Fallo en Chromium (${modo_actual}), devolviendo HTTP 503 para activar respaldo estilizado en cliente: ${mensaje}`,
+        error instanceof Error ? error.stack : undefined,
       );
-      return generarPdfRespaldoDesdeHtml(html, opciones);
+      throw new ServiceUnavailableException(
+        `El motor de generación PDF (Chromium) no está disponible en este entorno: ${mensaje}`,
+      );
     }
   }
 
@@ -221,15 +223,24 @@ export class NavegadorPdfServicio {
 
   private async obtenerClienteChromium(): Promise<ModuloSparticuzChromium> {
     if (!this.cliente_chromium_cache) {
-      const importar_esm = new Function(
-        'especificador',
-        'return import(especificador);',
-      ) as (
-        especificador: string,
-      ) => Promise<
-        { default?: ModuloSparticuzChromium } & ModuloSparticuzChromium
-      >;
-      const modulo = await importar_esm('@sparticuz/chromium');
+      let modulo: {
+        default?: ModuloSparticuzChromium;
+      } & ModuloSparticuzChromium;
+      try {
+        // Node >= 22.12 soporta require(ESM) de forma nativa y @vercel/nft lo rastrea estáticamente
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        modulo = require('@sparticuz/chromium') as {
+          default?: ModuloSparticuzChromium;
+        } & ModuloSparticuzChromium;
+      } catch (error: unknown) {
+        const codigo = (error as { code?: string })?.code;
+        if (codigo !== 'ERR_REQUIRE_ESM') {
+          throw error;
+        }
+        modulo = (await import('@sparticuz/chromium')) as unknown as {
+          default?: ModuloSparticuzChromium;
+        } & ModuloSparticuzChromium;
+      }
       this.cliente_chromium_cache = modulo.default || modulo;
     }
     return this.cliente_chromium_cache;
@@ -251,10 +262,9 @@ export class NavegadorPdfServicio {
       const ruta_bin_personalizada = (
         process.env.PUPPETEER_CHROMIUM_PACK_URL || ''
       ).trim();
-      ruta_ejecutable =
-        ruta_bin_personalizada && !ruta_bin_personalizada.startsWith('http')
-          ? await cliente_chromium.executablePath(ruta_bin_personalizada)
-          : await cliente_chromium.executablePath();
+      ruta_ejecutable = ruta_bin_personalizada
+        ? await cliente_chromium.executablePath(ruta_bin_personalizada)
+        : await cliente_chromium.executablePath();
     }
 
     const argumentos_deduplicados = Array.from(
@@ -267,7 +277,7 @@ export class NavegadorPdfServicio {
     return cliente_puppeteer.launch({
       args: argumentos_deduplicados,
       executablePath: ruta_ejecutable,
-      headless: cliente_chromium.headless ?? true,
+      headless: cliente_chromium.headless ?? 'shell',
     });
   }
 

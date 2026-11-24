@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import {
   PdfServicio,
   separarNombresYApellidos,
@@ -844,21 +845,50 @@ describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transport
       expect(html_consolidado_sin).toContain('Bs 80.00');
     });
 
-    it('NavegadorPdfServicio usa generador PDF de respaldo cuando Chromium falla en serverless', async () => {
+    it('NavegadorPdfServicio lanza ServiceUnavailableException (HTTP 503) cuando Chromium falla para no devolver PDF plano degradado', async () => {
       const navegador_pdf = new NavegadorPdfServicio();
       jest
         .spyOn(navegador_pdf, 'ejecutarConNavegador')
         .mockRejectedValue(new Error('Chromium no disponible en Vercel'));
 
-      const bufer = await navegador_pdf.generarPdfDesdeHtml(
-        '<html><body><h1>Planilla Donación Transporte BUMAN-D</h1><table><tr><th>Becario</th><th>Monto</th></tr><tr><td>Isaías Daniel Herrera Mamani</td><td>Bs 9.60</td></tr></table></body></html>',
-      );
+      await expect(
+        navegador_pdf.generarPdfDesdeHtml(
+          '<html><body><h1>Planilla Donación Transporte BUMAN-D</h1></body></html>',
+        ),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
 
-      expect(Buffer.isBuffer(bufer)).toBe(true);
-      const texto_pdf = bufer.toString('latin1');
-      expect(texto_pdf.startsWith('%PDF-1.4')).toBe(true);
-      expect(texto_pdf).toContain('Planilla Donaci');
-      expect(texto_pdf).toContain('Herrera Mamani');
+    it('NavegadorPdfServicio en modo cloud acepta PUPPETEER_CHROMIUM_PACK_URL con URL remota http(s)', async () => {
+      const prev_mode = process.env.PUPPETEER_MODE;
+      const prev_pack = process.env.PUPPETEER_CHROMIUM_PACK_URL;
+      const prev_exec = process.env.PUPPETEER_EXECUTABLE_PATH;
+
+      process.env.PUPPETEER_MODE = 'cloud';
+      process.env.PUPPETEER_CHROMIUM_PACK_URL =
+        'https://cdn.ejemplo.bo/chromium-pack.tar';
+      delete process.env.PUPPETEER_EXECUTABLE_PATH;
+
+      try {
+        const navegador_pdf = new NavegadorPdfServicio();
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const chromium_mock = require('@sparticuz/chromium') as {
+          executablePath: jest.Mock;
+        };
+        chromium_mock.executablePath.mockClear();
+
+        await navegador_pdf.generarPdfDesdeHtml('<html><body>OK</body></html>');
+
+        expect(chromium_mock.executablePath).toHaveBeenCalledWith(
+          'https://cdn.ejemplo.bo/chromium-pack.tar',
+        );
+      } finally {
+        if (prev_mode === undefined) delete process.env.PUPPETEER_MODE;
+        else process.env.PUPPETEER_MODE = prev_mode;
+        if (prev_pack === undefined) delete process.env.PUPPETEER_CHROMIUM_PACK_URL;
+        else process.env.PUPPETEER_CHROMIUM_PACK_URL = prev_pack;
+        if (prev_exec === undefined) delete process.env.PUPPETEER_EXECUTABLE_PATH;
+        else process.env.PUPPETEER_EXECUTABLE_PATH = prev_exec;
+      }
     });
   });
 });
