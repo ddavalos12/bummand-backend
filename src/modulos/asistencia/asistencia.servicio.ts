@@ -801,8 +801,9 @@ export class AsistenciaServicio {
       }
     }
 
+    const copia_registro = { ...guardado };
     return Object.assign(guardado, {
-      registro: guardado,
+      registro: copia_registro,
       mensaje: 'Asistencia manual registrada satisfactoriamente.',
     });
   }
