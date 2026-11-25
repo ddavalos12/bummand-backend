@@ -781,7 +781,11 @@ export class AsistenciaServicio {
       minutos_retraso: 0,
       confirmado_organizador: true,
       es_registro_manual: true,
-      motivo_contingencia: dto.motivo_contingencia || dto.motivoContingencia || 'Registro manual administrativo (contingencia sin megas/olvido)',
+      motivo_contingencia:
+        dto.motivo_contingencia ||
+        dto.motivoContingencia ||
+        dto.motivo ||
+        'Registro manual administrativo (contingencia sin megas/olvido)',
       lugar_practica_id: dto.lugar_practica_id ?? dto.lugarPracticaId ?? null,
       evento_id: dto.evento_id ?? dto.eventoId ?? null,
     });

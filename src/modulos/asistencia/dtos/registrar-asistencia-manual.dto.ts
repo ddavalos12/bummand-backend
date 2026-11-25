@@ -117,4 +117,60 @@ export class RegistrarAsistenciaManualDto {
   @IsOptional()
   @IsString()
   motivoContingencia?: string;
+
+  @ApiPropertyOptional({
+    example: 'Sin megas en el celular / olvido de marcación',
+    description: 'Alias corto del motivo de contingencia',
+  })
+  @IsOptional()
+  @IsString()
+  motivo?: string;
+
+  @ApiPropertyOptional({
+    example: 'Oficina Central Bloque A',
+    description: 'Nombre referencial de la sede o lugar seleccionado en el cliente web',
+  })
+  @IsOptional()
+  @IsString()
+  lugar_nombre?: string;
+
+  @ApiPropertyOptional({
+    example: 'Oficina Central Bloque A',
+    description: 'Alias en camelCase del nombre de la sede',
+  })
+  @IsOptional()
+  @IsString()
+  lugarNombre?: string;
+
+  @ApiPropertyOptional({
+    example: 4,
+    description: 'Horas estimadas calculadas en cliente (el servidor recalcula de forma autoritativa)',
+  })
+  @IsOptional()
+  @IsNumber()
+  horas_trabajadas?: number;
+
+  @ApiPropertyOptional({
+    example: 4,
+    description: 'Alias en camelCase de las horas estimadas',
+  })
+  @IsOptional()
+  @IsNumber()
+  horasTrabajadas?: number;
+
+  @ApiPropertyOptional({
+    example: 'Administrador',
+    description: 'Nombre referencial del usuario administrativo o mentor que registra',
+  })
+  @IsOptional()
+  @IsString()
+  registrado_por?: string;
+
+  @ApiPropertyOptional({
+    example: 'Administrador',
+    description: 'Alias en camelCase del usuario que registra',
+  })
+  @IsOptional()
+  @IsString()
+  registradoPor?: string;
 }
