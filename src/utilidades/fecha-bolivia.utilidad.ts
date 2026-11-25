@@ -96,14 +96,38 @@ export function obtenerFechaHoraBolivia(base: Date = new Date()): FechaHoraBoliv
   }
 }
 
+export const DIA_CORTE_MENSUAL_BANCARIO = 24;
+
+export function avanzarMesPeriodo(anio: number, mes: number, delta: number): { anio: number; mes: number } {
+  const indice = anio * 12 + (mes - 1) + delta;
+  return {
+    anio: Math.floor(indice / 12),
+    mes: ((indice % 12) + 12) % 12 + 1,
+  };
+}
+
+export function obtenerPeriodoCorteDesdeComponentes(anio: number, mes: number, dia: number): string {
+  const destino = dia >= DIA_CORTE_MENSUAL_BANCARIO ? avanzarMesPeriodo(anio, mes, 1) : { anio, mes };
+  return `${String(destino.anio).padStart(4, '0')}-${String(destino.mes).padStart(2, '0')}`;
+}
+
+export function obtenerPeriodoCorteDesdeFechaIso(fecha_iso?: string | null): string | null {
+  const coincidencia = (fecha_iso || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!coincidencia) return null;
+  const anio = Number(coincidencia[1]);
+  const mes = Number(coincidencia[2]);
+  const dia = Number(coincidencia[3]);
+  if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
+  return obtenerPeriodoCorteDesdeComponentes(anio, mes, dia);
+}
+
 export function obtenerPeriodoActualBolivia(base: Date = new Date()): string {
   const bo = obtenerFechaHoraBolivia(base);
-  return `${String(bo.anio).padStart(4, '0')}-${String(bo.mes).padStart(2, '0')}`;
+  return obtenerPeriodoCorteDesdeComponentes(bo.anio, bo.mes, bo.dia);
 }
 
 export function obtenerNombreMesAnioBolivia(base: Date = new Date()): string {
-  const bo = obtenerFechaHoraBolivia(base);
-  return `${NOMBRES_MESES_ESPANOL[bo.mes - 1]} ${bo.anio}`;
+  return obtenerNombrePeriodoDesdeIso(obtenerPeriodoActualBolivia(base));
 }
 
 export function obtenerNombrePeriodoDesdeIso(periodo: string): string {
@@ -123,11 +147,12 @@ export function obtenerRangoMesBolivia(
   anio: number,
   mes: number,
 ): { fecha_inicio: string; fecha_fin: string } {
-  const mes_pad = String(mes).padStart(2, '0');
-  const ultimo_dia = new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+  const anterior = avanzarMesPeriodo(anio, mes, -1);
+  const inicio_mes_pad = String(anterior.mes).padStart(2, '0');
+  const fin_mes_pad = String(mes).padStart(2, '0');
   return {
-    fecha_inicio: `${anio}-${mes_pad}-01`,
-    fecha_fin: `${anio}-${mes_pad}-${String(ultimo_dia).padStart(2, '0')}`,
+    fecha_inicio: `${String(anterior.anio).padStart(4, '0')}-${inicio_mes_pad}-${String(DIA_CORTE_MENSUAL_BANCARIO).padStart(2, '0')}`,
+    fecha_fin: `${String(anio).padStart(4, '0')}-${fin_mes_pad}-${String(DIA_CORTE_MENSUAL_BANCARIO - 1).padStart(2, '0')}`,
   };
 }
 
@@ -142,4 +167,35 @@ export function extraerFechaIsoSinDesfase(
   const fecha = valor instanceof Date ? valor : new Date(valor);
   if (isNaN(fecha.getTime())) return null;
   return fecha.toISOString().slice(0, 10);
+}
+
+export function calcularSegundosEntreHoras(
+  hora_ingreso?: string | null,
+  hora_salida?: string | null,
+): number {
+  if (!hora_ingreso || !hora_salida) return 0;
+  const partes_ing = hora_ingreso.trim().split(':').map(Number);
+  const partes_sal = hora_salida.trim().split(':').map(Number);
+  if (partes_ing.length < 2 || partes_sal.length < 2) return 0;
+  const [h_i, m_i, s_i = 0] = partes_ing;
+  const [h_s, m_s, s_s = 0] = partes_sal;
+  if ([h_i, m_i, s_i, h_s, m_s, s_s].some((n) => Number.isNaN(n))) return 0;
+  const diff = h_s * 3600 + m_s * 60 + s_s - (h_i * 3600 + m_i * 60 + s_i);
+  return diff > 0 ? diff : 0;
+}
+
+export function formatearSegundosAHhmmss(total_segundos: number): string {
+  const signo = total_segundos < 0 ? '-' : '';
+  const abs = Math.max(0, Math.round(Math.abs(total_segundos)));
+  const horas = Math.floor(abs / 3600);
+  const minutos = Math.floor((abs % 3600) / 60);
+  const segundos = abs % 60;
+  return `${signo}${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+}
+
+export function formatearHorasDecimalAHhmmss(horas?: number | null): string {
+  if (horas === null || horas === undefined || Number.isNaN(Number(horas))) {
+    return '00:00:00';
+  }
+  return formatearSegundosAHhmmss(Math.round(Number(horas) * 3600));
 }

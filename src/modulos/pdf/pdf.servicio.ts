@@ -18,9 +18,14 @@ import {
   RANGOS_APROBACION_OFICIALES,
 } from '../evaluaciones/constantes/consolidado-semestral-datos.constantes';
 import {
+  calcularSegundosEntreHoras,
   extraerFechaIsoSinDesfase,
+  formatearHorasDecimalAHhmmss,
+  formatearSegundosAHhmmss,
   NOMBRES_MESES_ESPANOL,
   obtenerFechaHoraBolivia,
+  obtenerPeriodoActualBolivia,
+  obtenerPeriodoCorteDesdeFechaIso,
   obtenerRangoMesBolivia,
 } from '../../utilidades/fecha-bolivia.utilidad';
 
@@ -806,9 +811,22 @@ export class PdfServicio {
         r.tipo === TipoAsistencia.ESCUELA_LIDERES
           ? '14:30'
           : r.hora_prevista || '08:00';
-      const real = r.hora_ingreso || '08:00';
+      const real = r.hora_ingreso || '08:00:00';
       const retraso_m = r.minutos_retraso || 0;
-      const horas = r.tipo === TipoAsistencia.ESCUELA_LIDERES ? 0 : Number(r.horas_trabajadas || 4.0);
+      const segs =
+        r.tipo === TipoAsistencia.ESCUELA_LIDERES
+          ? 0
+          : r.hora_ingreso && r.hora_salida
+          ? calcularSegundosEntreHoras(r.hora_ingreso, r.hora_salida) ||
+            Math.round(Number(r.horas_trabajadas || 0) * 3600)
+          : r.horas_trabajadas !== null && r.horas_trabajadas !== undefined
+          ? Math.round(Number(r.horas_trabajadas) * 3600)
+          : 0;
+      const horas = Number((segs / 3600).toFixed(2));
+      const horas_hms =
+        r.tipo !== TipoAsistencia.ESCUELA_LIDERES && !r.hora_salida && segs === 0
+          ? 'En curso'
+          : formatearSegundosAHhmmss(segs);
       const estado =
         retraso_m > 0
           ? `Tardanza (+${retraso_m}m)`
@@ -828,6 +846,8 @@ export class PdfServicio {
         real,
         retraso_m,
         horas,
+        segs,
+        horas_hms,
         estado,
       };
     });
@@ -840,7 +860,9 @@ export class PdfServicio {
       con_retraso.length > 0
         ? Math.round(con_retraso.reduce((acc, i) => acc + i.retraso_m, 0) / con_retraso.length)
         : 0;
-    const total_horas = items_render.reduce((acc, i) => acc + i.horas, 0).toFixed(1);
+    const total_horas_hms = formatearSegundosAHhmmss(
+      items_render.reduce((acc, i) => acc + i.segs, 0),
+    );
 
     const tipo_filtro_nombre =
       opciones.tipo === 'practicas'
@@ -863,7 +885,7 @@ export class PdfServicio {
           <td style="text-align: center; font-family: monospace;">${item.fecha}</td>
           <td style="text-align: center; font-family: monospace; color: #64748B;">${item.previsto}</td>
           <td style="text-align: center; font-family: monospace;"><strong>${item.real}</strong></td>
-          <td style="text-align: center; font-family: monospace;">${item.horas} h</td>
+          <td style="text-align: center; font-family: monospace;">${item.horas_hms}</td>
           <td style="text-align: center; font-family: monospace; font-weight: bold; color: ${item.retraso_m > 0 ? '#B45309' : '#059669'};">
             ${item.retraso_m > 0 ? `+${item.retraso_m} min` : '0 min'}
           </td>
@@ -1090,7 +1112,7 @@ export class PdfServicio {
             <div class="kpi-col">
               <div class="kpi-card">
                 <div class="kpi-title">Horas Acreditadas</div>
-                <div class="kpi-value">${total_horas} hrs</div>
+                <div class="kpi-value">${total_horas_hms}</div>
               </div>
             </div>
           </div>
@@ -1145,9 +1167,10 @@ export class PdfServicio {
     fecha_fin: string;
     mes_nombre: string;
   } {
-    const fecha_bo = obtenerFechaHoraBolivia();
-    let anio = fecha_bo.anio;
-    let mes_num = fecha_bo.mes;
+    const periodo_actual = obtenerPeriodoActualBolivia();
+    const [anio_actual_str, mes_actual_str] = periodo_actual.split('-');
+    let anio = parseInt(anio_actual_str, 10) || obtenerFechaHoraBolivia().anio;
+    let mes_num = parseInt(mes_actual_str, 10) || obtenerFechaHoraBolivia().mes;
 
     if (mes) {
       const match_iso = mes.trim().match(/^(\d{4})-(\d{1,2})$/);
@@ -1778,11 +1801,22 @@ export class PdfServicio {
           ? 'Escuela de Líderes'
           : 'Acciones de Servicio';
       const previsto =
-        a.hora_prevista || (a.tipo === TipoAsistencia.ESCUELA_LIDERES ? '14:30' : '08:00');
-      const ingreso = a.hora_ingreso || '08:00';
-      const salida = a.hora_salida || '12:00';
+        a.hora_prevista || (a.tipo === TipoAsistencia.ESCUELA_LIDERES ? '14:30:00' : '08:00:00');
+      const ingreso = a.hora_ingreso || '08:00:00';
+      const salida = a.hora_salida || null;
       const retraso_m = a.minutos_retraso || 0;
-      const horas = a.tipo === TipoAsistencia.ESCUELA_LIDERES ? 0 : (Number(a.horas_trabajadas) || 4.0);
+      const segundos_item =
+        a.tipo === TipoAsistencia.ESCUELA_LIDERES
+          ? 0
+          : a.hora_ingreso && a.hora_salida
+          ? calcularSegundosEntreHoras(a.hora_ingreso, a.hora_salida) ||
+            Math.round(Number(a.horas_trabajadas || 0) * 3600)
+          : Math.round(Number(a.horas_trabajadas || 0) * 3600);
+      const horas = Number((segundos_item / 3600).toFixed(2));
+      const horas_hms =
+        a.tipo !== TipoAsistencia.ESCUELA_LIDERES && !a.hora_salida && segundos_item === 0
+          ? 'En curso'
+          : formatearSegundosAHhmmss(segundos_item);
       const dist_gps = a.dentro_de_radio ? 'Conforme (<50m)' : 'Fuera Geocerca';
       const estado =
         retraso_m > 0
@@ -1799,9 +1833,11 @@ export class PdfServicio {
         sede: a.bloque || sede_estudiante,
         hora_prevista: previsto,
         hora_ingreso: ingreso,
-        hora_salida: salida,
+        hora_salida: salida || 'En curso',
         retraso_m,
         horas,
+        segundos_item,
+        horas_hms,
         geocerca: dist_gps,
         estado,
         es_retraso: retraso_m > 0,
@@ -1809,29 +1845,36 @@ export class PdfServicio {
     });
 
     const total_dias = items_render.length;
-    const horas_totales = items_render.reduce((acc, i) => acc + i.horas, 0);
+    const total_segundos = items_render.reduce((acc, i) => acc + i.segundos_item, 0);
+    const horas_totales = Number((total_segundos / 3600).toFixed(2));
+    const horas_totales_hms = formatearSegundosAHhmmss(total_segundos);
     const meta_horas = 36.0;
-    const pct_avance = Math.round((horas_totales / meta_horas) * 100);
+    const meta_segundos = 36 * 3600;
+    const meta_horas_hms = formatearSegundosAHhmmss(meta_segundos);
+    const pct_avance = Math.round((total_segundos / meta_segundos) * 100);
     const retrasos = items_render.filter((i) => i.es_retraso);
     const asistencias_conformes = total_dias - retrasos.length;
     const pct_puntualidad =
       total_dias > 0 ? ((asistencias_conformes / total_dias) * 100).toFixed(1) : '0.0';
     const minutos_totales_retraso = retrasos.reduce((acc, i) => acc + i.retraso_m, 0);
 
-    const horas_practicas = items_render
-      .filter((i) => i.tipo === 'Prácticas')
-      .reduce((acc, i) => acc + i.horas, 0)
-      .toFixed(1);
+    const horas_practicas = formatearSegundosAHhmmss(
+      items_render
+        .filter((i) => i.tipo === 'Prácticas')
+        .reduce((acc, i) => acc + i.segundos_item, 0),
+    );
 
-    const horas_lideres = items_render
-      .filter((i) => i.tipo === 'Escuela de Líderes')
-      .reduce((acc, i) => acc + i.horas, 0)
-      .toFixed(1);
+    const horas_lideres = formatearSegundosAHhmmss(
+      items_render
+        .filter((i) => i.tipo === 'Escuela de Líderes')
+        .reduce((acc, i) => acc + i.segundos_item, 0),
+    );
 
-    const horas_servicio = items_render
-      .filter((i) => i.tipo === 'Acciones de Servicio')
-      .reduce((acc, i) => acc + i.horas, 0)
-      .toFixed(1);
+    const horas_servicio = formatearSegundosAHhmmss(
+      items_render
+        .filter((i) => i.tipo === 'Acciones de Servicio')
+        .reduce((acc, i) => acc + i.segundos_item, 0),
+    );
 
     const html = this.generarAsistenciaMensualEstudianteHtml({
       nombre_estudiante,
@@ -1844,7 +1887,9 @@ export class PdfServicio {
       items: items_render,
       total_dias,
       horas_totales,
+      horas_totales_hms,
       meta_horas,
+      meta_horas_hms,
       pct_avance,
       asistencias_conformes,
       pct_puntualidad,
@@ -1894,13 +1939,16 @@ export class PdfServicio {
       hora_salida: string;
       retraso_m: number;
       horas: number;
+      horas_hms?: string;
       geocerca: string;
       estado: string;
       es_retraso: boolean;
     }>;
     total_dias: number;
     horas_totales: number;
+    horas_totales_hms?: string;
     meta_horas: number;
+    meta_horas_hms?: string;
     pct_avance: number;
     asistencias_conformes: number;
     pct_puntualidad: string;
@@ -1911,6 +1959,10 @@ export class PdfServicio {
     horas_servicio: string;
   }): string {
     const fecha_actual = new Date();
+    const horas_totales_hms =
+      datos.horas_totales_hms || formatearHorasDecimalAHhmmss(datos.horas_totales);
+    const meta_horas_hms =
+      datos.meta_horas_hms || formatearHorasDecimalAHhmmss(datos.meta_horas);
 
     const filas_html = datos.items
       .map(
@@ -1926,7 +1978,7 @@ export class PdfServicio {
             <strong>${it.hora_ingreso}</strong>
           </td>
           <td style="text-align: center; font-family: monospace; font-weight: 700; color: #063A6B;">
-            ${it.horas.toFixed(2)} h
+            ${it.horas_hms || formatearHorasDecimalAHhmmss(it.horas)}
           </td>
           <td style="text-align: center; font-family: monospace; font-weight: bold; color: ${
             it.retraso_m > 0 ? '#B45309' : '#059669'
@@ -2179,7 +2231,7 @@ export class PdfServicio {
             <div class="kpi-col">
               <div class="kpi-card" style="border-color: #A7F3D0; background: #ECFDF5;">
                 <div class="kpi-title" style="color: #065F46;">Horas Acumuladas</div>
-                <div class="kpi-value" style="color: #065F46;">${datos.horas_totales.toFixed(1)} / ${datos.meta_horas.toFixed(1)} h</div>
+                <div class="kpi-value" style="color: #065F46;">${horas_totales_hms} / ${meta_horas_hms}</div>
               </div>
             </div>
             <div class="kpi-col">
@@ -2223,12 +2275,12 @@ export class PdfServicio {
                   <strong>TOTAL HORAS ACREDITADAS EN EL MES:</strong>
                 </td>
                 <td style="text-align: center; font-family: monospace; font-size: 11px; font-weight: 900; color: #063A6B; padding: 6px 5px;">
-                  ${datos.horas_totales.toFixed(2)} h
+                  ${horas_totales_hms}
                 </td>
                 <td colspan="2" style="text-align: center; font-size: 8.5px; color: #065F46; font-weight: bold;">
                   ${
                     datos.horas_totales > datos.meta_horas
-                      ? `META SUPERADA (+${(datos.horas_totales - datos.meta_horas).toFixed(1)} h) (${datos.pct_avance}%)`
+                      ? `META SUPERADA (+${formatearHorasDecimalAHhmmss(datos.horas_totales - datos.meta_horas)}) (${datos.pct_avance}%)`
                       : datos.horas_totales === datos.meta_horas
                       ? `META MENSUAL ALCANZADA (${datos.pct_avance}%)`
                       : `EN PROGRESO (${datos.pct_avance}%)`
@@ -2240,13 +2292,13 @@ export class PdfServicio {
 
           <div class="desglose-actividades">
             <div class="desglose-item">
-              <span style="color: #64748B;">Prácticas Preprofesionales:</span> <strong>${datos.horas_practicas} hrs</strong>
+              <span style="color: #64748B;">Prácticas Preprofesionales:</span> <strong>${datos.horas_practicas.includes(':') ? datos.horas_practicas : formatearHorasDecimalAHhmmss(Number(datos.horas_practicas))}</strong>
             </div>
             <div class="desglose-item">
-              <span style="color: #64748B;">Escuela de Líderes (Viernes):</span> <strong>${datos.horas_lideres} hrs</strong>
+              <span style="color: #64748B;">Escuela de Líderes (Viernes):</span> <strong>${datos.horas_lideres.includes(':') ? datos.horas_lideres : formatearHorasDecimalAHhmmss(Number(datos.horas_lideres))}</strong>
             </div>
             <div class="desglose-item">
-              <span style="color: #64748B;">Acciones de Servicio Solidario:</span> <strong>${datos.horas_servicio} hrs</strong>
+              <span style="color: #64748B;">Acciones de Servicio Solidario:</span> <strong>${datos.horas_servicio.includes(':') ? datos.horas_servicio : formatearHorasDecimalAHhmmss(Number(datos.horas_servicio))}</strong>
             </div>
           </div>
 
@@ -2947,7 +2999,7 @@ export class PdfServicio {
               </tr>
               <tr>
                 <td class="metric-lbl">Horas acumuladas y acreditadas en prácticas/liderazgo:</td>
-                <td class="metric-val">${datos.total_horas.toFixed(2)} hrs</td>
+                <td class="metric-val">${formatearHorasDecimalAHhmmss(datos.total_horas)}</td>
               </tr>
             </table>
           </div>
@@ -3038,7 +3090,15 @@ export class PdfServicio {
       }
       const asistencias = await qb.getMany();
       total_asistencias = asistencias.length;
-      total_horas = asistencias.reduce((acc, a) => acc + (Number(a.horas_trabajadas) || 0), 0);
+      const total_segs = asistencias.reduce((acc, a) => {
+        if (a.tipo === TipoAsistencia.ESCUELA_LIDERES) return acc;
+        if (a.hora_ingreso && a.hora_salida) {
+          const s = calcularSegundosEntreHoras(a.hora_ingreso, a.hora_salida);
+          if (s > 0) return acc + s;
+        }
+        return acc + Math.round((Number(a.horas_trabajadas) || 0) * 3600);
+      }, 0);
+      total_horas = Number((total_segs / 3600).toFixed(2));
     }
 
     if (this.solicitud_pasajes_repo) {
@@ -3730,6 +3790,8 @@ export class PdfServicio {
       hora_prevista: string;
       hora_gps: string;
       horas: number;
+      segundos: number;
+      horas_hms: string;
       retraso_m: number;
       estado: string;
     }> = [];
@@ -3759,9 +3821,20 @@ export class PdfServicio {
         const nombre_completo = a.becario?.usuario?.nombre || 'Estudiante Becario';
         const ci_val = a.becario?.ci || 'S/C';
         const sede_val = a.becario?.ubicacion || 'Sede Central';
-        const hora_prev = a.tipo === TipoAsistencia.ESCUELA_LIDERES ? '14:30' : '08:00';
-        const hora_real = a.hora_ingreso || '08:00';
-        const horas_val = a.tipo === TipoAsistencia.ESCUELA_LIDERES ? 0 : (Number(a.horas_trabajadas) || 4.0);
+        const hora_prev = a.tipo === TipoAsistencia.ESCUELA_LIDERES ? '14:30:00' : '08:00:00';
+        const hora_real = a.hora_ingreso || '08:00:00';
+        const segundos_val =
+          a.tipo === TipoAsistencia.ESCUELA_LIDERES
+            ? 0
+            : a.hora_ingreso && a.hora_salida
+            ? calcularSegundosEntreHoras(a.hora_ingreso, a.hora_salida) ||
+              Math.round((Number(a.horas_trabajadas) || 0) * 3600)
+            : Math.round((Number(a.horas_trabajadas) || 0) * 3600);
+        const horas_val = Number((segundos_val / 3600).toFixed(2));
+        const horas_hms_val =
+          a.tipo !== TipoAsistencia.ESCUELA_LIDERES && !a.hora_salida && segundos_val === 0
+            ? 'En curso'
+            : formatearSegundosAHhmmss(segundos_val);
         const retraso_val = Number(a.minutos_retraso) || 0;
         const estado_str =
           retraso_val > 0
@@ -3777,6 +3850,8 @@ export class PdfServicio {
           hora_prevista: hora_prev,
           hora_gps: hora_real,
           horas: horas_val,
+          segundos: segundos_val,
+          horas_hms: horas_hms_val,
           retraso_m: retraso_val,
           estado: estado_str,
         };
@@ -3789,7 +3864,9 @@ export class PdfServicio {
       total_registros > 0
         ? Math.round(((total_registros - con_retraso.length) / total_registros) * 100)
         : 0;
-    const total_horas = items_render.reduce((acc, i) => acc + i.horas, 0).toFixed(2);
+    const total_horas_hms = formatearSegundosAHhmmss(
+      items_render.reduce((acc, i) => acc + i.segundos, 0),
+    );
 
     const filas_html = items_render
       .map(
@@ -3803,7 +3880,7 @@ export class PdfServicio {
           <td style="text-align: center; font-family: monospace;">${it.fecha}</td>
           <td style="text-align: center; font-family: monospace; color: #64748B;">${it.hora_prevista}</td>
           <td style="text-align: center; font-family: monospace;"><strong>${it.hora_gps}</strong></td>
-          <td style="text-align: center; font-family: monospace; font-weight: 700; color: #063A6B;">${it.horas.toFixed(2)} h</td>
+          <td style="text-align: center; font-family: monospace; font-weight: 700; color: #063A6B;">${it.horas_hms}</td>
           <td style="text-align: center; font-family: monospace; font-weight: bold; color: ${it.retraso_m > 0 ? '#B45309' : '#059669'};">
             ${it.retraso_m > 0 ? `+${it.retraso_m} min` : '0 min'}
           </td>
@@ -3894,7 +3971,7 @@ export class PdfServicio {
             <div class="kpi-col">
               <div class="kpi-card">
                 <div class="kpi-title">Horas Acreditadas</div>
-                <div class="kpi-value">${total_horas} hrs</div>
+                <div class="kpi-value">${total_horas_hms}</div>
               </div>
             </div>
           </div>
@@ -3918,7 +3995,7 @@ export class PdfServicio {
             <tfoot>
               <tr style="background: #F1F5F9; font-weight: bold;">
                 <td colspan="5" style="text-align: right; padding: 6px;">TOTAL HORAS ACREDITADAS EN AUDITORÍA:</td>
-                <td style="text-align: center; font-family: monospace; color: #063A6B;">${total_horas} h</td>
+                <td style="text-align: center; font-family: monospace; color: #063A6B;">${total_horas_hms}</td>
                 <td colspan="2" style="text-align: center; font-size: 7.5px; color: #065F46;">ACREDITACIÓN AUDITADA</td>
               </tr>
             </tfoot>
@@ -4058,7 +4135,10 @@ export class PdfServicio {
       }
     }
 
-    return MESES_ESPANOL[obtenerFechaHoraBolivia().mes - 1];
+    const mes_corte =
+      Number(obtenerPeriodoActualBolivia().split('-')[1]) ||
+      obtenerFechaHoraBolivia().mes;
+    return MESES_ESPANOL[mes_corte - 1];
   }
 
   resolverRangoFechasPlanilla(opciones: {

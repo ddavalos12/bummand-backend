@@ -157,10 +157,11 @@ export class BecariosServicio {
 
     if (resultado.length > 0 && this.becarioRepositorio.manager) {
       try {
-        const bo = obtenerFechaHoraBolivia();
+        const periodo_corte = obtenerPeriodoActualBolivia();
+        const [anio_corte, mes_corte] = periodo_corte.split('-').map(Number);
         const { fecha_inicio: inicio_mes, fecha_fin: fin_mes } = obtenerRangoMesBolivia(
-          bo.anio,
-          bo.mes,
+          anio_corte,
+          mes_corte,
         );
         const filas_horas: Array<{ becario_id: number; total_horas: string | number }> =
           await this.becarioRepositorio.manager.query(

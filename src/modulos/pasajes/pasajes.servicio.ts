@@ -29,6 +29,7 @@ import {
   obtenerNombreMesAnioBolivia,
   obtenerNombrePeriodoDesdeIso,
   obtenerPeriodoActualBolivia,
+  obtenerPeriodoCorteDesdeFechaIso,
   obtenerRangoMesBolivia,
 } from '../../utilidades/fecha-bolivia.utilidad';
 
@@ -351,9 +352,10 @@ export class PasajesServicio {
 
     if (!solicitud) {
       const fecha_iso_rec = extraerFechaIsoSinDesfase(dto.fecha);
-      const periodo_calculado = fecha_iso_rec
-        ? obtenerNombrePeriodoDesdeIso(fecha_iso_rec.slice(0, 7))
-        : obtenerNombreMesAnioBolivia();
+      const periodo_iso = fecha_iso_rec
+        ? obtenerPeriodoCorteDesdeFechaIso(fecha_iso_rec) || fecha_iso_rec.slice(0, 7)
+        : obtenerPeriodoActualBolivia();
+      const periodo_calculado = obtenerNombrePeriodoDesdeIso(periodo_iso);
       solicitud = this.solicitudRepositorio.create({
         becario_id: becario_id_real,
         periodo: periodo_calculado,
@@ -364,6 +366,7 @@ export class PasajesServicio {
       solicitud = await this.solicitudRepositorio.save(solicitud);
     }
 
+    const apoyo_crudo = (dto.apoyo_realizado ?? dto.apoyoRealizado ?? '').trim();
     const nuevo_recorrido = this.recorridoRepositorio.create({
       solicitud_id: solicitud.id,
       fecha: new Date(dto.fecha),
@@ -372,7 +375,7 @@ export class PasajesServicio {
       destino: dto.destino,
       tarifa: Number(dto.tarifa),
       tipo_actividad: tipo_actividad_crudo,
-      apoyo_realizado: dto.apoyo_realizado || dto.apoyoRealizado,
+      apoyo_realizado: apoyo_crudo || undefined,
       lat_origen: dto.lat_origen ?? dto.latOrigen,
       lng_origen: dto.lng_origen ?? dto.lngOrigen,
       lat_destino: dto.lat_destino ?? dto.latDestino,
@@ -435,8 +438,26 @@ export class PasajesServicio {
       throw new BadRequestException('No se puede enviar una solicitud de pasajes sin recorridos registrados.');
     }
 
-    const dia_del_mes = obtenerFechaHoraBolivia(fecha_referencia).dia;
-    if (dia_del_mes < 24) {
+    const bo_referencia = obtenerFechaHoraBolivia(fecha_referencia);
+    const dia_del_mes = bo_referencia.dia;
+    let periodo_solicitud_habilitado = true;
+    if (solicitud.periodo) {
+      const partes_periodo = solicitud.periodo.trim().split(/\s+/);
+      const anio_sol = Number(partes_periodo[partes_periodo.length - 1]);
+      const mes_idx = NOMBRES_MESES_ESPANOL.findIndex(
+        (m) => m.toLowerCase() === partes_periodo[0]?.toLowerCase(),
+      );
+      if (!Number.isNaN(anio_sol) && mes_idx >= 0) {
+        const fecha_apertura = `${anio_sol}-${String(mes_idx + 1).padStart(2, '0')}-24`;
+        periodo_solicitud_habilitado = bo_referencia.fecha_iso >= fecha_apertura;
+      } else {
+        periodo_solicitud_habilitado = dia_del_mes >= 24;
+      }
+    } else {
+      periodo_solicitud_habilitado = dia_del_mes >= 24;
+    }
+
+    if (!periodo_solicitud_habilitado) {
       throw new BadRequestException(
         `Regla institucional BUMAND: El envío formal de la solicitud de pasajes solo está permitido a partir del día 24 de cada mes. Día actual: ${dia_del_mes}.`,
       );
@@ -1131,7 +1152,7 @@ export class PasajesServicio {
       const actividad =
         r.tipo_actividad || (r as any).tipoActividad || 'Prácticas';
       const apoyo =
-        r.apoyo_realizado || (r as any).apoyoRealizado || 'Apoyo institucional en sede asignada';
+        r.apoyo_realizado || (r as any).apoyoRealizado || null;
 
       // Extraer secuencia estructurada de paradas
       const paradas_set: string[] = [];
@@ -1174,10 +1195,11 @@ export class PasajesServicio {
     // Fallback con paradas auténticas y georreferenciadas La Paz - El Alto si no hay datos en BD
     if (items_render.length === 0) {
       const fecha_bo = obtenerFechaHoraBolivia();
-      const anio_def = fecha_bo.anio;
-      const mes_def = String(fecha_bo.mes).padStart(2, '0');
-      const mes_prefijo = `${anio_def}-${mes_def}`;
-      const periodo_def = `${NOMBRES_MESES_ESPANOL[fecha_bo.mes - 1]} ${anio_def}`;
+      const periodo_actual = obtenerPeriodoActualBolivia();
+      const [anio_def, mes_def_str] = periodo_actual.split('-');
+      const mes_def = Number(mes_def_str) || fecha_bo.mes;
+      const mes_prefijo = `${anio_def}-${String(mes_def).padStart(2, '0')}`;
+      const periodo_def = obtenerNombreMesAnioBolivia();
 
       const catalogo_simulado = [
         {

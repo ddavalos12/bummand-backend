@@ -238,8 +238,9 @@ export class AsistenciaControlador {
   @Roles(Rol.ADMINISTRADOR, Rol.SUPERVISOR, Rol.BECARIO)
   @ApiOperation({
     summary: 'Resumen de horas mensuales trabajadas por becario',
-    description: 'Devuelve el resumen de horas acumuladas por mes para cada becario y el total acumulado en el mes actual.',
+    description: 'Devuelve el resumen de horas acumuladas por mes (corte día 24) para cada becario y el total acumulado en el periodo.',
   })
+  @ApiQuery({ name: 'mes', required: false, description: 'Periodo de corte (ej. 2026-12)' })
   @ApiResponse({
     status: 200,
     description: 'Resumen consolidado de horas trabajadas por mes.',
@@ -247,10 +248,12 @@ export class AsistenciaControlador {
   obtenerHorasMensuales(
     @UsuarioActual() usuario?: Usuario,
     @Query('supervisor_id') supervisor_id?: number,
+    @Query('mes') mes?: string,
   ) {
     return this.asistenciaServicio.obtenerHorasMensuales(
       usuario,
       supervisor_id ? Number(supervisor_id) : undefined,
+      mes,
     );
   }
 

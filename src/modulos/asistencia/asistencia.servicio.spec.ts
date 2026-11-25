@@ -520,7 +520,9 @@ describe('AsistenciaServicio', () => {
       expect(resultado).toHaveLength(2);
       expect(asistencia_repo.find).toHaveBeenCalledWith({
         where: { becario_id: 7 },
-        relations: { becario: { usuario: true, supervisor: true } },
+        relations: {
+          becario: { usuario: true, supervisor: true, lugar_practica: true, iglesia: true },
+        },
         order: { fecha: 'DESC', created_at: 'DESC' },
       });
     });
@@ -709,8 +711,8 @@ describe('AsistenciaServicio', () => {
       expect(NOMBRES_MESES_GESTION['2026-12']).toBe('Diciembre 2026');
     });
 
-    it('calcula mes_actual en America/La_Paz incluso en borde de cambio de mes UTC', async () => {
-      jest.setSystemTime(new Date('2026-12-01T02:00:00.000Z')); // 2026-11-30 22:00 en La Paz
+    it('calcula mes_actual en America/La_Paz incluso en borde de corte día 24 y UTC', async () => {
+      jest.setSystemTime(new Date('2026-11-24T02:00:00.000Z')); // 2026-11-23 22:00 en La Paz -> Noviembre 2026
       becario_repo.find.mockResolvedValue([
         {
           id: 7,
@@ -719,7 +721,7 @@ describe('AsistenciaServicio', () => {
           usuario: { nombre: 'Becario Prueba' },
           registros_asistencia: [
             { id: 1, fecha: '2026-11-15', tipo: TipoAsistencia.PRACTICAS, horas_trabajadas: 4 },
-            { id: 2, fecha: '2026-12-02', tipo: TipoAsistencia.PRACTICAS, horas_trabajadas: 6 },
+            { id: 2, fecha: '2026-11-24', tipo: TipoAsistencia.PRACTICAS, horas_trabajadas: 6 },
           ],
         },
       ]);
@@ -727,11 +729,13 @@ describe('AsistenciaServicio', () => {
       const nov_bo = await servicio.obtenerHorasMensuales();
       expect(nov_bo[0].mes_actual).toBe('2026-11');
       expect(nov_bo[0].horas_mes_actual).toBe(4);
+      expect(nov_bo[0].horas_mes_actual_hms).toBe('04:00:00');
 
-      jest.setSystemTime(new Date('2026-12-01T12:00:00.000Z')); // 2026-12-01 08:00 en La Paz
+      jest.setSystemTime(new Date('2026-11-24T12:00:00.000Z')); // 2026-11-24 08:00 en La Paz -> Diciembre 2026
       const dic_bo = await servicio.obtenerHorasMensuales();
       expect(dic_bo[0].mes_actual).toBe('2026-12');
       expect(dic_bo[0].horas_mes_actual).toBe(6);
+      expect(dic_bo[0].horas_mes_actual_hms).toBe('06:00:00');
     });
 
     it('genera extracto de Diciembre 2026 y marca estado_meta dinámico según ciclo actual', async () => {

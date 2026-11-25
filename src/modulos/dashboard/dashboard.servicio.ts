@@ -13,6 +13,7 @@ import {
   extraerFechaIsoSinDesfase,
   NOMBRES_MESES_CORTOS_ESPANOL,
   obtenerFechaHoraBolivia,
+  obtenerPeriodoCorteDesdeFechaIso,
 } from '../../utilidades/fecha-bolivia.utilidad';
 
 export interface MetricasGenerales {
@@ -321,7 +322,8 @@ export class DashboardServicio {
       total_horas_acumuladas += horas;
 
       if (f_str) {
-        const mes_num = Number(f_str.slice(5, 7));
+        const periodo_corte = obtenerPeriodoCorteDesdeFechaIso(f_str);
+        const mes_num = periodo_corte ? Number(periodo_corte.slice(5, 7)) : Number(f_str.slice(5, 7));
         if (mes_num >= 1 && mes_num <= 12) {
           horas_por_mes[mes_num - 1] = (horas_por_mes[mes_num - 1] || 0) + horas;
         }
@@ -347,7 +349,8 @@ export class DashboardServicio {
         metricas_becario[b_id].a_tiempo += 1;
         metricas_becario[b_id].en_radio += 1;
         total_horas_acumuladas += 4.0;
-        const mes_num = Number(f_str.slice(5, 7));
+        const periodo_corte = obtenerPeriodoCorteDesdeFechaIso(f_str);
+        const mes_num = periodo_corte ? Number(periodo_corte.slice(5, 7)) : Number(f_str.slice(5, 7));
         if (mes_num >= 1 && mes_num <= 12) {
           horas_por_mes[mes_num - 1] = (horas_por_mes[mes_num - 1] || 0) + 4.0;
         }

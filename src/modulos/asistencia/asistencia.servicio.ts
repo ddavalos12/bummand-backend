@@ -30,14 +30,19 @@ import {
   obtenerIdsBecariosDesignadosMentor,
 } from '../../utilidades/filtro-mentor.utilidad';
 import {
+  calcularSegundosEntreHoras,
+  formatearSegundosAHhmmss,
   obtenerFechaHoraBolivia,
   obtenerNombrePeriodoDesdeIso,
   obtenerPeriodoActualBolivia,
+  obtenerPeriodoCorteDesdeFechaIso,
+  obtenerRangoMesBolivia,
 } from '../../utilidades/fecha-bolivia.utilidad';
 
 const MARGEN_GPS_MAXIMO_M = 10;
 export const META_HORAS_SEMANAL = 9;
 export const META_HORAS_MENSUAL = 36;
+export const META_SEGUNDOS_MENSUAL = META_HORAS_MENSUAL * 3600;
 
 export interface MovimientoExtractoAsistencia {
   id: number;
@@ -48,12 +53,18 @@ export interface MovimientoExtractoAsistencia {
   tipo_etiqueta: string;
   sede: string;
   hora_entrada: string;
-  hora_salida: string;
+  hora_salida: string | null;
   horas_dia: number;
+  segundos_dia: number;
+  horas_dia_hms: string;
   saldo_acumulado: number;
+  saldo_acumulado_segundos: number;
+  saldo_acumulado_hms: string;
   minutos_retraso: number;
   dentro_de_radio: boolean;
   distancia_metros: number;
+  lat_ingreso?: number | null;
+  lng_ingreso?: number | null;
   estado: string;
   estado_aprobacion: string;
 }
@@ -61,9 +72,15 @@ export interface MovimientoExtractoAsistencia {
 export interface ExtractoMensualAsistencia {
   periodo: string;
   mes_nombre: string;
+  fecha_inicio_corte?: string;
+  fecha_fin_corte?: string;
   horas_acumuladas: number;
+  segundos_acumulados: number;
+  horas_acumuladas_hms: string;
   meta_horas: number;
+  meta_horas_hms: string;
   diferencia_horas: number;
+  diferencia_hms: string;
   porcentaje_cumplimiento: number;
   estado_meta: 'cumplido' | 'en_progreso' | 'en_riesgo';
   jornadas_totales: number;
@@ -76,7 +93,10 @@ export interface ExtractoMensualAsistencia {
 export interface RespuestaExtractoMensual {
   becario_id: number;
   total_horas_gestion: number;
+  total_segundos_gestion: number;
+  total_horas_gestion_hms: string;
   promedio_mensual: number;
+  promedio_mensual_hms: string;
   total_meses: number;
   dias_permiso_aprobado?: number;
   horas_compensadas_permiso?: number;
@@ -636,12 +656,14 @@ export class AsistenciaServicio {
     registro_abierto.lat_salida = dto.latitud;
     registro_abierto.lng_salida = dto.longitud;
     
-    // Cálculo básico de horas (Escuela de Líderes no suma horas de práctica)
-    const [h_i, m_i] = registro_abierto.hora_ingreso.split(':').map(Number);
-    const [h_s, m_s] = registro_abierto.hora_salida.split(':').map(Number);
-    const horas = (h_s + m_s / 60) - (h_i + m_i / 60);
+    const segundos_trabajados = calcularSegundosEntreHoras(
+      registro_abierto.hora_ingreso,
+      registro_abierto.hora_salida,
+    );
     registro_abierto.horas_trabajadas =
-      tipo === TipoAsistencia.ESCUELA_LIDERES ? 0 : parseFloat(horas.toFixed(2));
+      tipo === TipoAsistencia.ESCUELA_LIDERES
+        ? 0
+        : parseFloat((segundos_trabajados / 3600).toFixed(2));
 
     await this.asistenciaRepositorio.save(registro_abierto);
 
@@ -760,10 +782,8 @@ export class AsistenciaServicio {
     if (tipo === TipoAsistencia.ESCUELA_LIDERES) {
       horas_trabajadas = 0;
     } else if (hora_salida) {
-      const [h_i, m_i] = hora_ingreso.split(':').map(Number);
-      const [h_s, m_s] = hora_salida.split(':').map(Number);
-      const horas = (h_s + m_s / 60) - (h_i + m_i / 60);
-      horas_trabajadas = horas > 0 ? parseFloat(horas.toFixed(2)) : 0;
+      const segundos = calcularSegundosEntreHoras(hora_ingreso, hora_salida);
+      horas_trabajadas = segundos > 0 ? parseFloat((segundos / 3600).toFixed(2)) : 0;
     }
 
     const [anio, mes, dia] = dto.fecha.split('-').map(Number);
@@ -839,11 +859,94 @@ export class AsistenciaServicio {
     if (!id_becario) {
       return [];
     }
-    return this.asistenciaRepositorio.find({
+    const registros = await this.asistenciaRepositorio.find({
       where: { becario_id: id_becario },
-      relations: { becario: { usuario: true, supervisor: true } },
+      relations: {
+        becario: { usuario: true, supervisor: true, lugar_practica: true, iglesia: true },
+      },
       order: { fecha: 'DESC', created_at: 'DESC' },
     });
+    return this.enriquecerRegistros(registros);
+  }
+
+  private calcularDistanciaRegistro(
+    registro: RegistroAsistencia,
+    becario?: Becario | null,
+  ): number | null {
+    if (
+      registro.lat_ingreso === null ||
+      registro.lat_ingreso === undefined ||
+      registro.lng_ingreso === null ||
+      registro.lng_ingreso === undefined
+    ) {
+      return null;
+    }
+    const objetivo =
+      registro.tipo === TipoAsistencia.ACCIONES_SERVICIO
+        ? becario?.iglesia
+        : becario?.lugar_practica;
+    if (
+      objetivo &&
+      objetivo.latitud !== null &&
+      objetivo.latitud !== undefined &&
+      objetivo.longitud !== null &&
+      objetivo.longitud !== undefined
+    ) {
+      return Math.round(
+        calcularDistanciaMetros(
+          Number(registro.lat_ingreso),
+          Number(registro.lng_ingreso),
+          Number(objetivo.latitud),
+          Number(objetivo.longitud),
+        ),
+      );
+    }
+    return null;
+  }
+
+  private normalizarHoraTexto(hora?: string | null): string | null {
+    if (!hora) return null;
+    const partes = String(hora).trim().split(':');
+    if (partes.length < 2) return null;
+    const hh = partes[0].padStart(2, '0').slice(-2);
+    const mm = partes[1].padStart(2, '0').slice(-2);
+    const ss = (partes[2] || '00').slice(0, 2).padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
+  }
+
+  private calcularSegundosRegistro(
+    registro: RegistroAsistencia,
+    tiene_permiso: boolean = false,
+  ): number {
+    if (registro.tipo === TipoAsistencia.ESCUELA_LIDERES && !tiene_permiso) {
+      return 0;
+    }
+    if (registro.hora_ingreso && registro.hora_salida) {
+      const segundos = calcularSegundosEntreHoras(registro.hora_ingreso, registro.hora_salida);
+      if (segundos > 0) return segundos;
+    }
+    const horas_num = Number(registro.horas_trabajadas);
+    if (!Number.isNaN(horas_num) && horas_num > 0) {
+      return Math.round(horas_num * 3600);
+    }
+    return tiene_permiso ? 4 * 3600 : 0;
+  }
+
+  private enriquecerRegistros(registros: RegistroAsistencia[]): RegistroAsistencia[] {
+    for (const registro of registros) {
+      const dist = this.calcularDistanciaRegistro(registro, registro.becario);
+      const segs = this.calcularSegundosRegistro(registro, false);
+      const extra = registro as unknown as Record<string, unknown>;
+      if (dist !== null) {
+        extra.distancia_ingreso_m = dist;
+      }
+      extra.segundos_trabajados = segs;
+      extra.horas_trabajadas_hms =
+        registro.hora_salida || segs > 0 || registro.tipo === TipoAsistencia.ESCUELA_LIDERES
+          ? formatearSegundosAHhmmss(segs)
+          : 'En curso';
+    }
+    return registros;
   }
 
   async listarAsistencias(opciones?: {
@@ -897,7 +1000,8 @@ export class AsistenciaServicio {
       .createQueryBuilder('asistencia')
       .leftJoinAndSelect('asistencia.becario', 'becario')
       .leftJoinAndSelect('becario.usuario', 'usuario')
-      .leftJoinAndSelect('becario.lugar_practica', 'lugar_practica');
+      .leftJoinAndSelect('becario.lugar_practica', 'lugar_practica')
+      .leftJoinAndSelect('becario.iglesia', 'iglesia');
 
     if (ids_mentor_permitidos && ids_mentor_permitidos.size > 0) {
       qb.andWhere('asistencia.becario_id IN (:...idsMentor)', {
@@ -941,7 +1045,7 @@ export class AsistenciaServicio {
       }
     }
 
-    return registros;
+    return this.enriquecerRegistros(registros);
   }
 
   private calcularMultaEscuelaLideres(minutos: number): { monto_bs: number; tramo: string } {
@@ -960,6 +1064,7 @@ export class AsistenciaServicio {
   async obtenerHorasMensuales(
     usuario?: Usuario,
     supervisor_id?: number,
+    mes_consulta?: string,
   ): Promise<
     Array<{
       becario_id: number;
@@ -970,15 +1075,22 @@ export class AsistenciaServicio {
       carrera: string;
       mes_actual: string;
       horas_mes_actual: number;
+      segundos_mes_actual: number;
+      horas_mes_actual_hms: string;
       meta_horas: number;
+      meta_horas_hms: string;
       meta_horas_semanal: number;
       horas_excedentes: number;
+      horas_excedentes_hms: string;
       porcentaje_cumplimiento: number;
       estado_meta: 'meta_superada' | 'cumplido' | 'en_progreso' | 'en_riesgo';
       total_horas: number;
+      total_segundos: number;
+      total_horas_hms: string;
       dias_permiso_aprobado: number;
       horas_compensadas_permiso: number;
       meses: Record<string, number>;
+      meses_hms: Record<string, string>;
     }>
   > {
     const [todos_becarios, todas_justificaciones] = await Promise.all([
@@ -1031,11 +1143,16 @@ export class AsistenciaServicio {
       permisos_por_becario.set(j.becario_id, set_fechas);
     }
 
-    const clave_mes_actual = obtenerPeriodoActualBolivia();
+    const clave_mes_actual =
+      mes_consulta && /^\d{4}-\d{2}$/.test(mes_consulta.trim())
+        ? mes_consulta.trim()
+        : obtenerPeriodoActualBolivia();
 
     return becarios.map((becario) => {
+      const segundos_por_mes: Record<string, number> = {};
       const meses: Record<string, number> = {};
-      let total_horas_acumuladas = 0;
+      const meses_hms: Record<string, string> = {};
+      let total_segundos_acumulados = 0;
       const fechas_con_horas = new Set<string>();
       const set_permisos = permisos_por_becario.get(becario.id) || new Set<string>();
 
@@ -1046,40 +1163,46 @@ export class AsistenciaServicio {
             ? (registro.fecha as string).substring(0, 10)
             : (registro.fecha as Date).toISOString().substring(0, 10);
         const tiene_permiso = set_permisos.has(fecha_completa);
-        const horas_raw = Number(registro.horas_trabajadas) || 0;
-        const horas = tiene_permiso && horas_raw === 0 ? 4.0 : horas_raw;
-        if (horas <= 0) continue;
-        if (registro.tipo === TipoAsistencia.ESCUELA_LIDERES && !tiene_permiso) continue;
+        const segundos = this.calcularSegundosRegistro(registro, tiene_permiso);
+        if (segundos <= 0) continue;
 
         fechas_con_horas.add(fecha_completa);
-        const fecha_str = fecha_completa.substring(0, 7);
-        meses[fecha_str] = Number(((meses[fecha_str] || 0) + horas).toFixed(2));
-        total_horas_acumuladas = Number((total_horas_acumuladas + horas).toFixed(2));
+        const periodo_corte =
+          obtenerPeriodoCorteDesdeFechaIso(fecha_completa) || fecha_completa.substring(0, 7);
+        segundos_por_mes[periodo_corte] = (segundos_por_mes[periodo_corte] || 0) + segundos;
+        total_segundos_acumulados += segundos;
       }
 
       for (const f_permiso of set_permisos) {
         if (!fechas_con_horas.has(f_permiso)) {
-          const mes_permiso = f_permiso.substring(0, 7);
-          meses[mes_permiso] = Number(((meses[mes_permiso] || 0) + 4.0).toFixed(2));
-          total_horas_acumuladas = Number((total_horas_acumuladas + 4.0).toFixed(2));
+          const mes_permiso =
+            obtenerPeriodoCorteDesdeFechaIso(f_permiso) || f_permiso.substring(0, 7);
+          const segundos_permiso = 4 * 3600;
+          segundos_por_mes[mes_permiso] = (segundos_por_mes[mes_permiso] || 0) + segundos_permiso;
+          total_segundos_acumulados += segundos_permiso;
         }
+      }
+
+      for (const [clave_p, segs_p] of Object.entries(segundos_por_mes)) {
+        meses[clave_p] = Number((segs_p / 3600).toFixed(2));
+        meses_hms[clave_p] = formatearSegundosAHhmmss(segs_p);
       }
 
       const dias_permiso_aprobado = set_permisos.size;
       const horas_compensadas_permiso = Number((dias_permiso_aprobado * 4.0).toFixed(2));
 
+      const segundos_mes_actual = segundos_por_mes[clave_mes_actual] || 0;
       const horas_mes_actual = meses[clave_mes_actual] || 0;
-      const horas_excedentes = Math.max(
-        0,
-        parseFloat((horas_mes_actual - META_HORAS_MENSUAL).toFixed(2)),
-      );
+      const total_horas_acumuladas = Number((total_segundos_acumulados / 3600).toFixed(2));
+      const segundos_excedentes = Math.max(0, segundos_mes_actual - META_SEGUNDOS_MENSUAL);
+      const horas_excedentes = Number((segundos_excedentes / 3600).toFixed(2));
       const porcentaje_cumplimiento = Math.round(
-        (horas_mes_actual / META_HORAS_MENSUAL) * 100,
+        (segundos_mes_actual / META_SEGUNDOS_MENSUAL) * 100,
       );
       const estado_meta: 'meta_superada' | 'cumplido' | 'en_progreso' | 'en_riesgo' =
-        horas_mes_actual > META_HORAS_MENSUAL
+        segundos_mes_actual > META_SEGUNDOS_MENSUAL
           ? 'meta_superada'
-          : horas_mes_actual === META_HORAS_MENSUAL
+          : segundos_mes_actual === META_SEGUNDOS_MENSUAL
           ? 'cumplido'
           : horas_mes_actual >= 27
           ? 'en_progreso'
@@ -1094,15 +1217,22 @@ export class AsistenciaServicio {
         carrera: becario.carrera,
         mes_actual: clave_mes_actual,
         horas_mes_actual,
+        segundos_mes_actual,
+        horas_mes_actual_hms: formatearSegundosAHhmmss(segundos_mes_actual),
         meta_horas: META_HORAS_MENSUAL,
+        meta_horas_hms: formatearSegundosAHhmmss(META_SEGUNDOS_MENSUAL),
         meta_horas_semanal: META_HORAS_SEMANAL,
         horas_excedentes,
+        horas_excedentes_hms: formatearSegundosAHhmmss(segundos_excedentes),
         porcentaje_cumplimiento,
         estado_meta,
         total_horas: total_horas_acumuladas,
+        total_segundos: total_segundos_acumulados,
+        total_horas_hms: formatearSegundosAHhmmss(total_segundos_acumulados),
         dias_permiso_aprobado,
         horas_compensadas_permiso,
         meses,
+        meses_hms,
       };
     });
   }
@@ -1308,7 +1438,10 @@ export class AsistenciaServicio {
           return {
             becario_id: becario.id,
             total_horas_gestion: 0,
+            total_segundos_gestion: 0,
+            total_horas_gestion_hms: '00:00:00',
             promedio_mensual: 0,
+            promedio_mensual_hms: '00:00:00',
             total_meses: 0,
             dias_permiso_aprobado: 0,
             horas_compensadas_permiso: 0,
@@ -1346,7 +1479,7 @@ export class AsistenciaServicio {
         j.fecha_incidencia instanceof Date
           ? j.fecha_incidencia.toISOString().split('T')[0]
           : String(j.fecha_incidencia).substring(0, 10);
-      const per = f_str.substring(0, 7);
+      const per = obtenerPeriodoCorteDesdeFechaIso(f_str) || f_str.substring(0, 7);
       if (!permisos_por_mes[per]) {
         permisos_por_mes[per] = new Set<string>();
       }
@@ -1361,7 +1494,7 @@ export class AsistenciaServicio {
         reg.fecha instanceof Date
           ? reg.fecha.toISOString().split('T')[0]
           : String(reg.fecha).substring(0, 10);
-      const periodo = fecha_str.substring(0, 7);
+      const periodo = obtenerPeriodoCorteDesdeFechaIso(fecha_str) || fecha_str.substring(0, 7);
       if (!registros_por_mes[periodo]) {
         registros_por_mes[periodo] = [];
       }
@@ -1373,6 +1506,7 @@ export class AsistenciaServicio {
     const periodos_evaluar = Array.from(
       new Set([
         ...PERIODOS_GESTION_2026,
+        clave_mes_actual,
         ...Object.keys(registros_por_mes),
         ...Object.keys(permisos_por_mes),
       ]),
@@ -1384,7 +1518,13 @@ export class AsistenciaServicio {
       const regs_mes = registros_por_mes[periodo] || [];
       const set_permisos_mes = permisos_por_mes[periodo] || new Set<string>();
       const fechas_registradas_mes = new Set<string>();
-      let movimientos_mes: MovimientoExtractoAsistencia[] = [];
+      const movimientos_mes: MovimientoExtractoAsistencia[] = [];
+
+      const [anio_p, mes_p] = periodo.split('-').map(Number);
+      const { fecha_inicio: fecha_inicio_corte, fecha_fin: fecha_fin_corte } =
+        !Number.isNaN(anio_p) && !Number.isNaN(mes_p)
+          ? obtenerRangoMesBolivia(anio_p, mes_p)
+          : { fecha_inicio: undefined, fecha_fin: undefined };
 
       if (regs_mes.length > 0) {
         for (const reg of regs_mes) {
@@ -1396,24 +1536,21 @@ export class AsistenciaServicio {
           const tiene_permiso = todas_fechas_permiso.has(fecha_str);
           const [anio_reg, mes_reg, dia_reg] = fecha_str.split('-');
           const fecha_corta = `${dia_reg}-${mes_reg}`;
-          const dt = new Date(Date.UTC(Number(anio_reg), Number(mes_reg) - 1, Number(dia_reg), 12, 0, 0));
+          const dt = new Date(
+            Date.UTC(Number(anio_reg), Number(mes_reg) - 1, Number(dia_reg), 12, 0, 0),
+          );
           const dia_semana = NOMBRES_DIAS_SEMANA[dt.getUTCDay()];
 
-          let horas_dia = 0;
-          if (reg.tipo === TipoAsistencia.ESCUELA_LIDERES && !tiene_permiso) {
-            horas_dia = 0;
-          } else if (reg.horas_trabajadas !== null && reg.horas_trabajadas !== undefined && Number(reg.horas_trabajadas) > 0) {
-            horas_dia = Number(reg.horas_trabajadas);
-          } else if (tiene_permiso) {
-            horas_dia = 4.0;
-          } else if (reg.hora_ingreso && reg.hora_salida) {
-            const [h_i, m_i] = reg.hora_ingreso.split(':').map(Number);
-            const [h_s, m_s] = reg.hora_salida.split(':').map(Number);
-            const diff = (h_s + m_s / 60) - (h_i + m_i / 60);
-            horas_dia = diff > 0 ? parseFloat(diff.toFixed(2)) : 0;
-          } else {
-            horas_dia = 4.25;
-          }
+          const segundos_dia = this.calcularSegundosRegistro(reg, tiene_permiso);
+          const horas_dia = Number((segundos_dia / 3600).toFixed(2));
+          const es_abierto =
+            !tiene_permiso &&
+            !reg.hora_salida &&
+            reg.tipo !== TipoAsistencia.ESCUELA_LIDERES &&
+            segundos_dia === 0;
+          const horas_dia_hms = es_abierto
+            ? 'En curso'
+            : formatearSegundosAHhmmss(segundos_dia);
 
           const tipo_etiqueta_map: Record<string, string> = {
             [TipoAsistencia.PRACTICAS]: 'Prácticas Preprofesionales',
@@ -1421,19 +1558,23 @@ export class AsistenciaServicio {
             [TipoAsistencia.ACCIONES_SERVICIO]: 'Acciones de Servicio',
           };
 
-          let sede = sede_practicas;
+          let sede = reg.bloque || sede_practicas;
           if (reg.tipo === TipoAsistencia.ESCUELA_LIDERES) {
-            sede = 'Sede Central Diaconía';
+            sede = reg.bloque || 'Sede Central Diaconía';
           } else if (reg.tipo === TipoAsistencia.ACCIONES_SERVICIO) {
-            sede = sede_iglesia;
+            sede = reg.bloque || sede_iglesia;
           }
 
-          const hora_entrada = reg.hora_ingreso ? reg.hora_ingreso.substring(0, 5) : '08:00';
-          const hora_salida = reg.hora_salida
-            ? reg.hora_salida.substring(0, 5)
-            : reg.tipo === TipoAsistencia.ESCUELA_LIDERES
-            ? '17:30'
-            : '12:15';
+          const hora_entrada = this.normalizarHoraTexto(reg.hora_ingreso) || '08:00:00';
+          const hora_salida = this.normalizarHoraTexto(reg.hora_salida);
+          const distancia_calculada = this.calcularDistanciaRegistro(reg, becario);
+          const distancia_metros = tiene_permiso
+            ? 0
+            : distancia_calculada !== null
+            ? distancia_calculada
+            : reg.dentro_de_radio === false
+            ? 150
+            : 0;
 
           movimientos_mes.push({
             id: reg.id,
@@ -1447,12 +1588,18 @@ export class AsistenciaServicio {
             sede,
             hora_entrada,
             hora_salida,
-            horas_dia: Number(horas_dia.toFixed(2)),
+            horas_dia,
+            segundos_dia,
+            horas_dia_hms,
             saldo_acumulado: 0,
+            saldo_acumulado_segundos: 0,
+            saldo_acumulado_hms: '00:00:00',
             minutos_retraso: tiene_permiso ? 0 : reg.minutos_retraso || 0,
             dentro_de_radio: tiene_permiso ? true : (reg.dentro_de_radio ?? true),
-            distancia_metros: (tiene_permiso || reg.dentro_de_radio) ? 12 : 185,
-            estado: (tiene_permiso || reg.hora_salida) ? 'completado' : 'en_curso',
+            distancia_metros,
+            lat_ingreso: reg.lat_ingreso ?? null,
+            lng_ingreso: reg.lng_ingreso ?? null,
+            estado: tiene_permiso || reg.hora_salida ? 'completado' : 'en_curso',
             estado_aprobacion: tiene_permiso
               ? EstadoAprobacionAsistencia.APROBADO_ADMINISTRACION
               : reg.estado_aprobacion || EstadoAprobacionAsistencia.APROBADO_ADMINISTRACION,
@@ -1463,23 +1610,32 @@ export class AsistenciaServicio {
       let id_sintetico = 90000;
       for (const f_perm of set_permisos_mes) {
         if (fechas_registradas_mes.has(f_perm)) continue;
-        const [anio_p, mes_p, dia_p] = f_perm.split('-');
-        const dt_p = new Date(Date.UTC(Number(anio_p), Number(mes_p) - 1, Number(dia_p), 12, 0, 0));
+        const [anio_perm, mes_perm, dia_perm] = f_perm.split('-');
+        const dt_p = new Date(
+          Date.UTC(Number(anio_perm), Number(mes_perm) - 1, Number(dia_perm), 12, 0, 0),
+        );
+        const segs_permiso = 4 * 3600;
         movimientos_mes.push({
           id: id_sintetico++,
           fecha: f_perm,
-          fecha_corta: `${dia_p}-${mes_p}`,
+          fecha_corta: `${dia_perm}-${mes_perm}`,
           dia_semana: NOMBRES_DIAS_SEMANA[dt_p.getUTCDay()],
           tipo: TipoAsistencia.PRACTICAS,
           tipo_etiqueta: 'Permiso Aprobado (Compensado 100%)',
           sede: sede_practicas,
-          hora_entrada: '08:00',
-          hora_salida: '12:00',
+          hora_entrada: '08:00:00',
+          hora_salida: '12:00:00',
           horas_dia: 4.0,
+          segundos_dia: segs_permiso,
+          horas_dia_hms: formatearSegundosAHhmmss(segs_permiso),
           saldo_acumulado: 0,
+          saldo_acumulado_segundos: 0,
+          saldo_acumulado_hms: '00:00:00',
           minutos_retraso: 0,
           dentro_de_radio: true,
           distancia_metros: 0,
+          lat_ingreso: null,
+          lng_ingreso: null,
           estado: 'completado',
           estado_aprobacion: EstadoAprobacionAsistencia.APROBADO_ADMINISTRACION,
         });
@@ -1489,21 +1645,30 @@ export class AsistenciaServicio {
 
       movimientos_mes.sort((a, b) => a.fecha.localeCompare(b.fecha));
 
-      let saldo_progresivo = 0;
+      let saldo_segundos_progresivo = 0;
       for (const mov of movimientos_mes) {
-        if (mov.tipo !== TipoAsistencia.ESCUELA_LIDERES || mov.horas_dia > 0) {
-          saldo_progresivo = Number((saldo_progresivo + mov.horas_dia).toFixed(2));
+        if (mov.tipo !== TipoAsistencia.ESCUELA_LIDERES || mov.segundos_dia > 0) {
+          saldo_segundos_progresivo += mov.segundos_dia;
         }
-        mov.saldo_acumulado = saldo_progresivo;
+        mov.saldo_acumulado_segundos = saldo_segundos_progresivo;
+        mov.saldo_acumulado_hms = formatearSegundosAHhmmss(saldo_segundos_progresivo);
+        mov.saldo_acumulado = Number((saldo_segundos_progresivo / 3600).toFixed(2));
       }
 
-      const horas_acumuladas = movimientos_mes[movimientos_mes.length - 1].saldo_acumulado;
-
-      const diferencia_horas = Number((horas_acumuladas - META_HORAS_MENSUAL).toFixed(2));
-      const porcentaje_cumplimiento = Math.round((horas_acumuladas / META_HORAS_MENSUAL) * 100);
+      const segundos_acumulados = saldo_segundos_progresivo;
+      const horas_acumuladas = Number((segundos_acumulados / 3600).toFixed(2));
+      const diferencia_segundos = segundos_acumulados - META_SEGUNDOS_MENSUAL;
+      const diferencia_horas = Number((diferencia_segundos / 3600).toFixed(2));
+      const diferencia_hms =
+        diferencia_segundos === 0
+          ? '00:00:00'
+          : `${diferencia_segundos < 0 ? '-' : '+'}${formatearSegundosAHhmmss(Math.abs(diferencia_segundos))}`;
+      const porcentaje_cumplimiento = Math.round(
+        (segundos_acumulados / META_SEGUNDOS_MENSUAL) * 100,
+      );
 
       let estado_meta: 'cumplido' | 'en_progreso' | 'en_riesgo' = 'en_progreso';
-      if (horas_acumuladas >= META_HORAS_MENSUAL) {
+      if (segundos_acumulados >= META_SEGUNDOS_MENSUAL) {
         estado_meta = 'cumplido';
       } else if (periodo >= clave_mes_actual) {
         estado_meta = 'en_progreso';
@@ -1520,9 +1685,15 @@ export class AsistenciaServicio {
       todos_los_extractos.push({
         periodo,
         mes_nombre,
+        fecha_inicio_corte,
+        fecha_fin_corte,
         horas_acumuladas,
+        segundos_acumulados,
+        horas_acumuladas_hms: formatearSegundosAHhmmss(segundos_acumulados),
         meta_horas: META_HORAS_MENSUAL,
+        meta_horas_hms: formatearSegundosAHhmmss(META_SEGUNDOS_MENSUAL),
         diferencia_horas,
+        diferencia_hms,
         porcentaje_cumplimiento,
         estado_meta,
         jornadas_totales: movimientos_mes.length,
@@ -1547,16 +1718,24 @@ export class AsistenciaServicio {
       );
     }
 
-    const suma_total = todos_los_extractos.reduce((acc, curr) => acc + curr.horas_acumuladas, 0);
+    const total_segundos_gestion = todos_los_extractos.reduce(
+      (acc, curr) => acc + curr.segundos_acumulados,
+      0,
+    );
     const meses_totales = todos_los_extractos.length || 1;
-    const promedio = suma_total / meses_totales;
+    const promedio_segundos = Math.round(total_segundos_gestion / meses_totales);
+    const suma_total = total_segundos_gestion / 3600;
+    const promedio = promedio_segundos / 3600;
     const total_dias_permiso_gestion = todas_fechas_permiso.size;
     const total_horas_compensadas_gestion = Number((total_dias_permiso_gestion * 4.0).toFixed(2));
 
     return {
       becario_id: becario?.id || identificador,
       total_horas_gestion: Number(suma_total.toFixed(2)),
+      total_segundos_gestion,
+      total_horas_gestion_hms: formatearSegundosAHhmmss(total_segundos_gestion),
       promedio_mensual: Number(promedio.toFixed(2)),
+      promedio_mensual_hms: formatearSegundosAHhmmss(promedio_segundos),
       total_meses: extractos_filtrados.length,
       dias_permiso_aprobado: total_dias_permiso_gestion,
       horas_compensadas_permiso: total_horas_compensadas_gestion,

@@ -899,15 +899,19 @@ describe('PdfServicio - Planillas Oficiales de Donación (Refrigerio y Transport
         expect(parseado).toEqual({
           anio: 2026,
           mes_num: 12,
-          fecha_inicio: '2026-12-01',
-          fecha_fin: '2026-12-31',
+          fecha_inicio: '2026-11-24',
+          fecha_fin: '2026-12-23',
           mes_nombre: 'Diciembre 2026',
         });
         expect(servicio.resolverNombreMesPlanilla({})).toBe('Diciembre');
 
-        jest.setSystemTime(new Date('2026-12-01T02:00:00.000Z')); // 30 nov 22:00 en Bolivia
+        jest.setSystemTime(new Date('2026-11-24T02:00:00.000Z')); // 23 nov 22:00 en Bolivia -> Noviembre 2026
         expect(servicio.parsearMes().mes_nombre).toBe('Noviembre 2026');
         expect(servicio.resolverNombreMesPlanilla({})).toBe('Noviembre');
+
+        jest.setSystemTime(new Date('2026-11-24T12:00:00.000Z')); // 24 nov 08:00 en Bolivia -> Diciembre 2026
+        expect(servicio.parsearMes().mes_nombre).toBe('Diciembre 2026');
+        expect(servicio.resolverNombreMesPlanilla({})).toBe('Diciembre');
       } finally {
         jest.useRealTimers();
       }
