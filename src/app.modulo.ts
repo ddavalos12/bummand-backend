@@ -39,6 +39,7 @@ import { AsistenciaEvento } from './modulos/eventos/entidades/asistencia-evento.
 import { Justificacion } from './modulos/justificaciones/entidades/justificacion.entidad';
 import { Multa } from './modulos/asistencia/entidades/multa.entidad';
 import { Refrigerio } from './modulos/refrigerios/entidades/refrigerio.entidad';
+import { RecorridoGpsPrueba } from './modulos/recorridos-gps-prueba/entidades/recorrido-gps-prueba.entidad';
 
 import { AlmacenamientoModulo } from './modulos/almacenamiento/almacenamiento.modulo';
 import { UsuariosModulo } from './modulos/usuarios/usuarios.modulo';
@@ -60,6 +61,7 @@ import { DatosModulo } from './datos/datos.modulo';
 import { TiempoRealModulo } from './modulos/tiempo-real/tiempo-real.modulo';
 import { BibliaModulo } from './modulos/biblia/biblia.modulo';
 import { RefrigeriosModulo } from './modulos/refrigerios/refrigerios.modulo';
+import { RecorridosGpsPruebaModulo } from './modulos/recorridos-gps-prueba/recorridos-gps-prueba.modulo';
 
 const ENTIDADES_BUMAND = [
   Usuario,
@@ -96,6 +98,7 @@ const ENTIDADES_BUMAND = [
   Justificacion,
   Multa,
   Refrigerio,
+  RecorridoGpsPrueba,
 ];
 
 @Module({
@@ -191,6 +194,7 @@ const ENTIDADES_BUMAND = [
     TiempoRealModulo,
     BibliaModulo,
     RefrigeriosModulo,
+    RecorridosGpsPruebaModulo,
   ],
   controllers: [AppControlador],
   providers: [AppServicio],

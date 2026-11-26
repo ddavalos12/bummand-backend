@@ -62,4 +62,8 @@ export class TiempoRealGateway
   notificarRefrigerio(datos_refrigerio: unknown) {
     this.emitirSeguro('refrigerio_actualizado', datos_refrigerio);
   }
+
+  notificarRecorridoGpsPrueba(datos_recorrido: unknown) {
+    this.emitirSeguro('recorrido_gps_prueba_actualizado', datos_recorrido);
+  }
 }

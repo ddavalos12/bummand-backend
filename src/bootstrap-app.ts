@@ -158,6 +158,10 @@ export async function configurarAplicacion(
         'Consolidado analítico de horas, presupuesto del 80% y rankings',
       )
       .addTag('PDF', 'Generación headless de reportes oficiales certificados en PDF')
+      .addTag(
+        'Recorridos GPS (Prueba)',
+        'Módulo temporal de verificación de trazabilidad GPS, reloj monotónico, integridad SHA-256 y anti-fraude',
+      )
       .build();
 
     const documento_swagger = SwaggerModule.createDocument(
