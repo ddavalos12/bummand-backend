@@ -116,18 +116,22 @@ export class RecorridosGpsPruebaServicio {
       });
     }
 
-    const punto_desfase = puntos_ordenados.find(
-      (p) =>
-        p.desfase_reloj_gps_seg !== undefined &&
-        p.desfase_reloj_gps_seg !== null &&
-        Math.abs(p.desfase_reloj_gps_seg) > UMBRAL_DESFASE_RELOJ_GPS_SEG,
-    );
+    const punto_desfase = puntos_ordenados.find((p) => {
+      const desfase = p.desfase_reloj_gps_seg ?? p.desfase_reloj_seg;
+      return (
+        desfase !== undefined &&
+        desfase !== null &&
+        Math.abs(desfase) > UMBRAL_DESFASE_RELOJ_GPS_SEG
+      );
+    });
     if (punto_desfase) {
+      const desfase_valor =
+        punto_desfase.desfase_reloj_gps_seg ?? punto_desfase.desfase_reloj_seg;
       alertas.push({
         codigo: 'DESFASE_RELOJ_GPS',
         severidad: 'alta',
         secuencia: punto_desfase.secuencia,
-        mensaje: `Desfase entre reloj del dispositivo y tiempo satelital GPS superior a ${UMBRAL_DESFASE_RELOJ_GPS_SEG}s (${punto_desfase.desfase_reloj_gps_seg}s).`,
+        mensaje: `Desfase entre reloj del dispositivo y tiempo satelital GPS superior a ${UMBRAL_DESFASE_RELOJ_GPS_SEG}s (${desfase_valor}s).`,
       });
     }
 
@@ -246,9 +250,27 @@ export class RecorridosGpsPruebaServicio {
     let distancia_acumulada_m = 0;
     const puntos_guardados: PuntoGpsPruebaGuardado[] = puntos_ordenados.map(
       (punto, idx) => {
+        const punto_normalizado: PuntoGpsPruebaDto = {
+          secuencia: punto.secuencia,
+          latitud: punto.latitud,
+          longitud: punto.longitud,
+          precision_m: punto.precision_m,
+          altitud_m: punto.altitud_m,
+          velocidad_ms: punto.velocidad_ms ?? punto.velocidad_mps,
+          rumbo_grados: punto.rumbo_grados,
+          hora_dispositivo_iso: punto.hora_dispositivo_iso,
+          hora_gps_iso: punto.hora_gps_iso,
+          reloj_monotonico_ms: punto.reloj_monotonico_ms,
+          desfase_reloj_gps_seg:
+            punto.desfase_reloj_gps_seg ?? punto.desfase_reloj_seg,
+          es_ubicacion_simulada: punto.es_ubicacion_simulada,
+          modo_captura: punto.modo_captura,
+          hash_punto: punto.hash_punto,
+        };
+
         if (idx === 0) {
           return {
-            ...punto,
+            ...punto_normalizado,
             distancia_tramo_anterior_m: 0,
             velocidad_tramo_kmh: 0,
           };
@@ -270,7 +292,7 @@ export class RecorridosGpsPruebaServicio {
         const velocidad_kmh = (distancia_tramo / delta_seg) * 3.6;
 
         return {
-          ...punto,
+          ...punto_normalizado,
           distancia_tramo_anterior_m: Number(distancia_tramo.toFixed(2)),
           velocidad_tramo_kmh: Number(velocidad_kmh.toFixed(2)),
         };

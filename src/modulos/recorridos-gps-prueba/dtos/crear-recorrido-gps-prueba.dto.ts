@@ -50,6 +50,11 @@ export class PuntoGpsPruebaDto {
   @IsNumber()
   velocidad_ms?: number;
 
+  @ApiPropertyOptional({ example: 1.45 })
+  @IsOptional()
+  @IsNumber()
+  velocidad_mps?: number;
+
   @ApiPropertyOptional({ example: 180.0 })
   @IsOptional()
   @IsNumber()
@@ -74,6 +79,11 @@ export class PuntoGpsPruebaDto {
   @IsInt()
   desfase_reloj_gps_seg?: number;
 
+  @ApiPropertyOptional({ example: 2 })
+  @IsOptional()
+  @IsInt()
+  desfase_reloj_seg?: number;
+
   @ApiProperty({ example: false })
   @IsBoolean()
   es_ubicacion_simulada: boolean;
@@ -89,6 +99,12 @@ export class PuntoGpsPruebaDto {
   @IsString()
   @MaxLength(128)
   hash_punto?: string;
+
+  @ApiPropertyOptional({ maxLength: 128 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  hash_anterior?: string;
 }
 
 export class CrearRecorridoGpsPruebaDto {
