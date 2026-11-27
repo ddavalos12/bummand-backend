@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DashboardServicio } from './dashboard.servicio';
-import { RegistroAsistencia } from '../asistencia/entidades/registro-asistencia.entidad';
+import { RegistroAsistencia, TipoAsistencia } from '../asistencia/entidades/registro-asistencia.entidad';
 import { SolicitudPasajes, EstadoSolicitud } from '../pasajes/entidades/solicitud-pasaje.entidad';
 import { Becario } from '../becarios/entidades/becario.entidad';
 import { Evaluacion } from '../evaluaciones/entidades/evaluacion.entidad';
@@ -219,6 +219,39 @@ describe('DashboardServicio', () => {
       const semana = await servicio.obtenerSeguimientoSemanal(undefined, '2026-10-12');
       expect(semana.semana_inicio).toBe('2026-10-12');
       expect(semana.semana_fin).toBe('2026-10-18');
+    });
+
+    it('incluye tipo y sede reales en becarios_con_retraso para Escuela de Líderes', async () => {
+      becario_repo.find.mockResolvedValue([
+        { id: 10, carrera: 'Contaduría Pública', unidad: 'Seguros', usuario: { nombre: 'Mariela Jimenez' } },
+      ]);
+      const qb_mock = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          {
+            id: 68,
+            becario_id: 10,
+            tipo: TipoAsistencia.ESCUELA_LIDERES,
+            bloque: 'Escuela de Líderes Diaconales',
+            hora_ingreso: '14:45:02',
+            hora_prevista: '14:30',
+            minutos_retraso: 15,
+            dentro_de_horario: false,
+            fecha: new Date('2026-11-27'),
+          },
+        ]),
+      };
+      asistencia_repo.createQueryBuilder.mockReturnValue(qb_mock);
+
+      const semana = await servicio.obtenerSeguimientoSemanal(undefined, '2026-11-27');
+      expect(semana.becarios_con_retraso).toHaveLength(1);
+      expect(semana.becarios_con_retraso[0].tipo).toBe(TipoAsistencia.ESCUELA_LIDERES);
+      expect(semana.becarios_con_retraso[0].tipo_actividad).toBe('escuela_lideres');
+      expect(semana.becarios_con_retraso[0].sede).toBe('Escuela de Líderes Diaconales');
+      expect(semana.becarios_con_retraso[0].hora_prevista).toBe('14:30');
     });
   });
 });

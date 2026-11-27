@@ -78,7 +78,11 @@ export interface InfoBecarioResumen {
 }
 
 export interface ItemBecarioConRetraso {
+  asistencia_id?: number;
   becario: InfoBecarioResumen;
+  tipo?: TipoAsistencia;
+  tipo_actividad?: string;
+  sede?: string;
   hora_ingreso: string;
   hora_prevista: string;
   minutos_retraso: number;
@@ -573,7 +577,13 @@ export class DashboardServicio {
       if (tiene_retraso && a.hora_ingreso) {
         const b = mapa_becarios.get(a.becario_id) || a.becario;
         const minutos = a.minutos_retraso > 0 ? a.minutos_retraso : 1;
+        const tipo_reg = a.tipo || TipoAsistencia.PRACTICAS;
+        const sede_reg =
+          tipo_reg === TipoAsistencia.ESCUELA_LIDERES
+            ? a.bloque || 'Escuela de Líderes Diaconales'
+            : a.bloque || b?.unidad || 'Oficina Central';
         becarios_con_retraso.push({
+          asistencia_id: a.id,
           becario: {
             id: b ? b.id : a.becario_id,
             nombre: b?.usuario?.nombre || b?.nombre || `Becario #${a.becario_id}`,
@@ -581,8 +591,13 @@ export class DashboardServicio {
             universidad: b?.universidad || 'Universidad',
             unidad: b?.unidad || null,
           },
+          tipo: tipo_reg,
+          tipo_actividad: tipo_reg,
+          sede: sede_reg,
           hora_ingreso: a.hora_ingreso,
-          hora_prevista: a.hora_prevista || '08:00',
+          hora_prevista:
+            a.hora_prevista ||
+            (tipo_reg === TipoAsistencia.ESCUELA_LIDERES ? '14:30' : '08:00'),
           minutos_retraso: a.minutos_retraso || minutos,
           fecha: f_str,
         });
