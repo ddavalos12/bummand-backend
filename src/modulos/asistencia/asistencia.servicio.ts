@@ -7,7 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { RegistroAsistencia, TipoAsistencia, EstadoAprobacionAsistencia } from './entidades/registro-asistencia.entidad';
 import { Multa } from './entidades/multa.entidad';
 import { CoordenadasDto } from './dtos/coordenadas.dto';
@@ -529,6 +529,14 @@ export class AsistenciaServicio {
 
     const evaluacion_horario = this.verificarPuntualidad(tipo, becario, ahora);
 
+    const bloque_efectivo =
+      dto.bloque ||
+      (tipo === TipoAsistencia.ESCUELA_LIDERES
+        ? 'Escuela de Líderes Diaconales'
+        : tipo === TipoAsistencia.ACCIONES_SERVICIO
+          ? nombre_recinto_objetivo
+          : null);
+
     const registro = this.asistenciaRepositorio.create({
       becario_id: becario.id,
       tipo,
@@ -536,7 +544,7 @@ export class AsistenciaServicio {
       hora_ingreso: bo.hora_hhmmss,
       lat_ingreso: dto.latitud,
       lng_ingreso: dto.longitud,
-      bloque: dto.bloque || null,
+      bloque: bloque_efectivo,
       confirmado_organizador: false,
       dentro_de_radio,
       dentro_de_horario: evaluacion_horario.dentro,
@@ -801,6 +809,10 @@ export class AsistenciaServicio {
       minutos_retraso: 0,
       confirmado_organizador: true,
       es_registro_manual: true,
+      bloque:
+        tipo === TipoAsistencia.ESCUELA_LIDERES
+          ? 'Escuela de Líderes Diaconales'
+          : null,
       motivo_contingencia:
         dto.motivo_contingencia ||
         dto.motivoContingencia ||
@@ -932,17 +944,88 @@ export class AsistenciaServicio {
     return tiene_permiso ? 4 * 3600 : 0;
   }
 
-  private enriquecerRegistros(registros: RegistroAsistencia[]): RegistroAsistencia[] {
+  private async enriquecerRegistros(registros: RegistroAsistencia[]): Promise<RegistroAsistencia[]> {
+    if (!registros || registros.length === 0) {
+      return registros;
+    }
+
+    const mapa_multas = new Map<number, Multa>();
+    if (this.multaRepositorio && typeof this.multaRepositorio.find === 'function') {
+      try {
+        const ids = registros.map((r) => r.id).filter((id) => typeof id === 'number' && id > 0);
+        if (ids.length > 0) {
+          const multas = (await this.multaRepositorio.find({
+            where: { asistencia_id: In(ids) },
+          })) || [];
+          for (const multa of multas) {
+            if (multa.asistencia_id) {
+              mapa_multas.set(multa.asistencia_id, multa);
+            }
+          }
+        }
+      } catch {
+        // Silencioso si la relación o repositorio no están disponibles en entorno de prueba
+      }
+    }
+
     for (const registro of registros) {
       const dist = this.calcularDistanciaRegistro(registro, registro.becario);
       const segs = this.calcularSegundosRegistro(registro, false);
       const extra = registro as unknown as Record<string, unknown>;
+      const tipo_reg = registro.tipo || TipoAsistencia.PRACTICAS;
+
+      let es_viernes = false;
+      if (registro.fecha) {
+        const fecha_iso =
+          registro.fecha instanceof Date
+            ? registro.fecha.toISOString().substring(0, 10)
+            : String(registro.fecha).substring(0, 10);
+        const [anio_f, mes_f, dia_f] = fecha_iso.split('-').map(Number);
+        if (!Number.isNaN(anio_f) && !Number.isNaN(mes_f) && !Number.isNaN(dia_f)) {
+          es_viernes = new Date(Date.UTC(anio_f, mes_f - 1, dia_f, 12, 0, 0)).getUTCDay() === 5;
+        }
+      }
+
+      const sede_nombre =
+        tipo_reg === TipoAsistencia.ESCUELA_LIDERES
+          ? registro.bloque || 'Escuela de Líderes Diaconales'
+          : tipo_reg === TipoAsistencia.ACCIONES_SERVICIO
+            ? registro.bloque || registro.becario?.iglesia?.nombre || 'Acción de Servicio Diaconal'
+            : registro.bloque ||
+              registro.becario?.lugar_practica?.nombre ||
+              'Oficina Central Diaconía IFD - El Alto';
+
+      const multa_asociada = mapa_multas.get(registro.id);
+      const aprobado_admin =
+        registro.estado_aprobacion === EstadoAprobacionAsistencia.APROBADO_ADMINISTRACION;
+      let monto_multa_bs = 0;
+      let exime_multa = false;
+
+      if (aprobado_admin) {
+        monto_multa_bs = 0;
+        exime_multa = true;
+      } else if (multa_asociada) {
+        monto_multa_bs = Number(multa_asociada.monto_bs || 0);
+        exime_multa = monto_multa_bs === 0 && (registro.minutos_retraso || 0) > 0;
+      } else if (
+        tipo_reg === TipoAsistencia.ESCUELA_LIDERES &&
+        es_viernes &&
+        (registro.minutos_retraso || 0) > 0
+      ) {
+        monto_multa_bs = this.calcularMultaEscuelaLideres(registro.minutos_retraso).monto_bs;
+      }
+
       if (dist !== null) {
         extra.distancia_ingreso_m = dist;
       }
+      extra.tipo_actividad = tipo_reg;
+      extra.sede_nombre = sede_nombre;
+      extra.es_viernes = es_viernes;
+      extra.monto_multa_bs = monto_multa_bs;
+      extra.exime_multa = exime_multa;
       extra.segundos_trabajados = segs;
       extra.horas_trabajadas_hms =
-        registro.hora_salida || segs > 0 || registro.tipo === TipoAsistencia.ESCUELA_LIDERES
+        registro.hora_salida || segs > 0 || tipo_reg === TipoAsistencia.ESCUELA_LIDERES
           ? formatearSegundosAHhmmss(segs)
           : 'En curso';
     }

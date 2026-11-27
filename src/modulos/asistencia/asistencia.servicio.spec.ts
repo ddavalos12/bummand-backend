@@ -776,4 +776,39 @@ describe('AsistenciaServicio', () => {
       expect(ext_nov?.estado_meta).toBe('en_riesgo');
     });
   });
+
+  describe('Enriquecimiento de tipo_actividad, sede y multa en listado de asistencias', () => {
+    it('enriquece registros de Escuela de Líderes con tipo_actividad, sede_nombre, es_viernes y monto_multa_bs', async () => {
+      becario_repo.findOne.mockResolvedValue({ id: 10, usuario_id: 10 });
+      asistencia_repo.find.mockResolvedValue([
+        {
+          id: 68,
+          becario_id: 10,
+          tipo: TipoAsistencia.ESCUELA_LIDERES,
+          fecha: '2026-11-27',
+          hora_ingreso: '14:45:02',
+          hora_salida: null,
+          minutos_retraso: 15,
+          bloque: null,
+          estado_aprobacion: EstadoAprobacionAsistencia.PENDIENTE,
+          becario: {
+            id: 10,
+            lugar_practica: { nombre: 'Oficina Central Diaconía IFD - El Alto' },
+          },
+        },
+      ]);
+      multa_repo.find.mockResolvedValue([
+        { id: 4, asistencia_id: 68, monto_bs: 20, minutos_retraso: 15 },
+      ]);
+
+      const resultado = await servicio.obtenerPorUsuario(10);
+      const reg = resultado[0] as unknown as Record<string, unknown>;
+
+      expect(reg.tipo_actividad).toBe('escuela_lideres');
+      expect(reg.sede_nombre).toBe('Escuela de Líderes Diaconales');
+      expect(reg.es_viernes).toBe(true);
+      expect(reg.monto_multa_bs).toBe(20);
+      expect(reg.horas_trabajadas_hms).toBe('00:00:00');
+    });
+  });
 });
